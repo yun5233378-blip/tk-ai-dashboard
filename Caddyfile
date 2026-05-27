@@ -1,0 +1,4 @@
+tk-api.void52.site {
+    encode gzip
+    reverse_proxy api:8000
+}

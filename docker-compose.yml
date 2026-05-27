@@ -1,0 +1,50 @@
+services:
+    redis:
+        image: redis:7-alpine
+        container_name: tk-ai-redis
+        restart: unless-stopped
+        command: ["redis-server", "--appendonly", "yes", "--save", "60", "1"]
+        volumes:
+            - redis_data:/data
+        healthcheck:
+            test: ["CMD", "redis-cli", "ping"]
+            interval: 10s
+            timeout: 3s
+            retries: 5
+
+    api:
+        build: .
+        container_name: tk-ai-api
+        restart: unless-stopped
+        env_file:
+            - .env
+        environment:
+            HOST: 0.0.0.0
+            PORT: 8000
+            REDIS_URL: redis://redis:6379/0
+            ALLOW_LOCAL_CORS: "0"
+        expose:
+            - "8000"
+        shm_size: "1gb"
+        depends_on:
+            redis:
+                condition: service_healthy
+
+    caddy:
+        image: caddy:2-alpine
+        container_name: tk-ai-caddy
+        restart: unless-stopped
+        ports:
+            - "80:80"
+            - "443:443"
+        volumes:
+            - ./Caddyfile:/etc/caddy/Caddyfile:ro
+            - caddy_data:/data
+            - caddy_config:/config
+        depends_on:
+            - api
+
+volumes:
+    redis_data:
+    caddy_data:
+    caddy_config:
