@@ -1,0 +1,3770 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TK跨境电商 AI 负面舆情诊断与智能选品系统</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --tk-bg: #F8FAFC;
+            --tk-surface: rgba(255, 255, 255, 0.8);
+            --tk-surface-strong: rgba(255, 255, 255, 0.92);
+            --tk-ink: #0F172A;
+            --tk-muted: #64748B;
+            --tk-line: rgba(226, 232, 240, 0.72);
+            --tk-indigo: #6366F1;
+            --tk-violet: #8B5CF6;
+            --tk-rose: #FB7185;
+            --tk-emerald: #34D399;
+            --tk-ease: cubic-bezier(0.16, 1, 0.3, 1);
+            --tk-card-shadow: 0 1px 3px rgba(0, 0, 0, 0.03), 0 10px 40px -10px rgba(0, 0, 0, 0.04);
+            --tk-card-shadow-hover: 0 20px 50px -12px rgba(99, 102, 241, 0.12), 0 0 26px rgba(139, 92, 246, 0.08);
+        }
+        * {
+            letter-spacing: 0;
+        }
+        body {
+            font-family: 'PingFang SC', 'SF Pro Display', 'Inter', system-ui, sans-serif;
+            background:
+                radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.055) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(236, 72, 153, 0.035) 0px, transparent 50%),
+                radial-gradient(at 72% 8%, rgba(79, 70, 229, 0.045) 0px, transparent 38%),
+                #F8FAFC;
+            color: var(--tk-ink);
+            text-rendering: geometricPrecision;
+        }
+        .app-shell {
+            background-color: #F8FAFC;
+        }
+        .app-header {
+            background: rgba(255, 255, 255, 0.82);
+            border-bottom: 1px solid rgba(226, 232, 240, 0.68);
+            box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+            backdrop-filter: blur(22px) saturate(1.4);
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 350px;
+            max-height: 400px;
+        }
+        @media (min-width: 768px) {
+            .chart-container { height: 400px; }
+        }
+        .nav-btn {
+            border-bottom: 2px solid transparent;
+            border-radius: 999px;
+            padding: 0.48rem 0.7rem;
+        }
+        .nav-active {
+            border-bottom-color: transparent;
+            background: #FFFFFF;
+            color: #4F46E5;
+            font-weight: 700;
+            border: 1px solid rgba(99, 102, 241, 0.14);
+            box-shadow: 0 4px 20px -2px rgba(99, 102, 241, 0.12), 0 2px 6px -1px rgba(99, 102, 241, 0.08);
+        }
+        .glass-card {
+            background: var(--tk-surface);
+            backdrop-filter: blur(20px) saturate(1.25);
+            border: 1px solid rgba(226, 232, 240, 0.6);
+            box-shadow: var(--tk-card-shadow);
+            transition: transform 0.3s var(--tk-ease), box-shadow 0.3s var(--tk-ease), border-color 0.3s var(--tk-ease), background-color 0.3s var(--tk-ease);
+        }
+        .glass-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--tk-card-shadow-hover);
+            border-color: rgba(99, 102, 241, 0.22);
+        }
+        .fade-in {
+            animation: fadeIn 0.42s var(--tk-ease);
+        }
+        .primary-action {
+            background-image: linear-gradient(135deg, #6366F1, #8B5CF6);
+            color: #FFFFFF;
+            box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 18px 42px rgba(99, 102, 241, 0.24);
+            transition: transform 0.25s var(--tk-ease), box-shadow 0.25s var(--tk-ease), filter 0.25s var(--tk-ease);
+        }
+        .primary-action:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12), 0 24px 56px rgba(99, 102, 241, 0.36);
+            filter: saturate(1.08);
+        }
+        .quiet-button {
+            background: rgba(255, 255, 255, 0.82);
+            border: 1px solid rgba(226, 232, 240, 0.78);
+            color: #475569;
+            transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.2s var(--tk-ease);
+        }
+        .quiet-button:hover {
+            background: rgba(248, 250, 252, 0.96);
+            border-color: rgba(129, 140, 248, 0.34);
+            transform: translateY(-1px);
+        }
+        .modal-backdrop {
+            background: rgba(15, 23, 42, 0.4);
+            backdrop-filter: blur(24px) saturate(1.25);
+        }
+        .modal-panel {
+            animation: scaleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+            background: rgba(255, 255, 255, 0.96);
+            border: 1px solid rgba(226, 232, 240, 0.82);
+            box-shadow: 0 28px 90px rgba(15, 23, 42, 0.18), 0 0 0 1px rgba(99, 102, 241, 0.06);
+            opacity: 0;
+            transform: scale(0.95) translateY(8px);
+        }
+        .modal-close {
+            width: 2.25rem;
+            height: 2.25rem;
+            border-radius: 999px;
+            background: rgba(248, 250, 252, 0.95);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+            color: #64748B;
+            line-height: 1;
+            transition: all 0.2s ease;
+        }
+        .modal-close:hover {
+            color: #0F172A;
+            background: rgba(241, 245, 249, 0.96);
+            border-color: rgba(129, 140, 248, 0.35);
+        }
+        .warning-banner {
+            background: linear-gradient(90deg, rgba(255, 241, 242, 0.92), rgba(254, 242, 242, 0.86));
+            border-top: 1px solid rgba(251, 113, 133, 0.18);
+            border-bottom: 1px solid rgba(251, 113, 133, 0.16);
+            color: #9F1239;
+            box-shadow: 0 18px 46px rgba(225, 29, 72, 0.08);
+            backdrop-filter: blur(18px);
+        }
+        .alert-dot {
+            position: relative;
+            width: 0.65rem;
+            height: 0.65rem;
+            margin-top: 0.36rem;
+            flex: none;
+            border-radius: 999px;
+            background: #F43F5E;
+            box-shadow: 0 0 0 7px rgb(244 63 94 / 0.12), 0 0 22px rgb(244 63 94 / 0.36);
+            animation: alertBlink 1.45s ease-in-out infinite;
+        }
+        .critical-light,
+        .normal-light {
+            position: relative;
+            display: inline-flex;
+            width: 0.7rem;
+            height: 0.7rem;
+            margin-top: 0.45rem;
+            flex: none;
+            align-items: center;
+            justify-content: center;
+        }
+        .critical-light::before {
+            content: "";
+            position: absolute;
+            width: 0.7rem;
+            height: 0.7rem;
+            border-radius: 999px;
+            background: #F43F5E;
+            opacity: 0.75;
+            animation: softPulseRing 1.4s cubic-bezier(0, 0, 0.2, 1) infinite;
+        }
+        .critical-light::after {
+            content: "";
+            width: 0.58rem;
+            height: 0.58rem;
+            border-radius: 999px;
+            background: #F43F5E;
+            box-shadow: 0 0 0 3px rgb(244 63 94 / 0.14), 0 0 18px rgb(244 63 94 / 0.55);
+        }
+        .normal-light::after {
+            content: "";
+            width: 0.58rem;
+            height: 0.58rem;
+            border-radius: 999px;
+            background: #34D399;
+            box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.12), 0 0 18px rgba(52, 211, 153, 0.38);
+        }
+        .weighted-badge {
+            position: relative;
+            isolation: isolate;
+            overflow: hidden;
+            border-radius: 999px;
+            border: 1px solid transparent;
+            background:
+                linear-gradient(rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.94)) padding-box,
+                linear-gradient(135deg, #6366F1, #EC4899) border-box;
+            color: #4F46E5;
+            box-shadow: 0 10px 28px rgba(99, 102, 241, 0.16);
+        }
+        .weighted-badge::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            z-index: -1;
+            background: linear-gradient(90deg, rgba(99, 102, 241, 0.16), rgba(236, 72, 153, 0.16));
+        }
+        .brief-glow {
+            position: relative;
+            overflow: hidden;
+            background-image: linear-gradient(135deg, #6366F1, #8B5CF6);
+            box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 18px 34px rgba(99, 102, 241, 0.22);
+        }
+        .brief-glow::before {
+            content: "";
+            position: absolute;
+            inset: -70%;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.42), transparent 42%);
+            animation: briefGlow 3.4s ease-in-out infinite;
+        }
+        .brief-glow > span {
+            position: relative;
+            z-index: 1;
+        }
+        .sps-slider {
+            appearance: none;
+            height: 0.375rem;
+            width: 100%;
+            border-radius: 999px;
+            background: #E2E8F0;
+            outline: none;
+        }
+        .sps-slider::-webkit-slider-thumb {
+            appearance: none;
+            width: 1.125rem;
+            height: 1.125rem;
+            border-radius: 999px;
+            background: #FFFFFF;
+            border: 3px solid #6366F1;
+            box-shadow: 0 4px 10px rgba(99, 102, 241, 0.25);
+            cursor: pointer;
+            transition: transform 0.18s var(--tk-ease), box-shadow 0.18s var(--tk-ease);
+        }
+        .sps-slider::-webkit-slider-thumb:hover {
+            transform: scale(1.1);
+            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+        }
+        .sps-slider::-moz-range-thumb {
+            width: 1.125rem;
+            height: 1.125rem;
+            border-radius: 999px;
+            background: #FFFFFF;
+            border: 3px solid #6366F1;
+            box-shadow: 0 4px 10px rgba(99, 102, 241, 0.25);
+            cursor: pointer;
+            transition: transform 0.18s var(--tk-ease), box-shadow 0.18s var(--tk-ease);
+        }
+        #pipeline-loading-state {
+            transition: opacity 0.28s var(--tk-ease), transform 0.28s var(--tk-ease);
+        }
+        .kicker-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            border-radius: 999px;
+            border: 1px solid rgba(129, 140, 248, 0.22);
+            background: rgba(99, 102, 241, 0.08);
+            color: #4F46E5;
+            padding: 0.32rem 0.64rem;
+            font-size: 0.7rem;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+        .neo-input,
+        input[type="text"],
+        select,
+        textarea {
+            background-color: rgba(255, 255, 255, 0.88) !important;
+            border-color: rgba(226, 232, 240, 0.82) !important;
+            color: #0F172A !important;
+        }
+        .neo-input::placeholder,
+        input[type="text"]::placeholder,
+        textarea::placeholder {
+            color: #64748B !important;
+        }
+        .neo-input:focus,
+        input[type="text"]:focus,
+        select:focus,
+        textarea:focus {
+            border-color: rgba(129, 140, 248, 0.58) !important;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.16) !important;
+        }
+        .dark-panel {
+            background: rgba(255, 255, 255, 0.72) !important;
+            border-color: rgba(226, 232, 240, 0.78) !important;
+        }
+        .dark-table {
+            background: rgba(255, 255, 255, 0.74) !important;
+        }
+        .dark-table thead {
+            background: rgba(248, 250, 252, 0.96) !important;
+        }
+        .dark-table tbody {
+            background: transparent !important;
+        }
+        .dark-table th {
+            color: #64748B !important;
+            border-color: rgba(226, 232, 240, 0.76) !important;
+        }
+        .dark-table td {
+            border-color: rgba(226, 232, 240, 0.7) !important;
+        }
+        .text-slate-900,
+        .text-slate-800,
+        .text-slate-700 {
+            color: #0F172A !important;
+        }
+        .text-slate-600,
+        .text-slate-500,
+        .text-slate-400 {
+            color: #64748B !important;
+        }
+        .bg-white {
+            background-color: rgba(255, 255, 255, 0.84) !important;
+        }
+        .bg-slate-50,
+        .bg-slate-100,
+        .bg-slate-700 {
+            background-color: rgba(248, 250, 252, 0.94) !important;
+        }
+        .bg-indigo-50,
+        .bg-indigo-100,
+        .bg-indigo-600,
+        .bg-purple-50,
+        .bg-violet-50 {
+            background-color: rgba(99, 102, 241, 0.12) !important;
+        }
+        .bg-emerald-50,
+        .bg-emerald-100 {
+            background-color: rgba(16, 185, 129, 0.1) !important;
+        }
+        .bg-rose-50,
+        .bg-rose-100,
+        .bg-rose-600 {
+            background-color: rgba(244, 63, 94, 0.12) !important;
+        }
+        .bg-amber-50,
+        .bg-amber-100 {
+            background-color: rgba(245, 158, 11, 0.12) !important;
+        }
+        .text-indigo-900,
+        .text-indigo-800,
+        .text-indigo-700,
+        .text-indigo-600 {
+            color: #4F46E5 !important;
+        }
+        .text-purple-950,
+        .text-purple-900,
+        .text-purple-800,
+        .text-purple-700 {
+            color: #6D28D9 !important;
+        }
+        .text-emerald-800,
+        .text-emerald-700,
+        .text-emerald-600,
+        .text-emerald-500 {
+            color: #047857 !important;
+        }
+        .text-rose-800,
+        .text-rose-700,
+        .text-rose-600,
+        .text-rose-500 {
+            color: #E11D48 !important;
+        }
+        .text-amber-800,
+        .text-amber-700,
+        .text-amber-500 {
+            color: #B45309 !important;
+        }
+        .border-slate-100,
+        .border-slate-200,
+        .border-slate-300,
+        .border-slate-600,
+        .border-indigo-100,
+        .border-indigo-500,
+        .border-emerald-100,
+        .border-rose-100,
+        .border-amber-100,
+        .border-purple-100,
+        .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
+        .divide-slate-200 > :not([hidden]) ~ :not([hidden]) {
+            border-color: rgba(226, 232, 240, 0.72) !important;
+        }
+        [class*="border-white/"],
+        [class*="border-purple-400/"],
+        [class*="border-indigo-400/"],
+        [class*="border-emerald-400/"],
+        [class*="border-rose-400/"],
+        [class*="border-amber-400/"] {
+            border-color: rgba(226, 232, 240, 0.72) !important;
+        }
+        [class*="bg-slate-950/"],
+        [class*="bg-slate-900/"] {
+            background-color: rgba(255, 255, 255, 0.68) !important;
+        }
+        [class*="bg-purple-500/"],
+        [class*="bg-indigo-500/"] {
+            background-color: rgba(99, 102, 241, 0.08) !important;
+        }
+        [class*="bg-emerald-500/"] {
+            background-color: rgba(16, 185, 129, 0.08) !important;
+        }
+        [class*="bg-rose-500/"] {
+            background-color: rgba(244, 63, 94, 0.08) !important;
+        }
+        [class*="bg-amber-500/"] {
+            background-color: rgba(245, 158, 11, 0.08) !important;
+        }
+        [class*="text-purple-100"],
+        [class*="text-purple-200"] {
+            color: #6D28D9 !important;
+        }
+        [class*="text-indigo-100"],
+        [class*="text-indigo-200"] {
+            color: #4F46E5 !important;
+        }
+        [class*="text-emerald-100"],
+        [class*="text-emerald-200"] {
+            color: #047857 !important;
+        }
+        [class*="text-rose-100"],
+        [class*="text-rose-200"] {
+            color: #E11D48 !important;
+        }
+        [class*="text-amber-100"],
+        [class*="text-amber-200"] {
+            color: #B45309 !important;
+        }
+        [class*="hover:bg-slate-50"]:hover,
+        [class*="hover:bg-rose-50"]:hover,
+        [class*="hover:bg-indigo-50"]:hover,
+        [class*="hover:bg-indigo-100"]:hover,
+        [class*="hover:bg-slate-200"]:hover {
+            background-color: rgba(99, 102, 241, 0.08) !important;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes scaleIn {
+            from { opacity: 0; transform: scale(0.95) translateY(8px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        @keyframes softPulseRing {
+            75%, 100% { transform: scale(2.25); opacity: 0; }
+        }
+        @keyframes alertBlink {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.45; transform: scale(0.82); }
+        }
+        @keyframes briefGlow {
+            0%, 100% { transform: translateX(-18%) translateY(8%) scale(0.9); opacity: 0.38; }
+            50% { transform: translateX(32%) translateY(-4%) scale(1.08); opacity: 0.76; }
+        }
+        @keyframes loginShake {
+            0%, 100% { transform: translateX(0); }
+            20% { transform: translateX(-8px); }
+            40% { transform: translateX(8px); }
+            60% { transform: translateX(-5px); }
+            80% { transform: translateX(5px); }
+        }
+        .login-card {
+            background: rgba(255, 255, 255, 0.82);
+            backdrop-filter: blur(28px) saturate(1.35);
+            border: 1px solid rgba(226, 232, 240, 0.82);
+            box-shadow: 0 32px 90px rgba(15, 23, 42, 0.18), 0 0 0 1px rgba(255, 255, 255, 0.72), 0 28px 80px rgba(99, 102, 241, 0.14);
+            animation: scaleIn 0.34s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+            opacity: 0;
+            transform: scale(0.95) translateY(8px);
+        }
+        .login-card.shake {
+            animation: loginShake 0.35s ease;
+        }
+    </style>
+</head>
+<body class="app-shell min-h-screen flex flex-col bg-slate-50 text-slate-900 antialiased">
+
+    <div id="login-screen" class="fixed inset-0 z-[120] hidden items-center justify-center bg-slate-950/25 backdrop-blur-xl p-4">
+        <div class="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(99,102,241,0.18),transparent_34%),radial-gradient(circle_at_72%_82%,rgba(139,92,246,0.14),transparent_36%),#F8FAFC]"></div>
+        <form id="login-form" class="login-card relative rounded-2xl w-full max-w-sm p-7 md:p-8">
+            <div class="mb-7 text-center">
+                <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white shadow-[0_18px_48px_rgba(99,102,241,0.18)] text-3xl">✨</div>
+                <div class="flex justify-center gap-2 mb-3">
+                    <span class="kicker-pill">[SECURED]</span>
+                    <span class="kicker-pill">[PLATINUM]</span>
+                </div>
+                <h2 class="text-xl font-black text-slate-900">TK-AI 安全登入</h2>
+                <p class="mt-2 text-xs font-semibold text-slate-400">Operator Console Access</p>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1">账号</label>
+                    <input id="login-username" type="text" autocomplete="username" value="admin" class="neo-input w-full px-3.5 py-2.5 rounded-lg text-sm focus:outline-none transition-all">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1">密码</label>
+                    <input id="login-password" type="password" autocomplete="current-password" class="neo-input w-full px-3.5 py-2.5 rounded-lg text-sm focus:outline-none transition-all">
+                </div>
+                <div id="login-error" class="hidden rounded-lg border border-rose-100 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700"></div>
+            </div>
+            <button id="btn-login-submit" type="submit" class="primary-action mt-6 w-full px-5 py-2.5 rounded-lg text-sm font-bold flex items-center justify-center gap-2">
+                <span id="login-spinner" class="hidden w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                安全登入
+            </button>
+        </form>
+    </div>
+
+    <div id="toast" class="fixed bottom-5 right-5 transform translate-y-20 opacity-0 transition-all duration-300 px-5 py-3.5 rounded-lg border border-white/70 shadow-[0_18px_55px_rgba(15,23,42,0.16)] z-[100] flex items-center gap-2.5 font-medium backdrop-blur-xl">
+        <span id="toast-icon" class="text-lg">ℹ️</span>
+        <span id="toast-msg">提示消息</span>
+    </div>
+
+    <header class="app-header sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 min-h-16 py-3 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+            <div class="flex flex-wrap items-center gap-2 font-black text-xl">
+                <span class="text-2xl">✨</span>
+                <span class="bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">TK-AI 智选舆情看板</span>
+                <span id="api-status-badge" class="ml-3 px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 flex items-center gap-1.5 border border-amber-200/70">
+                    <span class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
+                    等待 API 连接
+                </span>
+                <button id="btn-logout" class="hidden quiet-button ml-1 px-3 py-1 rounded-full text-xs font-bold">登出 🔓</button>
+            </div>
+            <nav class="w-full lg:w-auto flex gap-6 overflow-x-auto pb-1 lg:pb-0">
+                <button data-target="section-market" class="nav-btn nav-active whitespace-nowrap pb-1 text-sm transition-colors hover:text-indigo-500">运营驾驶舱</button>
+                <button data-target="section-intelligence" class="nav-btn whitespace-nowrap pb-1 text-sm text-slate-500 transition-colors hover:text-indigo-500">机会雷达</button>
+                <button data-target="section-sentiment" class="nav-btn whitespace-nowrap pb-1 text-sm text-slate-500 transition-colors hover:text-indigo-500">AI 舆情诊断</button>
+                <button data-target="section-products" class="nav-btn whitespace-nowrap pb-1 text-sm text-slate-500 transition-colors hover:text-indigo-500">选品优化</button>
+                <button data-target="section-architecture" class="nav-btn whitespace-nowrap pb-1 text-sm text-slate-500 transition-colors hover:text-indigo-500">技术架构</button>
+            </nav>
+        </div>
+    </header>
+
+    <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 w-full">
+        <div id="radar-alert-banner" class="warning-banner hidden mb-8 rounded-lg px-6 py-4">
+            <div class="flex items-start gap-3">
+                <span class="alert-dot" aria-hidden="true"></span>
+                <div>
+                    <div class="font-black">[实时雷达监控警报]</div>
+                <div id="radar-alert-message" class="text-sm mt-1">
+                        检测到海外买家负面反馈异常抬升，请立即进入选品雷达排查。
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="section-market" class="page-section fade-in">
+            <div class="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <div class="flex flex-wrap gap-2 mb-3">
+                        <span class="kicker-pill">[LIVE]</span>
+                        <span class="kicker-pill">[SYNCED]</span>
+                        <span class="kicker-pill">[SECURED]</span>
+                    </div>
+                    <h1 class="text-3xl font-bold text-slate-900 mb-2">TK-AI 白金微光舆情中枢</h1>
+                </div>
+                <div class="flex flex-wrap gap-3">
+                    <button id="btn-run-radar-patrol" class="quiet-button px-5 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-1.5">
+                        <span id="radar-patrol-spinner" class="hidden w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></span>
+                        <span>📡 雷达巡检</span>
+                    </button>
+                    <button id="btn-show-add-modal" class="primary-action px-5 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-1.5">
+                        <span>➕</span> 添加新监控商品
+                    </button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-6 mb-8">
+                <div class="glass-card rounded-lg overflow-hidden border border-slate-100">
+                    <div class="px-6 py-5 md:px-8 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                        <div>
+                            <h3 class="text-lg font-black text-slate-900">实时云端监控大盘</h3>
+                            <div class="mt-2 flex flex-wrap gap-2">
+                                <span class="kicker-pill">Redis Cloud</span>
+                                <span class="kicker-pill">Caddy TLS</span>
+                            </div>
+                        </div>
+                        <span id="live-workflow-status" class="self-start md:self-center px-3 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-bold">等待 API 同步</span>
+                    </div>
+                    <div class="grid grid-cols-2 lg:grid-cols-4 divide-x divide-y lg:divide-y-0 divide-slate-100">
+                        <div class="p-6">
+                            <div class="text-xs font-bold text-slate-400 uppercase tracking-wide">云端商品</div>
+                            <div id="live-product-count" class="mt-2 text-3xl font-black text-slate-900">0</div>
+                            <div class="mt-1 text-xs text-slate-500">已注册监控节点</div>
+                        </div>
+                        <div class="p-6">
+                            <div class="text-xs font-bold text-slate-400 uppercase tracking-wide">已诊断</div>
+                            <div id="live-diagnosed-count" class="mt-2 text-3xl font-black text-indigo-600">0</div>
+                            <div class="mt-2 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                                <div id="live-diagnostic-coverage" class="h-full w-0 bg-indigo-500 transition-all duration-500"></div>
+                            </div>
+                        </div>
+                        <div class="p-6">
+                            <div class="text-xs font-bold text-slate-400 uppercase tracking-wide">平均健康分</div>
+                            <div id="live-average-score" class="mt-2 text-3xl font-black text-emerald-600">--</div>
+                            <div class="mt-1 text-xs text-slate-500">AI 选品健康度</div>
+                        </div>
+                        <div class="p-6">
+                            <div class="text-xs font-bold text-slate-400 uppercase tracking-wide">雷达红线</div>
+                            <div id="live-critical-count" class="mt-2 text-3xl font-black text-rose-600">0</div>
+                            <div class="mt-1 text-xs text-slate-500">需优先处理商品</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="glass-card rounded-lg p-6 md:p-8 border border-slate-100">
+                    <div class="text-xs font-bold text-slate-400 uppercase tracking-wide">闭环状态</div>
+                    <div class="mt-4 flex flex-wrap gap-2">
+                        <span class="px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-bold">真实评论抓取</span>
+                        <span class="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold">品类自愈识别</span>
+                        <span class="px-3 py-1 rounded-full bg-rose-50 text-rose-700 text-xs font-bold">雷达红线预警</span>
+                        <span class="px-3 py-1 rounded-full bg-purple-500/10 text-purple-200 text-xs font-bold border border-purple-400/20">竞品横向 PK</span>
+                        <span class="px-3 py-1 rounded-full bg-amber-50 text-amber-700 text-xs font-bold">闭环改良建议</span>
+                    </div>
+                    <div class="mt-5 rounded-lg bg-slate-50/80 border border-slate-100 p-4">
+                        <div class="text-xs text-slate-400 font-bold">当前优先动作</div>
+                        <div id="live-next-action" class="mt-2 text-sm leading-relaxed">等待云端商品数据同步。</div>
+                    </div>
+                    <div id="live-risk-list" class="mt-4 text-xs text-slate-500 leading-relaxed">
+                        暂无风险商品。
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div class="glass-card p-6 md:p-8 rounded-lg border-l-4 border-indigo-500">
+                    <div class="text-sm text-slate-500 mb-1">TK美区电商品牌增长率</div>
+                    <div class="text-3xl font-bold text-slate-800">+145% <span class="text-sm text-emerald-500 font-normal">📈 极速扩张</span></div>
+                </div>
+                <div class="glass-card p-6 md:p-8 rounded-lg border-l-4 border-rose-500">
+                    <div class="text-sm text-slate-500 mb-1">鞋包/服饰/3C类目平均退货率</div>
+                    <div class="text-3xl font-bold text-slate-800">22.4% <span class="text-sm text-rose-500 font-normal">⚠️ 利润吞噬者</span></div>
+                </div>
+                <div class="glass-card p-6 md:p-8 rounded-lg border-l-4 border-amber-500">
+                    <div class="text-sm text-slate-500 mb-1">因差评导致的流量降权概率</div>
+                    <div class="text-3xl font-bold text-slate-800">68% <span class="text-sm text-amber-500 font-normal">📉 核心痛点</span></div>
+                </div>
+            </div>
+
+            <div class="glass-card p-6 md:p-8 rounded-lg">
+                <h3 class="text-lg font-semibold mb-4 text-slate-800">TK电商 GMV 增长与退货率趋势对比 (2023-2025预测)</h3>
+                <div class="chart-container">
+                    <canvas id="marketChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div id="section-intelligence" class="page-section hidden fade-in">
+            <div class="mb-8 flex flex-col xl:flex-row xl:items-end justify-between gap-5">
+                <div>
+                    <div class="flex flex-wrap gap-2 mb-3">
+                        <span class="kicker-pill">[MARKET GAP]</span>
+                        <span class="kicker-pill">[BATTLECARD]</span>
+                        <span class="kicker-pill">[ABSA EVIDENCE]</span>
+                    </div>
+                    <h1 class="text-3xl font-bold text-slate-900 mb-2">Market Gap Radar · 选品机会雷达</h1>
+                    <p class="text-sm text-slate-500 max-w-3xl">基于 ABSA 属性级舆情、评论样例、公开类目基线 lift 和供应链可修复度生成机会分，避免只凭漂亮图表做空心判断。</p>
+                </div>
+                <button id="btn-refresh-market-gap" class="quiet-button px-5 py-2.5 rounded-lg text-sm font-bold">
+                    🔄 重算机会分
+                </button>
+            </div>
+
+            <div id="market-gap-empty" class="hidden glass-card rounded-lg p-8 text-center border border-dashed border-slate-200">
+                <div class="text-3xl mb-3">◇</div>
+                <div class="text-lg font-black text-slate-900">等待真实诊断数据</div>
+                <p class="mt-2 text-sm text-slate-500">添加商品并完成 AI 舆情诊断后，机会雷达会自动生成市场缺口与战术卡。</p>
+            </div>
+
+            <div id="market-gap-content" class="space-y-8">
+                <div class="grid grid-cols-1 xl:grid-cols-[380px_1fr] gap-6">
+                    <div class="glass-card rounded-lg p-6 md:p-8 border border-indigo-100 relative overflow-hidden">
+                        <div class="absolute top-0 right-0 w-40 h-40 bg-indigo-500/10 blur-3xl rounded-full"></div>
+                        <div class="relative">
+                            <div class="flex items-center justify-between gap-3">
+                                <div>
+                                    <div class="text-xs font-black text-slate-400 uppercase tracking-wide">Prime Opportunity</div>
+                                    <div id="market-gap-prime-product" class="mt-2 text-xl font-black text-slate-900">--</div>
+                                </div>
+                                <div class="text-right">
+                                    <div id="market-gap-prime-score" class="text-5xl font-black text-indigo-600">--</div>
+                                    <div class="text-xs font-bold text-slate-400">GAP SCORE</div>
+                                </div>
+                            </div>
+                            <div id="market-gap-prime-type" class="mt-4 inline-flex rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100 px-3 py-1 text-xs font-black">--</div>
+                            <p id="market-gap-prime-thesis" class="mt-4 text-sm leading-relaxed text-slate-600">等待机会模型计算。</p>
+                            <div class="mt-5 grid grid-cols-3 gap-3">
+                                <div class="rounded-lg bg-slate-50/80 border border-slate-100 p-3">
+                                    <div class="text-[10px] font-bold text-slate-400 uppercase">Demand</div>
+                                    <div id="market-gap-prime-demand" class="mt-1 text-lg font-black text-slate-900">--</div>
+                                </div>
+                                <div class="rounded-lg bg-slate-50/80 border border-slate-100 p-3">
+                                    <div class="text-[10px] font-bold text-slate-400 uppercase">Risk</div>
+                                    <div id="market-gap-prime-risk" class="mt-1 text-lg font-black text-slate-900">--</div>
+                                </div>
+                                <div class="rounded-lg bg-slate-50/80 border border-slate-100 p-3">
+                                    <div class="text-[10px] font-bold text-slate-400 uppercase">Fixability</div>
+                                    <div id="market-gap-prime-fix" class="mt-1 text-lg font-black text-slate-900">--</div>
+                                </div>
+                            </div>
+                            <div id="market-gap-prime-evidence" class="mt-4 rounded-lg border border-indigo-100 bg-white/75 p-4 text-xs leading-relaxed text-slate-600">
+                                等待证据账本同步。
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="glass-card rounded-lg p-6 md:p-8 border border-slate-100">
+                        <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-5">
+                            <div>
+                                <h3 class="text-lg font-black text-slate-900">证据加权机会因子</h3>
+                                <div class="mt-2 flex flex-wrap gap-2">
+                                    <span class="kicker-pill">Demand Heat</span>
+                                    <span class="kicker-pill">Benchmark Lift</span>
+                                    <span class="kicker-pill">Evidence Confidence</span>
+                                </div>
+                            </div>
+                            <div id="market-gap-summary" class="text-xs font-bold text-slate-500">等待同步</div>
+                        </div>
+                        <div class="h-80">
+                            <canvas id="marketGapChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-6">
+                    <div class="glass-card rounded-lg overflow-hidden border border-slate-100">
+                        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between gap-3">
+                            <h3 class="text-lg font-black text-slate-900">Top Market Gaps</h3>
+                            <span class="text-xs font-bold text-slate-400">按机会分排序</span>
+                        </div>
+                        <div id="market-gap-list" class="divide-y divide-slate-100">
+                            <!-- Market gap rows rendered by JS -->
+                        </div>
+                    </div>
+
+                    <div class="glass-card rounded-lg p-6 border border-slate-100">
+                        <h3 class="text-lg font-black text-slate-900">ABSA Evidence Matrix</h3>
+                        <p class="mt-2 text-sm text-slate-500">聚合属性级负面证据、样例评论和公开基线倍数，确认缺口不是模型臆测。</p>
+                        <div id="market-gap-signal-grid" class="mt-5 space-y-3">
+                            <!-- Pain signals rendered by JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="section-sentiment" class="page-section hidden fade-in">
+            <div class="mb-8">
+                <div class="flex flex-wrap gap-2 mb-3">
+                    <span class="kicker-pill">[STREAM]</span>
+                    <span class="kicker-pill">[GPT-5.5]</span>
+                    <span class="kicker-pill">[AUTO CATEGORY]</span>
+                </div>
+                <h1 class="text-3xl font-bold text-slate-900 mb-2">AI 负面舆情实时诊断面板</h1>
+            </div>
+
+            <div class="glass-card p-6 md:p-8 rounded-lg mb-8">
+                <h3 class="text-lg font-bold text-indigo-900 mb-2 flex items-center gap-2">
+                    <span>🚀</span> 启动实时 AI 抓取与诊断管道 (Pipeline)
+                </h3>
+                <div class="flex flex-wrap gap-2 mb-4">
+                    <span class="kicker-pill">YouTube</span>
+                    <span class="kicker-pill">TikTok</span>
+                    <span class="kicker-pill">[QUEUED]</span>
+                </div>
+                <div class="flex flex-col md:flex-row gap-3">
+                    <input id="pipeline-url" type="text" placeholder="请输入 YouTube / TikTok 测评视频链接..." class="neo-input flex-grow px-4 py-2.5 rounded-lg text-sm focus:outline-none transition-all">
+                    <button id="btn-run-pipeline" class="primary-action px-6 py-2.5 rounded-lg text-sm font-medium flex items-center justify-center gap-2">
+                        <span id="spinner" class="hidden w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                        开始 AI 抓取与分析
+                    </button>
+                </div>
+
+                <div id="pipeline-loading-state" class="hidden mt-5 rounded-lg border border-indigo-100 bg-indigo-50/70 px-4 py-3">
+                    <div class="flex items-center justify-between gap-4">
+                        <div class="flex items-center gap-3 min-w-0">
+                            <span class="w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin flex-none"></span>
+                            <div class="min-w-0">
+                                <div id="pipeline-loading-title" class="text-sm font-black text-indigo-700">正在抓取并分析评论</div>
+                                <div id="pipeline-loading-detail" class="text-xs text-slate-500 mt-0.5">请稍候，系统会自动刷新诊断报告。</div>
+                            </div>
+                        </div>
+                        <span id="progress-percent" class="font-mono text-indigo-700 bg-white/70 px-2.5 py-1 rounded-md border border-indigo-100 text-xs font-bold">0%</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                <div class="text-slate-800 font-bold text-xl flex items-center gap-2">
+                    <span class="w-3 h-3 rounded-full bg-indigo-400 animate-ping"></span>
+                    当前诊断商品：<span id="active-product-title" class="text-indigo-600">加载中...</span>
+                </div>
+                <div class="w-full md:w-72">
+                    <select id="product-selector" class="neo-input w-full rounded-lg py-2 px-3 focus:outline-none text-sm font-semibold">
+                    </select>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8" id="report-print-area">
+                <div class="glass-card p-6 md:p-8 rounded-lg">
+                    <h3 class="text-lg font-semibold mb-4 text-slate-800">舆情情感分布比例</h3>
+                    <div id="doughnut-placeholder" class="hidden flex items-center justify-center h-64 text-slate-400 font-medium">等待抓取数据中...</div>
+                    <div class="chart-container" style="height: 300px;" id="doughnut-container">
+                        <canvas id="sentimentChart"></canvas>
+                    </div>
+                </div>
+                <div class="glass-card p-6 md:p-8 rounded-lg flex flex-col h-full">
+                    <h3 class="text-lg font-semibold mb-4 text-slate-800">AI 提取核心负面标签 TOP 5</h3>
+                    <div id="bar-placeholder" class="hidden flex items-center justify-center h-52 text-slate-400 font-medium">等待抓取数据中...</div>
+                    <div class="chart-container flex-grow" style="height: 250px;" id="bar-container">
+                        <canvas id="keywordChart"></canvas>
+                    </div>
+                    <div id="ai-insight-box" class="mt-4 p-4 rounded-lg border text-sm transition-all duration-300">
+                        <span class="font-bold">🤖 AI 诊断结论：</span> 加载中...
+                    </div>
+                    <div class="mt-4 flex justify-end">
+                        <button id="btn-export-report" class="quiet-button px-4 py-2 text-xs font-semibold rounded-lg flex items-center gap-1.5">
+                            <span>📄</span> 导出 AI 诊断意见书
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="sourcing-radar-panel" class="hidden glass-card rounded-lg border border-emerald-100 bg-emerald-50/40 p-6 md:p-8 mb-8">
+                <div class="mb-5">
+                    <h3 class="text-lg font-black text-slate-900">📦 1688 跨境源头工厂匹配与加权优选大盘</h3>
+                    <p id="sourcing-panel-note" class="text-sm text-slate-600 mt-1">系统将当前客诉转译为供应链改良方向，并推荐 1688 源头工厂进行打样验证。</p>
+                </div>
+                <div class="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-6">
+                    <div class="dark-panel rounded-lg p-4 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.7)]">
+                        <div class="h-80">
+                            <canvas id="factoryRadarChart"></canvas>
+                        </div>
+                    </div>
+                    <div id="factory-card-list" class="space-y-3">
+                        <!-- 推荐工厂卡片由 JS 动态渲染 -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- 竞品横向 PK 折叠面板：复用当前数据库中的商品诊断结果做多维对比 -->
+            <details id="competitor-vs-panel" class="glass-card rounded-lg overflow-hidden border border-indigo-100 group">
+                <summary class="cursor-pointer select-none list-none px-6 py-4 transition-colors flex items-center justify-between hover:bg-indigo-500/5">
+                    <span class="text-lg font-bold text-slate-900">📊 竞品横向 PK 对比大盘 (Competitor Head-to-Head)</span>
+                    <span class="text-xs font-semibold text-indigo-600 group-open:hidden">展开</span>
+                    <span class="text-xs font-semibold text-indigo-600 hidden group-open:inline">收起</span>
+                </summary>
+                <div class="px-6 pb-6 pt-2 border-t border-slate-100 bg-white/45">
+                    <div class="flex flex-col xl:flex-row xl:items-start gap-5">
+                        <div class="w-full xl:w-80 shrink-0">
+                            <div class="text-xs font-bold text-slate-500 uppercase tracking-wide mb-3">选择 2-3 个已诊断商品</div>
+                            <div id="competitor-checkbox-list" class="space-y-2 max-h-64 overflow-y-auto pr-1">
+                                <!-- 由 JS 根据当前数据库动态生成 -->
+                            </div>
+                    <button id="btn-run-vs-pipeline" class="primary-action mt-4 w-full px-4 py-2.5 text-sm font-bold rounded-lg flex items-center justify-center gap-2">
+                                <span id="vs-spinner" class="hidden w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                                一键启动多维 PK 诊断
+                            </button>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div id="vs-empty-state" class="h-64 rounded-lg border border-dashed border-slate-200 bg-slate-50/70 flex items-center justify-center text-sm text-slate-400">
+                                勾选 2-3 个商品后，将在这里生成健康度与负面情绪横向对比图。
+                            </div>
+                            <div id="vs-chart-wrap" class="hidden dark-panel rounded-lg p-4 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.7)]">
+                                <div class="h-72">
+                                    <canvas id="vsChart"></canvas>
+                                </div>
+                            </div>
+                            <div id="vs-ai-report" class="hidden mt-4 rounded-lg border border-violet-100 bg-violet-50/70 p-5 text-sm text-violet-800 leading-relaxed whitespace-pre-line shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
+                                <!-- AI 竞品击穿报告由 JS 动态渲染 -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </details>
+        </div>
+
+        <div id="section-products" class="page-section hidden fade-in">
+            <div class="mb-8">
+                <div class="flex flex-wrap gap-2 mb-3">
+                    <span class="kicker-pill">[RADAR]</span>
+                    <span class="kicker-pill">[SPS]</span>
+                    <span class="kicker-pill">[APPEAL]</span>
+                </div>
+                <h1 class="text-3xl font-bold text-slate-900 mb-4">数据驱动的选品优化建议库</h1>
+            </div>
+
+            <div class="glass-card rounded-lg overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="dark-table min-w-full divide-y divide-slate-200">
+                        <thead>
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">产品名称</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">AI 选品健康分</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">核心优化方向</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">系统建议动作</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-200" id="product-table-body">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <details id="system-maintenance-panel" class="mt-8 group">
+                <summary class="glass-card cursor-pointer select-none list-none rounded-lg px-6 py-4 border border-slate-100 flex items-center justify-between gap-4 hover:bg-indigo-500/5 transition-colors">
+                    <div>
+                        <h3 class="text-base font-black text-slate-900">系统维护与告警设置</h3>
+                        <div class="mt-2 flex flex-wrap gap-2">
+                            <span class="kicker-pill">Backup</span>
+                            <span class="kicker-pill">Audit</span>
+                            <span class="kicker-pill">Webhook</span>
+                        </div>
+                    </div>
+                    <span class="text-xs font-bold text-indigo-600 group-open:hidden">展开</span>
+                    <span class="text-xs font-bold text-indigo-600 hidden group-open:inline">收起</span>
+                </summary>
+
+                <div class="mt-4 grid grid-cols-1 gap-4">
+                    <div class="glass-card rounded-lg p-6 md:p-8 border border-slate-100">
+                        <div class="flex flex-col lg:flex-row lg:items-start justify-between gap-5">
+                            <div>
+                                <h3 class="text-lg font-black text-slate-900">🛟 云端数据备份与操作审计</h3>
+                                <div id="admin-backup-meta" class="mt-3 text-xs text-slate-500">等待加载审计状态...</div>
+                            </div>
+                            <div class="flex flex-wrap gap-2">
+                                <button id="btn-admin-export" class="quiet-button px-4 py-2 rounded-lg text-sm font-bold">⬇️ 导出备份</button>
+                                <button id="btn-admin-import" class="primary-action px-4 py-2 rounded-lg text-sm font-bold">⬆️ 恢复备份</button>
+                                <button id="btn-admin-refresh-audit" class="quiet-button px-4 py-2 rounded-lg text-sm font-bold">🔄 刷新审计</button>
+                            </div>
+                        </div>
+                        <input id="admin-restore-file" type="file" accept="application/json,.json" class="hidden">
+                        <div id="admin-audit-list" class="mt-5 grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div class="rounded-lg border border-dashed border-slate-300 p-4 text-sm text-slate-400 md:col-span-2">暂无审计日志。</div>
+                        </div>
+                    </div>
+
+                    <div class="glass-card rounded-lg p-6 md:p-8 border border-rose-400/20 bg-rose-500/5">
+                        <div class="flex flex-col lg:flex-row lg:items-start justify-between gap-5">
+                            <div>
+                                <h3 class="text-lg font-black text-slate-900">📣 雷达红线 Webhook 报警通知</h3>
+                                <div id="alert-status-meta" class="mt-3 text-xs text-slate-500">等待读取报警通道状态...</div>
+                            </div>
+                            <div class="flex flex-wrap gap-2">
+                                <button id="btn-alert-status" class="quiet-button px-4 py-2 rounded-lg text-sm font-bold">🔎 检查状态</button>
+                                <button id="btn-alert-test" class="px-4 py-2 rounded-lg bg-rose-600 text-white text-sm font-bold hover:bg-rose-700 transition-colors shadow-[0_12px_24px_rgba(225,29,72,0.18)]">📣 发送测试告警</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </details>
+        </div>
+
+        <div id="section-architecture" class="page-section hidden fade-in">
+            <div class="mb-8">
+                <div class="flex flex-wrap gap-2 mb-3">
+                    <span class="kicker-pill">[CLOUDFLARE]</span>
+                    <span class="kicker-pill">[FASTAPI]</span>
+                    <span class="kicker-pill">[REDIS]</span>
+                </div>
+                <h1 class="text-3xl font-bold text-slate-900 mb-4">系统架构与数据流设计思路</h1>
+            </div>
+
+            <div class="glass-card p-6 md:p-8 rounded-lg">
+                <h3 class="text-xl font-semibold mb-8 text-center text-indigo-300">业务数据流拓扑图</h3>
+                <div class="flex flex-col items-center max-w-4xl mx-auto space-y-6">
+                    <div class="flex flex-col md:flex-row gap-4 w-full justify-center">
+                        <div class="dark-panel p-4 rounded-lg w-full md:w-48 text-center">
+                            <div class="text-2xl mb-2">📺</div>
+                            <div class="font-bold text-sm">YouTube / TikTok 抓取</div>
+                            <div class="text-[10px] text-slate-400 mt-1">Shorts 重定向 + TikTok Web API</div>
+                        </div>
+                        <div class="rounded-lg w-full md:w-48 text-center p-4 bg-indigo-500/15 border border-indigo-400/20 shadow-[0_20px_40px_-15px_rgba(99,102,241,0.45)]">
+                            <div class="text-2xl mb-2">🐍</div>
+                            <div class="font-bold text-sm">Caddy + FastAPI 网关</div>
+                            <div class="text-[10px] text-indigo-200 mt-1">HTTPS 入口与账号登录</div>
+                        </div>
+                        <div class="dark-panel p-4 rounded-lg w-full md:w-48 text-center">
+                            <div class="text-2xl mb-2">🧠</div>
+                            <div class="font-bold text-sm">GPT-5.5 中转解析</div>
+                            <div class="text-[10px] text-slate-400 mt-1">结构化 JSON 分类提取</div>
+                        </div>
+                        <div class="dark-panel p-4 rounded-lg w-full md:w-48 text-center">
+                            <div class="text-2xl mb-2">☁️</div>
+                            <div class="font-bold text-sm">Redis 云端同步</div>
+                            <div class="text-[10px] text-slate-400 mt-1">跨端共享同一套大盘</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div id="add-product-modal" class="modal-backdrop fixed inset-0 z-[80] hidden flex items-center justify-center p-4">
+        <div class="modal-panel rounded-lg max-w-md w-full p-6 md:p-8 mx-4">
+            <div class="flex justify-between items-center mb-5">
+                <h3 class="text-lg font-bold text-slate-900 flex items-center gap-1.5">
+                    <span>➕</span> 添加新监控商品
+                </h3>
+                <button id="btn-close-modal" class="modal-close text-xl font-bold">&times;</button>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1">商品唯一识别 ID (Product ID)</label>
+                    <input id="modal-product-id" type="text" placeholder="例如: shoe_sneaker_01" class="neo-input w-full px-3.5 py-2 rounded-lg text-sm focus:outline-none transition-all">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1">商品显示名称 (Product Name)</label>
+                    <input id="modal-product-name" type="text" placeholder="例如: 潮流复古运动鞋" class="neo-input w-full px-3.5 py-2 rounded-lg text-sm focus:outline-none transition-all">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1">YouTube / TikTok 视频评测链接</label>
+                    <input id="modal-product-url" type="text" placeholder="请输入评测链接..." class="neo-input w-full px-3.5 py-2 rounded-lg text-sm focus:outline-none transition-all">
+                </div>
+            </div>
+            <div class="mt-6 flex justify-end gap-3">
+                <button id="btn-cancel-modal" class="quiet-button px-4 py-2 text-sm font-medium rounded-lg">取消</button>
+                <button id="btn-submit-modal" class="primary-action px-5 py-2 text-sm font-semibold rounded-lg">确认添加</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="sps-predictor-modal" class="modal-backdrop fixed inset-0 z-[85] hidden flex items-center justify-center p-4">
+        <div class="modal-panel rounded-lg max-w-3xl w-full p-6 md:p-8 mx-4">
+            <div class="flex justify-between items-start gap-4 mb-5">
+                <div>
+                    <h3 class="text-lg font-black text-slate-900 flex items-center gap-2">
+                        <span>🔮</span> SPS 店铺绩效修复预测器
+                    </h3>
+                    <p id="sps-product-title" class="text-sm text-slate-500 mt-1">正在读取商品数据...</p>
+                </div>
+                <button id="btn-close-sps-modal" class="modal-close text-xl font-bold">&times;</button>
+            </div>
+            <div class="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-6">
+                <div class="space-y-5 rounded-lg border border-slate-100 bg-slate-50/70 p-5 shadow-[inset_0_1px_12px_rgba(15,23,42,0.04)]">
+                    <div>
+                        <div class="flex justify-between text-xs font-bold text-slate-500 mb-2">
+                            <span>未来 15 天撤回差评数</span>
+                            <span id="sps-remove-value" class="text-rose-600">5</span>
+                        </div>
+                        <input id="sps-remove-slider" type="range" min="0" max="30" value="5" class="sps-slider">
+                    </div>
+                    <div>
+                        <div class="flex justify-between text-xs font-bold text-slate-500 mb-2">
+                            <span>未来 15 天新增好评数</span>
+                            <span id="sps-positive-value" class="text-emerald-600">50</span>
+                        </div>
+                        <input id="sps-positive-slider" type="range" min="0" max="120" value="50" class="sps-slider">
+                    </div>
+                    <div class="rounded-lg bg-indigo-500/10 border border-indigo-400/20 p-4 shadow-[inset_0_1px_0_rgba(148,163,184,0.18)]">
+                        <div class="text-xs font-bold text-indigo-700">15 天后预测 SPS</div>
+                        <div id="sps-projected-score" class="text-3xl font-black text-indigo-900 mt-1">--</div>
+                        <div id="sps-projected-note" class="text-xs text-indigo-700 mt-2 leading-relaxed">拖动滑块模拟主动服务修复效果。</div>
+                    </div>
+                </div>
+                <div class="h-72">
+                    <canvas id="spsChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="appeal-modal" class="modal-backdrop fixed inset-0 z-[90] hidden flex items-center justify-center p-4">
+        <div class="modal-panel rounded-lg max-w-4xl w-full p-6 md:p-8 mx-4">
+            <div class="flex justify-between items-start gap-4 mb-5">
+                <div>
+                    <h3 class="text-lg font-black text-slate-900 flex items-center gap-2">
+                        <span>🛡️</span> AI 一键英文申诉抗辩书
+                    </h3>
+                    <p id="appeal-modal-subtitle" class="text-sm text-slate-500 mt-1">AI 正在利用 GPT-5.5 根据近期负面声浪为您生成一键抗辩申诉意见书...</p>
+                </div>
+                <button id="btn-close-appeal-modal" class="modal-close text-xl font-bold">&times;</button>
+            </div>
+            <div id="appeal-loading" class="rounded-lg border border-indigo-100 bg-indigo-50/80 p-5 text-sm text-indigo-700">
+                <span class="inline-block w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin align-[-3px] mr-2"></span>
+                正在生成专业英文申诉抗辩信，请稍候...
+            </div>
+            <div id="appeal-result-wrap" class="hidden">
+                <textarea id="appeal-textarea" class="w-full h-96 rounded-lg border border-slate-200 bg-white/80 p-4 font-mono text-xs leading-relaxed text-slate-800 focus:outline-none"></textarea>
+                <div class="mt-4 flex justify-end gap-3">
+                    <button id="btn-copy-appeal" class="primary-action px-4 py-2 text-sm font-bold rounded-lg">
+                        📋 一键复制申诉信
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="brief-modal" class="modal-backdrop fixed inset-0 z-[95] hidden flex items-center justify-center p-4">
+        <div class="modal-panel rounded-lg max-w-4xl w-full p-6 md:p-8 mx-4">
+            <div class="flex justify-between items-start gap-4 mb-5">
+                <div>
+                    <h3 class="text-lg font-black text-slate-900 flex items-center gap-2">
+                        <span>📄</span> ISO 工艺/包材改良采购 Brief
+                    </h3>
+                    <p id="brief-modal-subtitle" class="text-sm text-slate-500 mt-1">AI 正在将海外客诉转译为 1688 工厂可执行的中文工业采购规范...</p>
+                </div>
+                <button id="btn-close-brief-modal" class="modal-close text-xl font-bold">&times;</button>
+            </div>
+            <div id="brief-loading" class="rounded-lg border border-emerald-100 bg-emerald-50/80 p-5 text-sm text-emerald-700">
+                <span class="inline-block w-4 h-4 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin align-[-3px] mr-2"></span>
+                正在生成 ISO 采购技术 Brief，请稍候...
+            </div>
+            <div id="brief-result-wrap" class="hidden">
+                <textarea id="brief-textarea" class="w-full h-96 rounded-lg border border-slate-200 bg-white/80 p-4 font-mono text-xs leading-relaxed text-slate-800 focus:outline-none"></textarea>
+                <div class="mt-4 flex justify-end gap-3">
+                    <button id="btn-copy-brief" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-lg shadow-[0_12px_24px_rgba(16,185,129,0.18)] transition-colors">
+                        📋 复制 Brief
+                    </button>
+                    <button id="btn-print-brief" class="quiet-button px-4 py-2 text-sm font-bold rounded-lg">
+                        🖨️ 导出打印
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="battlecard-modal" class="modal-backdrop fixed inset-0 z-[96] hidden flex items-center justify-center p-4">
+        <div class="modal-panel rounded-lg max-w-5xl w-full p-6 md:p-8 mx-4 max-h-[92vh] overflow-y-auto">
+            <div class="flex justify-between items-start gap-4 mb-5">
+                <div>
+                    <div class="flex flex-wrap gap-2 mb-3">
+                        <span class="kicker-pill">[BATTLECARD]</span>
+                        <span class="kicker-pill">[GO-TO-MARKET]</span>
+                    </div>
+                    <h3 id="battlecard-title" class="text-xl font-black text-slate-900">AI 选品战术卡</h3>
+                    <p id="battlecard-subtitle" class="text-sm text-slate-500 mt-1">基于舆情、痛点和供应链修复难度生成。</p>
+                </div>
+                <button id="btn-close-battlecard-modal" class="modal-close text-xl font-bold">&times;</button>
+            </div>
+
+            <div id="battlecard-content" class="space-y-5">
+                <!-- Battlecard rendered by JS -->
+            </div>
+
+            <div class="mt-6 flex flex-wrap justify-end gap-3">
+                <button id="btn-copy-battlecard" class="quiet-button px-4 py-2 text-sm font-bold rounded-lg">📋 复制战术卡</button>
+                <button id="btn-print-battlecard" class="primary-action px-4 py-2 text-sm font-bold rounded-lg">🖨️ 导出打印</button>
+            </div>
+        </div>
+    </div>
+
+    <footer class="bg-white/80 border-t border-slate-200/60 py-6 mt-auto backdrop-blur-md">
+        <div class="max-w-7xl mx-auto px-4 text-center text-sm text-slate-500">
+            &copy; 2026 TK Cross-border E-commerce AI Intelligence. SaaS Hub Version.
+        </div>
+    </footer>
+
+    <script>
+        const isLocalFrontend = ['localhost', '127.0.0.1', '::1', ''].includes(window.location.hostname);
+        const API_BASE_URL = window.TK_API_BASE_URL || (
+            isLocalFrontend ? 'http://localhost:8000' : 'https://tk-api.void52.site'
+        );
+
+        const mockProductsData = {};
+
+        let activeData = {};
+        let sentimentChart;
+        let keywordChart;
+        let vsChart;
+        let spsChart;
+        let factoryRadarChart;
+        let marketGapChart;
+        let currentSpsProductKey = '';
+        let currentSourcingProductKey = '';
+        let currentBattlecardProductKey = '';
+        let isLocalApiOnline = false;
+        let logOffset = 0;
+        let pollInterval = null;
+        let toastTimer = null;
+        let operatorAuthEnabled = false;
+        let isAuthenticated = false;
+
+        const OPERATOR_TOKEN_STORAGE_KEY = 'tk_ai_operator_token';
+        const OPERATOR_USERNAME_STORAGE_KEY = 'tk_ai_operator_username';
+
+        function isProtectedApiUrl(url) {
+            try {
+                const parsedUrl = new URL(url, window.location.href);
+                return parsedUrl.pathname.startsWith('/api/')
+                    && parsedUrl.pathname !== '/api/health'
+                    && parsedUrl.pathname !== '/api/login';
+            } catch (error) {
+                return false;
+            }
+        }
+
+        function setLoginVisible(isVisible) {
+            const loginScreen = document.getElementById('login-screen');
+            if (isVisible) {
+                loginScreen.classList.remove('hidden');
+                loginScreen.classList.add('flex');
+                setTimeout(() => document.getElementById('login-password').focus(), 50);
+            } else {
+                loginScreen.classList.add('hidden');
+                loginScreen.classList.remove('flex');
+            }
+        }
+
+        function getOperatorToken() {
+            return localStorage.getItem(OPERATOR_TOKEN_STORAGE_KEY) || '';
+        }
+
+        function syncAuthStateFromSession() {
+            isAuthenticated = Boolean(getOperatorToken());
+            updateLogoutVisibility();
+            setLoginVisible(!isAuthenticated);
+        }
+
+        function updateLogoutVisibility() {
+            const btnLogout = document.getElementById('btn-logout');
+            if (isAuthenticated) {
+                btnLogout.classList.remove('hidden');
+            } else {
+                btnLogout.classList.add('hidden');
+            }
+        }
+
+        async function authorizedFetch(url, options = {}) {
+            const protectedApi = isProtectedApiUrl(url);
+            const headers = new Headers(options.headers || {});
+
+            if (protectedApi) {
+                const token = getOperatorToken();
+                if (!token) {
+                    setLoginVisible(true);
+                    throw new Error('请先登录后再继续操作。');
+                }
+                headers.set('Authorization', `Bearer ${token}`);
+            }
+
+            const requestOptions = { ...options, headers };
+            let response = await fetch(url, requestOptions);
+
+            if (protectedApi && response.status === 401) {
+                localStorage.removeItem(OPERATOR_TOKEN_STORAGE_KEY);
+                localStorage.removeItem(OPERATOR_USERNAME_STORAGE_KEY);
+                isAuthenticated = false;
+                updateLogoutVisibility();
+                setLoginVisible(true);
+                throw new Error('登录已失效，请重新登录。');
+            }
+
+            return response;
+        }
+
+        const productSelector = document.getElementById('product-selector');
+        const btnRunPipeline = document.getElementById('btn-run-pipeline');
+        const pipelineUrl = document.getElementById('pipeline-url');
+        const btnRunRadarPatrol = document.getElementById('btn-run-radar-patrol');
+        const radarPatrolSpinner = document.getElementById('radar-patrol-spinner');
+        const pipelineLoadingState = document.getElementById('pipeline-loading-state');
+        const pipelineLoadingTitle = document.getElementById('pipeline-loading-title');
+        const pipelineLoadingDetail = document.getElementById('pipeline-loading-detail');
+        const progressPercent = document.getElementById('progress-percent');
+        const spinner = document.getElementById('spinner');
+        const competitorCheckboxList = document.getElementById('competitor-checkbox-list');
+        const btnRunVsPipeline = document.getElementById('btn-run-vs-pipeline');
+        const vsSpinner = document.getElementById('vs-spinner');
+        const vsEmptyState = document.getElementById('vs-empty-state');
+        const vsChartWrap = document.getElementById('vs-chart-wrap');
+        const vsAiReport = document.getElementById('vs-ai-report');
+        const radarAlertBanner = document.getElementById('radar-alert-banner');
+        const radarAlertMessage = document.getElementById('radar-alert-message');
+        const liveProductCount = document.getElementById('live-product-count');
+        const liveDiagnosedCount = document.getElementById('live-diagnosed-count');
+        const liveCriticalCount = document.getElementById('live-critical-count');
+        const liveAverageScore = document.getElementById('live-average-score');
+        const liveDiagnosticCoverage = document.getElementById('live-diagnostic-coverage');
+        const liveWorkflowStatus = document.getElementById('live-workflow-status');
+        const liveNextAction = document.getElementById('live-next-action');
+        const liveRiskList = document.getElementById('live-risk-list');
+        const marketGapEmpty = document.getElementById('market-gap-empty');
+        const marketGapContent = document.getElementById('market-gap-content');
+        const marketGapPrimeProduct = document.getElementById('market-gap-prime-product');
+        const marketGapPrimeScore = document.getElementById('market-gap-prime-score');
+        const marketGapPrimeType = document.getElementById('market-gap-prime-type');
+        const marketGapPrimeThesis = document.getElementById('market-gap-prime-thesis');
+        const marketGapPrimeDemand = document.getElementById('market-gap-prime-demand');
+        const marketGapPrimeRisk = document.getElementById('market-gap-prime-risk');
+        const marketGapPrimeFix = document.getElementById('market-gap-prime-fix');
+        const marketGapPrimeEvidence = document.getElementById('market-gap-prime-evidence');
+        const marketGapSummary = document.getElementById('market-gap-summary');
+        const marketGapList = document.getElementById('market-gap-list');
+        const marketGapSignalGrid = document.getElementById('market-gap-signal-grid');
+        const btnRefreshMarketGap = document.getElementById('btn-refresh-market-gap');
+        const spsPredictorModal = document.getElementById('sps-predictor-modal');
+        const spsProductTitle = document.getElementById('sps-product-title');
+        const spsRemoveSlider = document.getElementById('sps-remove-slider');
+        const spsPositiveSlider = document.getElementById('sps-positive-slider');
+        const spsRemoveValue = document.getElementById('sps-remove-value');
+        const spsPositiveValue = document.getElementById('sps-positive-value');
+        const spsProjectedScore = document.getElementById('sps-projected-score');
+        const spsProjectedNote = document.getElementById('sps-projected-note');
+        const appealModal = document.getElementById('appeal-modal');
+        const appealModalSubtitle = document.getElementById('appeal-modal-subtitle');
+        const appealLoading = document.getElementById('appeal-loading');
+        const appealResultWrap = document.getElementById('appeal-result-wrap');
+        const appealTextarea = document.getElementById('appeal-textarea');
+        const sourcingRadarPanel = document.getElementById('sourcing-radar-panel');
+        const sourcingPanelNote = document.getElementById('sourcing-panel-note');
+        const factoryCardList = document.getElementById('factory-card-list');
+        const briefModal = document.getElementById('brief-modal');
+        const briefModalSubtitle = document.getElementById('brief-modal-subtitle');
+        const briefLoading = document.getElementById('brief-loading');
+        const briefResultWrap = document.getElementById('brief-result-wrap');
+        const briefTextarea = document.getElementById('brief-textarea');
+        const battlecardModal = document.getElementById('battlecard-modal');
+        const battlecardTitle = document.getElementById('battlecard-title');
+        const battlecardSubtitle = document.getElementById('battlecard-subtitle');
+        const battlecardContent = document.getElementById('battlecard-content');
+        const adminBackupMeta = document.getElementById('admin-backup-meta');
+        const adminAuditList = document.getElementById('admin-audit-list');
+        const btnAdminExport = document.getElementById('btn-admin-export');
+        const btnAdminImport = document.getElementById('btn-admin-import');
+        const btnAdminRefreshAudit = document.getElementById('btn-admin-refresh-audit');
+        const adminRestoreFile = document.getElementById('admin-restore-file');
+        const alertStatusMeta = document.getElementById('alert-status-meta');
+        const btnAlertStatus = document.getElementById('btn-alert-status');
+        const btnAlertTest = document.getElementById('btn-alert-test');
+
+        async function handleLoginSubmit(event) {
+            event.preventDefault();
+            const usernameInput = document.getElementById('login-username');
+            const passwordInput = document.getElementById('login-password');
+            const loginError = document.getElementById('login-error');
+            const loginSpinner = document.getElementById('login-spinner');
+            const submitButton = document.getElementById('btn-login-submit');
+            const loginForm = document.getElementById('login-form');
+            const username = usernameInput.value.trim();
+            const password = passwordInput.value;
+
+            loginError.classList.add('hidden');
+            loginError.innerText = '';
+            loginForm.classList.remove('shake');
+
+            if (!username || !password) {
+                loginError.innerText = '账号或密码错误，请重新输入';
+                loginError.classList.remove('hidden');
+                loginForm.classList.add('shake');
+                setTimeout(() => loginForm.classList.remove('shake'), 380);
+                return;
+            }
+
+            submitButton.disabled = true;
+            loginSpinner.classList.remove('hidden');
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    throw new Error(payload.detail || '账号或密码不正确。');
+                }
+
+                const token = payload.token || payload.access_token;
+                if (token) {
+                    localStorage.setItem(OPERATOR_TOKEN_STORAGE_KEY, token);
+                }
+                localStorage.setItem(OPERATOR_USERNAME_STORAGE_KEY, payload.username || username);
+                isAuthenticated = true;
+                operatorAuthEnabled = true;
+                setLoginVisible(false);
+                updateLogoutVisibility();
+                document.getElementById('api-status-badge').innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> 实时 API 在线 · 已登录';
+                showToast('登录成功。', 'success');
+                await fetchAndLoadRealData(productSelector.value);
+                renderSelectorOptions(productSelector.value);
+                renderDiagnosticCharts(productSelector.value);
+                renderProductTable();
+                await refreshAdminAuditLogs();
+                await refreshAlertStatus();
+            } catch (error) {
+                loginError.innerText = '账号或密码错误，请重新输入';
+                loginError.classList.remove('hidden');
+                loginForm.classList.add('shake');
+                setTimeout(() => loginForm.classList.remove('shake'), 380);
+                passwordInput.select();
+            } finally {
+                submitButton.disabled = false;
+                loginSpinner.classList.add('hidden');
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem(OPERATOR_TOKEN_STORAGE_KEY);
+            localStorage.removeItem(OPERATOR_USERNAME_STORAGE_KEY);
+            isAuthenticated = false;
+            updateLogoutVisibility();
+            setLoginVisible(true);
+            document.getElementById('api-status-badge').innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> 实时 API 在线 · 待登录';
+            showToast('已退出登录。', 'info');
+        }
+
+        document.getElementById('login-form').addEventListener('submit', handleLoginSubmit);
+        document.getElementById('btn-logout').addEventListener('click', logout);
+
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            const msgSpan = document.getElementById('toast-msg');
+            const iconSpan = document.getElementById('toast-icon');
+            const toastBase = 'fixed bottom-5 right-5 transform transition-all duration-300 px-5 py-3.5 rounded-lg shadow-[0_18px_55px_rgba(15,23,42,0.16)] z-[100] flex items-center gap-2.5 font-semibold backdrop-blur-xl';
+            msgSpan.innerText = message;
+
+            if (toastTimer) {
+                clearTimeout(toastTimer);
+            }
+
+            if (type === 'success') {
+                iconSpan.innerText = '✅';
+                toast.className = `${toastBase} translate-y-0 opacity-100 bg-emerald-500 text-white border border-emerald-400`;
+            } else if (type === 'error') {
+                iconSpan.innerText = '❌';
+                toast.className = `${toastBase} translate-y-0 opacity-100 bg-rose-500 text-white border border-rose-400`;
+            } else {
+                iconSpan.innerText = 'ℹ️';
+                toast.className = `${toastBase} translate-y-0 opacity-100 bg-white text-slate-800 border border-slate-200/70`;
+            }
+
+            toastTimer = setTimeout(() => {
+                toast.className = `${toastBase} translate-y-20 opacity-0 bg-white text-slate-800 border border-white/70`;
+            }, 3000);
+        }
+
+        function wrapLabels(labelsArray) {
+            return (labelsArray || []).map(label => {
+                const safeLabel = String(label || '');
+                if (safeLabel.length <= 16) return safeLabel;
+                const words = safeLabel.split(' ');
+                let lines = [];
+                let currentLine = words[0] || safeLabel.slice(0, 16);
+                for (let i = 1; i < words.length; i++) {
+                    if (currentLine.length + words[i].length + 1 > 16) {
+                        lines.push(currentLine);
+                        currentLine = words[i];
+                    } else {
+                        currentLine += ' ' + words[i];
+                    }
+                }
+                lines.push(currentLine);
+                return lines;
+            });
+        }
+
+        const tooltipFixConfig = {
+            backgroundColor: 'rgba(15, 23, 42, 0.96)',
+            titleColor: '#E2E8F0',
+            bodyColor: '#475569',
+            borderColor: 'rgba(226, 232, 240, 0.82)',
+            borderWidth: 1,
+            callbacks: {
+                title: function(tooltipItems) {
+                    const item = tooltipItems[0];
+                    let label = item.chart.data.labels[item.dataIndex];
+                    return Array.isArray(label) ? label.join(' ') : label;
+                }
+            }
+        };
+
+        Chart.defaults.color = '#64748B';
+        Chart.defaults.borderColor = 'rgba(148,163,184,0.18)';
+        Chart.defaults.font.family = "'PingFang SC', 'SF Pro Display', 'Inter', system-ui, sans-serif";
+
+        function hasDiagnosticData(data) {
+            return !!(
+                data &&
+                !data.pending &&
+                Array.isArray(data.sentiment) &&
+                data.sentiment.length === 3 &&
+                Array.isArray(data.keywords) &&
+                data.keywords.length > 0 &&
+                Array.isArray(data.keywordLabels) &&
+                data.keywordLabels.length > 0 &&
+                typeof data.score === 'number'
+            );
+        }
+
+        function getProductSourceUrl(data) {
+            return (data && (data.source_url || data.url || '') || '').trim();
+        }
+
+        function isRadarCritical(item) {
+            return item && item.radar_status === 'critical';
+        }
+
+        function updateRadarAlertState() {
+            const criticalProducts = Object.values(activeData).filter(isRadarCritical);
+            if (criticalProducts.length === 0) {
+                radarAlertBanner.classList.add('hidden');
+                return;
+            }
+
+            const names = criticalProducts.map(item => item.product_name || item.product_id).join('、');
+            radarAlertMessage.innerText = `CRITICAL x${criticalProducts.length} · ${names}`;
+            radarAlertBanner.classList.remove('hidden');
+        }
+
+        function renderLiveOverview() {
+            const products = Object.values(activeData || {});
+            const diagnosedProducts = products.filter(hasDiagnosticData);
+            const criticalProducts = products.filter(isRadarCritical);
+            const diagnosedCount = diagnosedProducts.length;
+            const productCount = products.length;
+            const averageScore = diagnosedCount > 0
+                ? Math.round(diagnosedProducts.reduce((sum, item) => sum + Number(item.score || 0), 0) / diagnosedCount)
+                : null;
+            const coverage = productCount > 0 ? Math.round((diagnosedCount / productCount) * 100) : 0;
+
+            liveProductCount.innerText = String(productCount);
+            liveDiagnosedCount.innerText = String(diagnosedCount);
+            liveCriticalCount.innerText = String(criticalProducts.length);
+            liveAverageScore.innerText = averageScore === null ? '--' : String(averageScore);
+            liveDiagnosticCoverage.style.width = `${coverage}%`;
+
+            liveWorkflowStatus.className = isLocalApiOnline
+                ? 'self-start md:self-center px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-200 border border-emerald-400/20 text-xs font-bold'
+                : 'self-start md:self-center px-3 py-1 rounded-full bg-amber-500/10 text-amber-200 border border-amber-400/20 text-xs font-bold';
+            liveWorkflowStatus.innerText = isLocalApiOnline
+                ? (isAuthenticated ? '云端 API 在线 · 已登录' : '云端 API 在线 · 待登录')
+                : '等待 API 同步';
+
+            if (productCount === 0) {
+                liveNextAction.innerText = 'Add product -> Run pipeline -> Radar sync.';
+                liveRiskList.innerText = 'NO MOCK DATA · CLOUD ONLY';
+                return;
+            }
+
+            if (criticalProducts.length > 0) {
+                const names = criticalProducts.slice(0, 3).map(item => item.product_name || item.product_id).join('、');
+                liveNextAction.innerText = `CRITICAL FIRST · ${names}`;
+                liveRiskList.innerHTML = criticalProducts.slice(0, 3).map(item => `
+                    <div class="mt-2 rounded-lg border border-rose-400/20 bg-rose-500/10 px-3 py-2 text-rose-200 font-semibold">
+                        🚨 ${item.product_name || item.product_id}：${item.radar_alert_reason || '负面声量异常'}
+                    </div>
+                `).join('');
+                return;
+            }
+
+            if (diagnosedCount < productCount) {
+                liveNextAction.innerText = `PENDING DIAGNOSIS · ${productCount - diagnosedCount}`;
+            } else {
+                liveNextAction.innerText = 'ALL CLEAR · READY FOR VS ANALYSIS';
+            }
+            liveRiskList.innerHTML = '<span class="inline-flex items-center gap-1 text-emerald-200 font-semibold">🟢 NORMAL · NO CRITICAL NODES</span>';
+        }
+
+        function syncActiveProductTitle(productKey) {
+            const title = document.getElementById('active-product-title');
+            const data = activeData[productKey];
+            title.innerText = data && data.product_name ? data.product_name : '等待选择商品';
+        }
+
+        function destroyDiagnosticCharts() {
+            if (sentimentChart) {
+                sentimentChart.destroy();
+                sentimentChart = null;
+            }
+            if (keywordChart) {
+                keywordChart.destroy();
+                keywordChart = null;
+            }
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function inferMarketGapTypeFromText(text, fixability = 0) {
+            if (/包装|破损|物流|盒|shipping|package|delivery|box/i.test(text)) return 'Packaging Trust Gap';
+            if (/尺码|尺寸|fit|size|适配|tight|small/i.test(text)) return 'Fit Localization Gap';
+            if (/材质|面料|起球|质量|耐用|quality|material|fabric|pilling|thin/i.test(text)) return 'Material Upgrade Gap';
+            if (/说明|教程|认知|不会|安装|manual|guide|setup|connect/i.test(text)) return 'Education & Onboarding Gap';
+            if (fixability >= 72) return 'Supply Chain Fix Gap';
+            return 'Differentiation Gap';
+        }
+
+        function getTopPain(item) {
+            const topAspect = getTopAspect(item);
+            if (topAspect) {
+                return topAspect.raw_label || topAspect.aspect || '需求认知不清';
+            }
+            if (!item || !Array.isArray(item.keywordLabels) || item.keywordLabels.length === 0) {
+                return '需求认知不清';
+            }
+            return item.keywordLabels[0] || '需求认知不清';
+        }
+
+        function getMarketGapType(item, metrics) {
+            const topAspect = getTopAspect(item);
+            if (topAspect && topAspect.gap_type) {
+                return topAspect.gap_type;
+            }
+            const pain = getTopPain(item);
+            const painText = `${pain} ${item.direction || ''} ${item.insight || ''}`;
+            return inferMarketGapTypeFromText(painText, metrics.fixability);
+        }
+
+        function getEvidenceLedger(item) {
+            return item && item.evidence_ledger && typeof item.evidence_ledger === 'object'
+                ? item.evidence_ledger
+                : {};
+        }
+
+        function getAspectTerms(item) {
+            if (item && Array.isArray(item.aspect_terms) && item.aspect_terms.length > 0) {
+                return item.aspect_terms.filter(Boolean);
+            }
+            const ledger = getEvidenceLedger(item);
+            if (Array.isArray(ledger.aspect_terms) && ledger.aspect_terms.length > 0) {
+                return ledger.aspect_terms.filter(Boolean);
+            }
+            if (!item || !Array.isArray(item.keywordLabels)) {
+                return [];
+            }
+            const values = Array.isArray(item.keywords) ? item.keywords : [];
+            const total = values.reduce((sum, value) => sum + Number(value || 0), 0) || 1;
+            return item.keywordLabels.slice(0, 5).map((label, index) => {
+                const frequency = Number(values[index] || 0);
+                return {
+                    aspect_id: `keyword_${index + 1}`,
+                    aspect: label,
+                    raw_label: label,
+                    gap_type: inferMarketGapTypeFromText(`${label} ${item.direction || ''} ${item.insight || ''}`),
+                    polarity: 'negative',
+                    frequency,
+                    mention_rate: Math.round((frequency / total) * 100),
+                    baseline_negative_rate: 8,
+                    benchmark_lift: Number(((frequency / total) * 100 / 8).toFixed(1)),
+                    confidence: 0.42,
+                    examples: [],
+                    method: 'frontend_keyword_fallback'
+                };
+            });
+        }
+
+        function getTopAspect(item) {
+            const terms = getAspectTerms(item);
+            return terms.length > 0 ? terms[0] : null;
+        }
+
+        function getEvidenceStats(item) {
+            const ledger = getEvidenceLedger(item);
+            const aspectTerms = getAspectTerms(item);
+            const topAspect = aspectTerms[0] || {};
+            const benchmark = item && item.market_benchmark && typeof item.market_benchmark === 'object'
+                ? item.market_benchmark
+                : (ledger.market_benchmark || {});
+            const confidence = Number(ledger.confidence || topAspect.confidence || 0);
+            const evidenceCount = Number(ledger.evidence_count || aspectTerms.reduce((sum, aspect) => {
+                return sum + (Array.isArray(aspect.examples) ? aspect.examples.length : 0);
+            }, 0));
+            const commentCount = Number(ledger.comment_count || 0);
+            const lift = Number(topAspect.benchmark_lift || benchmark.top_aspect_lift || 0);
+            const mentionRate = Number(topAspect.mention_rate || 0);
+            const frequency = Number(topAspect.frequency || 0);
+            return {
+                ledger,
+                aspectTerms,
+                topAspect,
+                confidence,
+                evidenceCount,
+                commentCount,
+                lift,
+                mentionRate,
+                frequency,
+                method: ledger.method || topAspect.method || 'keyword fallback',
+                benchmark
+            };
+        }
+
+        function renderEvidenceExample(example) {
+            if (!example || !example.text) {
+                return '';
+            }
+            const meta = [example.source, example.time, example.likes ? `${example.likes} likes` : '']
+                .filter(Boolean)
+                .join(' · ');
+            return `
+                <div class="rounded-lg border border-slate-100 bg-white/80 p-3">
+                    <div class="text-xs font-semibold text-slate-700 leading-relaxed">“${escapeHtml(example.text)}”</div>
+                    ${meta ? `<div class="mt-2 text-[10px] font-bold text-slate-400">${escapeHtml(meta)}</div>` : ''}
+                </div>
+            `;
+        }
+
+        function getAspectDisplayName(aspect) {
+            if (!aspect || typeof aspect !== 'object') {
+                return 'Unclassified aspect';
+            }
+            return aspect.raw_label || aspect.aspect || 'Unclassified aspect';
+        }
+
+        function formatBenchmarkLift(value) {
+            const lift = Number(value || 0);
+            return lift > 0 ? `${lift.toFixed(1)}x` : '--';
+        }
+
+        function formatConfidence(value) {
+            const confidence = Number(value || 0);
+            return `${Math.round(confidence * 100)}%`;
+        }
+
+        function getOpportunityRecords() {
+            return Object.keys(activeData || {})
+                .map(key => {
+                    const item = activeData[key];
+                    if (!hasDiagnosticData(item)) return null;
+
+                    const sentiment = Array.isArray(item.sentiment) ? item.sentiment : [0, 100, 0];
+                    const negative = Number(sentiment[2] || 0);
+                    const positive = Number(sentiment[0] || 0);
+                    const score = Number(item.score || 0);
+                    const evidence = getEvidenceStats(item);
+                    const topAspect = evidence.topAspect || {};
+                    const keywordTotal = Array.isArray(item.keywords)
+                        ? item.keywords.reduce((sum, value) => sum + Number(value || 0), 0)
+                        : 0;
+                    const topKeyword = Array.isArray(item.keywords) && item.keywords.length > 0
+                        ? Number(item.keywords[0] || 0)
+                        : 0;
+                    const concentration = keywordTotal > 0 ? Math.round((topKeyword / keywordTotal) * 100) : 0;
+                    const factories = Array.isArray(item.recommended_factories) ? item.recommended_factories : [];
+                    const radarDelta = Number(item.radar_negative_delta || 0);
+                    const evidenceConfidence = clampScore(evidence.confidence * 100);
+                    const benchmarkLift = Math.max(0, Number(evidence.lift || 0));
+                    const liftScore = clampScore(Math.min(benchmarkLift, 4) * 25);
+                    const evidenceDepth = clampScore((evidence.evidenceCount * 18) + Math.min(evidence.commentCount, 120) * 0.22 + evidence.frequency * 0.55);
+                    const aspectMentionRate = Number(evidence.mentionRate || 0);
+
+                    const demandHeat = clampScore(negative * 0.85 + Math.min(keywordTotal, 100) * 0.15 + aspectMentionRate * 0.65 + liftScore * 0.32 + Math.max(0, radarDelta) * 1.4);
+                    const painDensity = clampScore(concentration * 0.4 + negative * 0.28 + aspectMentionRate * 0.8 + liftScore * 0.22);
+                    const fixability = clampScore(
+                        factories.length > 0
+                            ? 68 + Math.min(22, factories.length * 8) + (isRadarCritical(item) ? 6 : 0)
+                            : 44 + Math.max(0, 100 - score) * 0.24
+                    );
+                    const riskDrag = clampScore(negative * 0.75 + Math.max(0, 72 - score) * 0.62 + (isRadarCritical(item) ? 18 : 0));
+                    const timingWindow = clampScore(42 + Math.max(0, radarDelta) * 1.8 + (isRadarCritical(item) ? 18 : 0) + Math.max(0, negative - positive) * 0.25);
+                    const gapScore = clampScore(
+                        demandHeat * 0.22 +
+                        painDensity * 0.18 +
+                        liftScore * 0.16 +
+                        evidenceConfidence * 0.14 +
+                        evidenceDepth * 0.1 +
+                        fixability * 0.12 +
+                        timingWindow * 0.08
+                    );
+                    const metrics = { demandHeat, painDensity, fixability, riskDrag, timingWindow, evidenceConfidence, liftScore, evidenceDepth };
+                    const gapType = getMarketGapType(item, metrics);
+                    const priority = gapScore >= 78 ? 'P0 · 立即打样' : (gapScore >= 64 ? 'P1 · 本周验证' : 'P2 · 观察池');
+                    const topPain = topAspect.raw_label || topAspect.aspect || getTopPain(item);
+                    const evidenceLine = benchmarkLift > 0
+                        ? `ABSA 证据显示“${topPain}”相对公开类目基线约 ${benchmarkLift.toFixed(1)}x`
+                        : `ABSA 证据显示“${topPain}”是当前最高频属性级痛点`;
+                    const thesis = `${gapType}：${evidenceLine}，置信度 ${Math.round(evidence.confidence * 100)}%，当前负面率 ${negative}%${radarDelta > 0 ? `，近 24H 抬升 ${radarDelta}%` : ''}。建议以“规避该痛点”的微创新版本切入，并用评论样例验证详情页卖点。`;
+
+                    return {
+                        key,
+                        item,
+                        gapScore,
+                        gapType,
+                        priority,
+                        topPain,
+                        keywordTotal,
+                        negative,
+                        positive,
+                        score,
+                        metrics,
+                        evidence,
+                        topAspect,
+                        benchmarkLift,
+                        thesis
+                    };
+                })
+                .filter(Boolean)
+                .sort((a, b) => b.gapScore - a.gapScore);
+        }
+
+        function renderMarketGapChart(records) {
+            const ctx = document.getElementById('marketGapChart').getContext('2d');
+            const topRecords = records.slice(0, 5);
+            const labels = topRecords.map(record => record.item.product_name || record.key);
+            const data = topRecords.map(record => record.gapScore);
+            const colors = topRecords.map(record => record.gapScore >= 78 ? '#6366F1' : (record.gapScore >= 64 ? '#8B5CF6' : '#94A3B8'));
+
+            const chartData = {
+                labels: wrapLabels(labels),
+                datasets: [{
+                    label: 'Market Gap Score',
+                    data,
+                    backgroundColor: colors,
+                    borderRadius: 7,
+                    maxBarThickness: 42
+                }]
+            };
+
+            if (marketGapChart) {
+                marketGapChart.data = chartData;
+                marketGapChart.update();
+                return;
+            }
+
+            marketGapChart = new Chart(ctx, {
+                type: 'bar',
+                data: chartData,
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: tooltipFixConfig
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            max: 100,
+                            grid: { color: 'rgba(148,163,184,0.16)' },
+                            ticks: { color: '#64748B' }
+                        },
+                        y: {
+                            grid: { display: false },
+                            ticks: { color: '#64748B' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderPainSignalMatrix(records) {
+            const signalMap = new Map();
+            records.forEach(record => {
+                const aspectTerms = record.evidence && Array.isArray(record.evidence.aspectTerms)
+                    ? record.evidence.aspectTerms
+                    : getAspectTerms(record.item);
+
+                aspectTerms.slice(0, 6).forEach(aspect => {
+                    if (!aspect || typeof aspect !== 'object') return;
+                    const label = getAspectDisplayName(aspect);
+                    const key = aspect.aspect_id || label;
+                    const current = signalMap.get(key) || {
+                        label,
+                        canonical: aspect.aspect || label,
+                        value: 0,
+                        mentionRate: 0,
+                        lift: 0,
+                        confidenceTotal: 0,
+                        count: 0,
+                        examples: 0,
+                        products: new Set()
+                    };
+                    current.value += Number(aspect.frequency || 0);
+                    current.mentionRate = Math.max(current.mentionRate, Number(aspect.mention_rate || 0));
+                    current.lift = Math.max(current.lift, Number(aspect.benchmark_lift || 0));
+                    current.confidenceTotal += Number(aspect.confidence || 0);
+                    current.count += 1;
+                    current.examples += Array.isArray(aspect.examples) ? aspect.examples.length : 0;
+                    current.products.add(record.item.product_name || record.key);
+                    signalMap.set(key, current);
+                });
+            });
+
+            const signals = Array.from(signalMap.values())
+                .map(signal => {
+                    const confidence = signal.count > 0 ? signal.confidenceTotal / signal.count : 0;
+                    const strength = clampScore(signal.value * 1.8 + signal.mentionRate * 0.55 + signal.lift * 16 + confidence * 24 + signal.products.size * 6);
+                    return { ...signal, confidence, strength };
+                })
+                .sort((a, b) => b.strength - a.strength)
+                .slice(0, 6);
+            if (signals.length === 0) {
+                marketGapSignalGrid.innerHTML = '<div class="rounded-lg border border-dashed border-slate-200 p-4 text-sm text-slate-400">暂无可聚合痛点。</div>';
+                return;
+            }
+
+            marketGapSignalGrid.innerHTML = signals.map(signal => {
+                const width = Math.max(8, Math.round(signal.strength));
+                return `
+                    <div class="rounded-lg border border-slate-100 bg-white/75 p-3">
+                        <div class="flex items-center justify-between gap-3">
+                            <div class="min-w-0">
+                                <div class="font-black text-sm text-slate-800 truncate">${escapeHtml(signal.label)}</div>
+                                <div class="text-[11px] text-slate-400 mt-0.5">覆盖 ${signal.products.size}/${records.length} 个商品 · 频次 ${signal.value} · 样例 ${signal.examples}</div>
+                            </div>
+                            <span class="text-xs font-black text-indigo-600">Lift ${formatBenchmarkLift(signal.lift)}</span>
+                        </div>
+                        <div class="mt-2 flex flex-wrap gap-1.5 text-[10px] font-bold">
+                            <span class="rounded-md bg-indigo-50 text-indigo-700 px-2 py-0.5">Conf ${formatConfidence(signal.confidence)}</span>
+                            <span class="rounded-md bg-slate-100 text-slate-600 px-2 py-0.5">Mention ${Math.round(signal.mentionRate)}%</span>
+                            <span class="rounded-md bg-violet-50 text-violet-700 px-2 py-0.5">Evidence weighted</span>
+                        </div>
+                        <div class="mt-3 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                            <div class="h-full rounded-full bg-gradient-to-r from-indigo-500 to-violet-500" style="width: ${width}%"></div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderMarketGapRadar() {
+            const records = getOpportunityRecords();
+            if (records.length === 0) {
+                marketGapEmpty.classList.remove('hidden');
+                marketGapContent.classList.add('hidden');
+                if (marketGapChart) {
+                    marketGapChart.destroy();
+                    marketGapChart = null;
+                }
+                return;
+            }
+
+            marketGapEmpty.classList.add('hidden');
+            marketGapContent.classList.remove('hidden');
+
+            const prime = records[0];
+            marketGapPrimeProduct.innerText = prime.item.product_name || prime.key;
+            marketGapPrimeScore.innerText = String(prime.gapScore);
+            marketGapPrimeType.innerText = `${prime.gapType} · ${prime.priority}`;
+            marketGapPrimeThesis.innerText = prime.thesis;
+            marketGapPrimeDemand.innerText = `${prime.metrics.demandHeat}/100`;
+            marketGapPrimeRisk.innerText = `${prime.metrics.riskDrag}/100`;
+            marketGapPrimeFix.innerText = `${prime.metrics.fixability}/100`;
+            marketGapSummary.innerText = `${records.length} 个已诊断商品 · ${records.filter(record => record.gapScore >= 64).length} 个可验证机会`;
+
+            const primeExamples = Array.isArray(prime.topAspect.examples) ? prime.topAspect.examples.slice(0, 2) : [];
+            const benchmarkReference = prime.evidence && prime.evidence.benchmark
+                ? prime.evidence.benchmark.reference
+                : '';
+            marketGapPrimeEvidence.innerHTML = `
+                <div class="flex items-center justify-between gap-3">
+                    <span class="font-black text-indigo-700">Evidence Ledger</span>
+                    <span class="rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100 px-2 py-0.5 font-black">${escapeHtml(prime.evidence.method || 'ABSA evidence')}</span>
+                </div>
+                <div class="mt-2 text-slate-700"><span class="font-black">Top Aspect:</span> ${escapeHtml(getAspectDisplayName(prime.topAspect))}</div>
+                <div class="mt-3 grid grid-cols-2 gap-2 text-[11px] font-bold">
+                    <span class="rounded-md bg-slate-50 px-2 py-1">Lift ${formatBenchmarkLift(prime.benchmarkLift)}</span>
+                    <span class="rounded-md bg-slate-50 px-2 py-1">Conf ${formatConfidence(prime.evidence.confidence)}</span>
+                    <span class="rounded-md bg-slate-50 px-2 py-1">Evidence ${prime.evidence.evidenceCount}</span>
+                    <span class="rounded-md bg-slate-50 px-2 py-1">Comments ${prime.evidence.commentCount || '--'}</span>
+                </div>
+                ${primeExamples.length > 0 ? `<div class="mt-3 space-y-2">${primeExamples.map(renderEvidenceExample).join('')}</div>` : '<div class="mt-3 rounded-lg border border-dashed border-slate-200 bg-slate-50/70 p-3 text-slate-400">当前为关键词兼容证据，下一次真实抓取后会补齐评论样例。</div>'}
+                ${benchmarkReference ? `<div class="mt-3 text-[10px] font-bold text-slate-400">Benchmark: ${escapeHtml(benchmarkReference)}</div>` : ''}
+            `;
+
+            marketGapList.innerHTML = records.map((record, index) => {
+                const examples = Array.isArray(record.topAspect.examples) ? record.topAspect.examples : [];
+                const firstExample = examples[0];
+                return `
+                <div class="p-5 hover:bg-indigo-50/40 transition-colors">
+                    <div class="flex flex-col xl:flex-row xl:items-start justify-between gap-4">
+                        <div class="min-w-0">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <span class="text-xs font-black text-slate-400">#${index + 1}</span>
+                                <span class="font-black text-slate-900">${escapeHtml(record.item.product_name || record.key)}</span>
+                                <span class="rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100 px-2.5 py-0.5 text-[11px] font-black">${escapeHtml(record.gapType)}</span>
+                            </div>
+                            <p class="mt-2 text-sm text-slate-600 leading-relaxed">${escapeHtml(record.thesis)}</p>
+                            <div class="mt-3 flex flex-wrap gap-2 text-[11px] font-bold">
+                                <span class="rounded-md bg-slate-100 text-slate-600 px-2 py-1">Pain ${record.metrics.painDensity}</span>
+                                <span class="rounded-md bg-slate-100 text-slate-600 px-2 py-1">Fix ${record.metrics.fixability}</span>
+                                <span class="rounded-md bg-slate-100 text-slate-600 px-2 py-1">Timing ${record.metrics.timingWindow}</span>
+                                <span class="rounded-md bg-rose-50 text-rose-700 px-2 py-1">Risk ${record.metrics.riskDrag}</span>
+                                <span class="rounded-md bg-indigo-50 text-indigo-700 px-2 py-1">Lift ${formatBenchmarkLift(record.benchmarkLift)}</span>
+                                <span class="rounded-md bg-violet-50 text-violet-700 px-2 py-1">Conf ${formatConfidence(record.evidence.confidence)}</span>
+                                <span class="rounded-md bg-emerald-50 text-emerald-700 px-2 py-1">Evidence ${record.evidence.evidenceCount}</span>
+                            </div>
+                            <div class="mt-3 text-[11px] font-bold text-slate-400 uppercase">Top Aspect · ${escapeHtml(getAspectDisplayName(record.topAspect))}</div>
+                            ${firstExample ? `<div class="mt-2 rounded-lg border border-slate-100 bg-white/70 p-3 text-xs text-slate-600 leading-relaxed">“${escapeHtml(firstExample.text)}”</div>` : ''}
+                        </div>
+                        <div class="flex xl:flex-col items-center xl:items-end gap-3 shrink-0">
+                            <div class="text-right">
+                                <div class="text-3xl font-black text-indigo-600">${record.gapScore}</div>
+                                <div class="text-[10px] font-bold text-slate-400">GAP SCORE</div>
+                            </div>
+                            <button data-battlecard-product="${record.key}" class="btn-battlecard quiet-button px-3 py-2 rounded-lg text-xs font-black">查看 Battlecard</button>
+                        </div>
+                    </div>
+                </div>
+                `;
+            }).join('');
+
+            renderMarketGapChart(records);
+            renderPainSignalMatrix(records);
+        }
+
+        function getOpportunityRecord(productKey) {
+            return getOpportunityRecords().find(record => record.key === productKey) || null;
+        }
+
+        function getBattlecard(productKey) {
+            const item = activeData[productKey];
+            if (!item || !hasDiagnosticData(item)) return null;
+
+            const record = getOpportunityRecord(productKey) || {
+                key: productKey,
+                item,
+                gapScore: clampScore(100 - Number(item.score || 0) * 0.35),
+                gapType: getMarketGapType(item, { fixability: 50 }),
+                priority: 'P2 · 观察池',
+                topPain: getTopPain(item),
+                negative: Array.isArray(item.sentiment) ? Number(item.sentiment[2] || 0) : 0,
+                metrics: {
+                    demandHeat: 50,
+                    painDensity: 50,
+                    fixability: 50,
+                    riskDrag: 50,
+                    timingWindow: 50,
+                    evidenceConfidence: 35,
+                    liftScore: 0,
+                    evidenceDepth: 0
+                },
+                evidence: getEvidenceStats(item),
+                topAspect: getTopAspect(item) || {},
+                benchmarkLift: Number(getEvidenceStats(item).lift || 0),
+                thesis: ''
+            };
+            const labels = Array.isArray(item.keywordLabels) ? item.keywordLabels : [];
+            const painStack = labels.slice(0, 3).filter(Boolean);
+            const evidence = record.evidence || getEvidenceStats(item);
+            const topAspect = record.topAspect || evidence.topAspect || {};
+            const aspectTerms = Array.isArray(evidence.aspectTerms) ? evidence.aspectTerms : [];
+            const topPain = record.topPain || getAspectDisplayName(topAspect) || getTopPain(item);
+            const evidenceExamples = Array.isArray(topAspect.examples) ? topAspect.examples.slice(0, 3) : [];
+            const benchmarkLift = Number(record.benchmarkLift || evidence.lift || 0);
+            const confidence = Number(evidence.confidence || 0);
+            const productName = item.product_name || productKey;
+            const factories = Array.isArray(item.recommended_factories) ? item.recommended_factories : [];
+            const factoryLine = factories.length > 0
+                ? factories.slice(0, 2).map(factory => factory.factory_name).join(' / ')
+                : '先以 2-3 家源头工厂做小批量打样';
+            const appealNeeded = isRadarCritical(item) || record.metrics.riskDrag >= 65;
+            const positioning = `主打“解决 ${topPain}”的高可信版本，避开同质低价款，用详情页前 3 秒直接对比竞品痛点。`;
+            const moat = record.gapType.includes('Material')
+                ? '材料工艺升级 + 可视化质检证明'
+                : (record.gapType.includes('Packaging')
+                    ? '运输损耗控制 + 开箱信任'
+                    : (record.gapType.includes('Education') ? '低学习成本 + 短视频上手教育' : '痛点规避 + 小批量快反'));
+            const adHook = `Stop losing money on ${topPain}. This version was built for buyers who returned the old one.`;
+
+            return {
+                productKey,
+                productName,
+                productId: item.product_id || productKey,
+                gapScore: record.gapScore,
+                gapType: record.gapType,
+                priority: record.priority,
+                topPain,
+                painStack,
+                positioning,
+                moat,
+                adHook,
+                factoryLine,
+                appealNeeded,
+                negative: record.negative,
+                healthScore: Number(item.score || 0),
+                metrics: record.metrics,
+                evidence,
+                topAspect,
+                aspectTerms,
+                evidenceExamples,
+                benchmarkLift,
+                confidence,
+                direction: item.direction || '等待供应链改良方向',
+                action: item.action || '待决策',
+                insight: item.insight || record.thesis,
+                thesis: record.thesis
+            };
+        }
+
+        function renderMetricPill(label, value, tone = 'slate') {
+            const toneClass = tone === 'rose'
+                ? 'bg-rose-50 text-rose-700 border-rose-100'
+                : (tone === 'emerald' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-slate-50 text-slate-700 border-slate-100');
+            return `
+                <div class="rounded-lg border ${toneClass} p-3">
+                    <div class="text-[10px] font-black uppercase opacity-70">${label}</div>
+                    <div class="mt-1 text-xl font-black">${value}</div>
+                </div>
+            `;
+        }
+
+        function renderBattlecardContent(card) {
+            const pains = card.painStack.length > 0 ? card.painStack : [card.topPain];
+            const aspectRows = Array.isArray(card.aspectTerms) ? card.aspectTerms.slice(0, 4) : [];
+            const benchmarkReference = card.evidence && card.evidence.benchmark
+                ? card.evidence.benchmark.reference
+                : '';
+            const exampleHtml = card.evidenceExamples.length > 0
+                ? card.evidenceExamples.map(renderEvidenceExample).join('')
+                : '<div class="rounded-lg border border-dashed border-slate-200 bg-slate-50/70 p-4 text-xs text-slate-400">暂无逐条评论样例。当前 Battlecard 使用关键词频次兼容证据，完成新一轮抓取后会自动补齐。</div>';
+            battlecardContent.innerHTML = `
+                <div class="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-5">
+                    <div class="rounded-lg border border-indigo-100 bg-indigo-50/40 p-5">
+                        <div class="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                            <div>
+                                <div class="text-xs font-black text-indigo-600 uppercase">Opportunity Thesis</div>
+                                <p class="mt-2 text-sm leading-relaxed text-slate-700">${escapeHtml(card.thesis || card.positioning)}</p>
+                            </div>
+                            <div class="shrink-0 text-right">
+                                <div class="text-5xl font-black text-indigo-600">${card.gapScore}</div>
+                                <div class="text-[10px] font-black text-slate-400">GAP SCORE</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        ${renderMetricPill('Health', `${card.healthScore}/100`, card.healthScore < 70 ? 'rose' : 'emerald')}
+                        ${renderMetricPill('Lift', formatBenchmarkLift(card.benchmarkLift), card.benchmarkLift >= 2 ? 'rose' : 'slate')}
+                        ${renderMetricPill('Confidence', formatConfidence(card.confidence), 'emerald')}
+                        ${renderMetricPill('Priority', card.priority.split(' · ')[0], card.gapScore >= 64 ? 'rose' : 'slate')}
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-4">
+                    <div class="rounded-lg border border-indigo-100 bg-white/80 p-5">
+                        <div class="flex items-center justify-between gap-3">
+                            <div>
+                                <div class="text-xs font-black text-indigo-700 uppercase">Evidence Used</div>
+                                <div class="mt-1 text-sm font-semibold text-slate-800">${escapeHtml(card.evidence.method || 'ABSA-inspired aspect mining')}</div>
+                            </div>
+                            <div class="text-right text-xs font-bold text-slate-500">
+                                <div>Evidence ${card.evidence.evidenceCount || 0}</div>
+                                <div>Comments ${card.evidence.commentCount || '--'}</div>
+                            </div>
+                        </div>
+                        <div class="mt-4 overflow-hidden rounded-lg border border-slate-100">
+                            ${aspectRows.length > 0 ? aspectRows.map(aspect => `
+                                <div class="grid grid-cols-[1fr_auto] gap-3 border-b border-slate-100 last:border-b-0 bg-slate-50/60 px-3 py-2.5">
+                                    <div class="min-w-0">
+                                        <div class="truncate text-xs font-black text-slate-800">${escapeHtml(getAspectDisplayName(aspect))}</div>
+                                        <div class="mt-0.5 text-[10px] font-bold text-slate-400">${escapeHtml(aspect.gap_type || 'Differentiation Gap')} · ${escapeHtml(aspect.method || 'evidence')}</div>
+                                    </div>
+                                    <div class="text-right text-[11px] font-black text-indigo-700">
+                                        <div>${formatBenchmarkLift(aspect.benchmark_lift)}</div>
+                                        <div class="text-slate-400">${Math.round(Number(aspect.mention_rate || 0))}%</div>
+                                    </div>
+                                </div>
+                            `).join('') : '<div class="p-4 text-xs text-slate-400">暂无属性级证据。</div>'}
+                        </div>
+                        ${benchmarkReference ? `<div class="mt-3 text-[10px] font-bold text-slate-400">Benchmark: ${escapeHtml(benchmarkReference)}</div>` : ''}
+                    </div>
+                    <div class="rounded-lg border border-slate-100 bg-slate-50/70 p-5">
+                        <div class="text-xs font-black text-slate-400 uppercase">Review Examples</div>
+                        <div class="mt-3 space-y-2">${exampleHtml}</div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    <div class="rounded-lg border border-slate-100 bg-white/75 p-5">
+                        <div class="text-xs font-black text-slate-400 uppercase">Positioning</div>
+                        <div class="mt-2 text-sm font-semibold text-slate-800 leading-relaxed">${escapeHtml(card.positioning)}</div>
+                    </div>
+                    <div class="rounded-lg border border-slate-100 bg-white/75 p-5">
+                        <div class="text-xs font-black text-slate-400 uppercase">Defensible Moat</div>
+                        <div class="mt-2 text-sm font-semibold text-slate-800 leading-relaxed">${escapeHtml(card.moat)}</div>
+                    </div>
+                    <div class="rounded-lg border border-slate-100 bg-white/75 p-5">
+                        <div class="text-xs font-black text-slate-400 uppercase">Supplier Move</div>
+                        <div class="mt-2 text-sm font-semibold text-slate-800 leading-relaxed">${escapeHtml(card.factoryLine)}</div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div class="rounded-lg border border-rose-100 bg-rose-50/40 p-5">
+                        <div class="text-xs font-black text-rose-700 uppercase">Buyer Pain Stack</div>
+                        <div class="mt-3 flex flex-wrap gap-2">
+                            ${pains.map(pain => `<span class="rounded-full bg-white/80 border border-rose-100 px-3 py-1 text-xs font-bold text-rose-700">${escapeHtml(pain)}</span>`).join('')}
+                        </div>
+                        <p class="mt-4 text-sm text-rose-700 leading-relaxed">${escapeHtml(card.insight)}</p>
+                    </div>
+                    <div class="rounded-lg border border-emerald-100 bg-emerald-50/40 p-5">
+                        <div class="text-xs font-black text-emerald-700 uppercase">Launch Script</div>
+                        <div class="mt-2 rounded-lg bg-white/80 border border-emerald-100 p-4 text-sm font-semibold text-slate-800 leading-relaxed">
+                            ${escapeHtml(card.adHook)}
+                        </div>
+                        <div class="mt-3 text-sm text-emerald-700 leading-relaxed">投放页先展示竞品痛点，再展示新版本如何规避该痛点。首批建议小预算 A/B 测试“痛点规避”和“升级工艺”两套钩子。</div>
+                    </div>
+                </div>
+
+                <div class="rounded-lg border border-slate-100 bg-slate-50/70 p-5">
+                    <div class="text-xs font-black text-slate-400 uppercase">Next 72H Actions</div>
+                    <div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                        <div class="rounded-lg bg-white border border-slate-100 p-4">
+                            <div class="font-black text-slate-900">1. 打样验证</div>
+                            <p class="mt-2 text-slate-600 leading-relaxed">围绕“${escapeHtml(card.topPain)}”做一版规避型样品，保留原价位但强化可信证据。</p>
+                        </div>
+                        <div class="rounded-lg bg-white border border-slate-100 p-4">
+                            <div class="font-black text-slate-900">2. 内容钩子</div>
+                            <p class="mt-2 text-slate-600 leading-relaxed">拍摄 15 秒对比视频：旧痛点 -> 新方案 -> 真实使用场景。</p>
+                        </div>
+                        <div class="rounded-lg bg-white border border-slate-100 p-4">
+                            <div class="font-black text-slate-900">3. 风险处理</div>
+                            <p class="mt-2 text-slate-600 leading-relaxed">${card.appealNeeded ? '同步准备申诉抗辩与售后 SOP，先止损再放量。' : '先进入观察池，等待下一轮雷达巡检确认趋势。'}</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function openBattlecard(productKey) {
+            const card = getBattlecard(productKey);
+            if (!card) {
+                showToast('当前商品尚未完成诊断，暂无法生成 Battlecard。', 'info');
+                return;
+            }
+            currentBattlecardProductKey = productKey;
+            battlecardTitle.innerText = `${card.productName} · AI 选品战术卡`;
+            battlecardSubtitle.innerText = `${card.gapType} · ${card.priority} · Product ID: ${card.productId}`;
+            renderBattlecardContent(card);
+            battlecardModal.classList.remove('hidden');
+        }
+
+        function getBattlecardPlainText(productKey) {
+            const card = getBattlecard(productKey);
+            if (!card) return '';
+            return [
+                `AI 选品战术卡 - ${card.productName}`,
+                `Product ID: ${card.productId}`,
+                `Gap Score: ${card.gapScore}/100`,
+                `Gap Type: ${card.gapType}`,
+                `Priority: ${card.priority}`,
+                '',
+                `Top Aspect: ${getAspectDisplayName(card.topAspect)}`,
+                `Benchmark Lift: ${formatBenchmarkLift(card.benchmarkLift)}`,
+                `Evidence Confidence: ${formatConfidence(card.confidence)}`,
+                `Evidence Count: ${card.evidence.evidenceCount || 0}`,
+                `Comment Sample: ${card.evidence.commentCount || 0}`,
+                '',
+                `Opportunity Thesis: ${card.thesis || card.positioning}`,
+                `Top Pain: ${card.topPain}`,
+                `Positioning: ${card.positioning}`,
+                `Moat: ${card.moat}`,
+                `Supplier Move: ${card.factoryLine}`,
+                `Ad Hook: ${card.adHook}`,
+                `Next Action: ${card.action}`,
+                '',
+                `Evidence Examples:`,
+                ...(card.evidenceExamples.length > 0
+                    ? card.evidenceExamples.map((example, index) => `${index + 1}. ${example.text}`)
+                    : ['暂无逐条评论样例，当前使用关键词频次兼容证据。']),
+                '',
+                `AI Insight: ${card.insight}`
+            ].join('\n');
+        }
+
+        // 根据 activeData 动态重建竞品复选框，确保新增商品或诊断后商品名能即时同步。
+        function renderCompetitorCheckboxes() {
+            const previousChecked = new Set(
+                Array.from(document.querySelectorAll('.competitor-checkbox:checked')).map(input => input.value)
+            );
+            competitorCheckboxList.innerHTML = '';
+
+            Object.keys(activeData).forEach((key, index) => {
+                const item = activeData[key];
+                const ready = hasDiagnosticData(item);
+                const shouldCheck = previousChecked.has(key) || (previousChecked.size === 0 && ready && index < 3);
+                const row = document.createElement('label');
+                row.className = 'flex items-start gap-3 rounded-lg border border-slate-200 bg-white/70 px-3 py-2.5 text-sm shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:border-violet-200 hover:bg-violet-50/60 transition-colors';
+                row.innerHTML = `
+                    <input type="checkbox" value="${key}" class="competitor-checkbox mt-1 h-4 w-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500" ${shouldCheck ? 'checked' : ''}>
+                    <span class="min-w-0 flex-1">
+                        <span class="block font-semibold text-slate-800 truncate">${item.product_name || key}</span>
+                        <span class="block text-xs text-slate-500 mt-0.5">ID: ${item.product_id || key} · ${ready ? `健康分 ${item.score}/100` : '待诊断'}</span>
+                    </span>
+                `;
+                competitorCheckboxList.appendChild(row);
+            });
+        }
+
+        // 读取当前勾选的商品 ID，后续会直接传给 /api/run-vs-pipeline。
+        function getSelectedCompetitorIds() {
+            return Array.from(document.querySelectorAll('.competitor-checkbox:checked')).map(input => input.value);
+        }
+
+        function getVsPalette(index) {
+            const colors = [
+                { bg: 'rgba(124, 58, 237, 0.72)', border: '#7C3AED' },
+                { bg: 'rgba(14, 165, 233, 0.72)', border: '#0EA5E9' },
+                { bg: 'rgba(16, 185, 129, 0.72)', border: '#10B981' }
+            ];
+            return colors[index % colors.length];
+        }
+
+        // 渲染竞品横向柱状图：每个商品一个 Dataset，对比健康分和负面情绪占比。
+        function renderVsChart(chartLabels, chartDatasets) {
+            const ctx = document.getElementById('vsChart').getContext('2d');
+            const datasets = chartDatasets.map((dataset, index) => {
+                const palette = getVsPalette(index);
+                return {
+                    label: dataset.product_name,
+                    data: dataset.data,
+                    backgroundColor: palette.bg,
+                    borderColor: palette.border,
+                    borderWidth: 1,
+                    borderRadius: 6,
+                    maxBarThickness: 34
+                };
+            });
+
+            vsEmptyState.classList.add('hidden');
+            vsChartWrap.classList.remove('hidden');
+
+            if (vsChart) {
+                vsChart.data.labels = chartLabels;
+                vsChart.data.datasets = datasets;
+                vsChart.update();
+                return;
+            }
+
+            vsChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: chartLabels,
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom' },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const suffix = context.dataIndex === 0 ? ' 分' : '%';
+                                    return `${context.dataset.label}: ${context.parsed.y}${suffix}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: { stepSize: 20, color: '#64748B' },
+                            grid: { color: 'rgba(148,163,184,0.16)' }
+                        },
+                        x: { grid: { display: false }, ticks: { color: '#64748B' } }
+                    }
+                }
+            });
+        }
+
+        // 渲染后端合并诊断出的《竞品差异化选品套利策略书》。
+        function renderVsReport(payload) {
+            const sourceBadge = payload.report_source === 'openai'
+                ? `GPT-5.5 · ${payload.model_used || 'gpt-5.5'}`
+                : '本地规则兜底';
+            vsAiReport.classList.remove('hidden');
+            vsAiReport.innerHTML = `
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-3">
+                    <div class="font-black text-violet-800">📌 AI 竞品击穿报告</div>
+                    <div class="text-[11px] font-bold text-violet-700 bg-violet-50 border border-violet-100 rounded-full px-2.5 py-1">${sourceBadge} · ${payload.generated_at || ''}</div>
+                </div>
+                <div>${payload.report || '暂无竞品报告。'}</div>
+            `;
+        }
+
+        function renderFactoryRadarChart(factories) {
+            const ctx = document.getElementById('factoryRadarChart').getContext('2d');
+            const labels = ['质量', '成本', '交付', '资质'];
+            const palette = [
+                { border: '#6366F1', bg: 'rgba(99, 102, 241, 0.22)', point: '#6366F1' },
+                { border: '#EC4899', bg: 'rgba(236, 72, 153, 0.18)', point: '#EC4899' },
+                { border: '#10B981', bg: 'rgba(16, 185, 129, 0.16)', point: '#10B981' }
+            ];
+            const datasets = factories.map((factory, index) => ({
+                label: factory.factory_name,
+                data: factory.scores || [0, 0, 0, 0],
+                borderColor: palette[index % palette.length].border,
+                backgroundColor: palette[index % palette.length].bg,
+                pointBackgroundColor: palette[index % palette.length].point,
+                pointBorderColor: '#FFFFFF',
+                pointBorderWidth: 2,
+                borderWidth: 2.5,
+                pointRadius: 4,
+                pointHoverRadius: 6
+            }));
+
+            if (factoryRadarChart) {
+                factoryRadarChart.data.labels = labels;
+                factoryRadarChart.data.datasets = datasets;
+                factoryRadarChart.update();
+                return;
+            }
+
+            factoryRadarChart = new Chart(ctx, {
+                type: 'radar',
+                data: { labels, datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                color: '#475569',
+                                boxWidth: 10,
+                                boxHeight: 10,
+                                usePointStyle: true,
+                                pointStyle: 'circle'
+                            }
+                        }
+                    },
+                    scales: {
+                        r: {
+                            suggestedMin: 0,
+                            suggestedMax: 100,
+                            angleLines: { color: 'rgba(148,163,184,0.18)' },
+                            pointLabels: {
+                                color: '#475569',
+                                font: {
+                                    size: 12,
+                                    weight: 700
+                                }
+                            },
+                            ticks: {
+                                stepSize: 20,
+                                color: '#64748B',
+                                backdropColor: 'rgba(248, 250, 252, 0)'
+                            },
+                            grid: { color: 'rgba(148,163,184,0.18)' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderSourcingPanel(productKey) {
+            const item = activeData[productKey];
+            const factories = item && Array.isArray(item.recommended_factories) ? item.recommended_factories : [];
+            currentSourcingProductKey = productKey;
+
+            if (!item || !isRadarCritical(item) || factories.length === 0) {
+                sourcingRadarPanel.classList.add('hidden');
+                return;
+            }
+
+            sourcingRadarPanel.classList.remove('hidden');
+            sourcingPanelNote.innerText = `${item.product_name || productKey} 已触发雷达红线，系统按质量 45%、成本 25%、交付 20%、资质 10% 推荐源头工厂。`;
+            renderFactoryRadarChart(factories);
+
+            factoryCardList.innerHTML = factories.map(factory => {
+                const scores = Array.isArray(factory.scores) ? factory.scores : [0, 0, 0, 0];
+                const scoreCells = [
+                    ['质', scores[0] || 0],
+                    ['本', scores[1] || 0],
+                    ['交', scores[2] || 0],
+                    ['证', scores[3] || 0]
+                ].map(([label, value]) => `
+                    <span class="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-bold text-slate-600">${label} ${value}</span>
+                `).join('');
+                return `
+                <div class="rounded-lg border border-slate-200 bg-white/75 p-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] transition-all duration-300 hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-[0_20px_50px_-12px_rgba(99,102,241,0.12)]">
+                    <div class="flex items-start justify-between gap-3">
+                        <div>
+                            <div class="font-black text-slate-900">${factory.factory_name}</div>
+                            <div class="text-xs text-slate-500 mt-1">${factory.category || '源头工厂'}</div>
+                        </div>
+                        <span class="weighted-badge px-2.5 py-1 text-[11px] font-black">综合 ${factory.weighted_score || '--'}分</span>
+                    </div>
+                    <div class="mt-3 flex flex-wrap gap-1.5">${scoreCells}</div>
+                    <p class="mt-3 text-sm text-slate-600 leading-relaxed">${factory.advantage || '可配合客诉问题做工艺改良。'}</p>
+                    <button data-brief-factory="${factory.factory_name}" class="btn-generate-brief brief-glow mt-4 w-full rounded-lg px-3 py-2 text-sm font-bold text-white transition-all duration-300 hover:-translate-y-0.5">
+                        <span>📄 生成采购 Brief</span>
+                    </button>
+                </div>
+            `;
+            }).join('');
+        }
+
+        const navBtns = document.querySelectorAll('.nav-btn');
+        const sections = document.querySelectorAll('.page-section');
+        navBtns.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                navBtns.forEach(b => {
+                    b.classList.remove('nav-active', 'text-indigo-600', 'font-semibold');
+                    b.classList.add('text-slate-500');
+                });
+                const current = e.target;
+                current.classList.add('nav-active');
+                current.classList.remove('text-slate-500');
+
+                const targetId = current.getAttribute('data-target');
+                sections.forEach(sec => {
+                    if (sec.id === targetId) {
+                        sec.classList.remove('hidden');
+                    } else {
+                        sec.classList.add('hidden');
+                    }
+                });
+            });
+        });
+
+        const ctxMarket = document.getElementById('marketChart').getContext('2d');
+        const marketGradient = ctxMarket.createLinearGradient(0, 0, 0, 360);
+        marketGradient.addColorStop(0, 'rgba(99, 102, 241, 0.28)');
+        marketGradient.addColorStop(1, 'rgba(99, 102, 241, 0)');
+        new Chart(ctxMarket, {
+            type: 'line',
+            data: {
+                labels: ['2023 Q1', '2023 Q3', '2024 Q1', '2024 Q3', '2025 Q1', '2025 Q3(预测)'],
+                datasets: [
+                    {
+                        label: '大盘总 GMV (百万美元)',
+                        data: [50, 120, 280, 500, 850, 1300],
+                        borderColor: '#6366F1',
+                        backgroundColor: marketGradient,
+                        borderWidth: 3,
+                        tension: 0.4,
+                        fill: true,
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: '平均退货率 (%)',
+                        data: [12, 13.5, 15, 18, 22.4, 25.1],
+                        borderColor: '#FB7185',
+                        backgroundColor: '#FB7185',
+                        borderWidth: 2,
+                        borderDash: [5, 5],
+                        tension: 0.2,
+                        yAxisID: 'y1'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    tooltip: tooltipFixConfig,
+                    legend: { position: 'bottom', labels: { color: '#64748B' } }
+                },
+                scales: {
+                    y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        grid: { color: 'rgba(148,163,184,0.16)' },
+                        ticks: { color: '#64748B' },
+                        title: { display: true, text: 'GMV ($M)', color: '#64748B' }
+                    },
+                    y1: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        grid: { drawOnChartArea: false, color: 'rgba(148,163,184,0.16)' },
+                        ticks: { color: '#64748B' },
+                        title: { display: true, text: '退货率 (%)', color: '#64748B' }
+                    },
+                    x: {
+                        grid: { color: 'rgba(148,163,184,0.16)' },
+                        ticks: { color: '#64748B' }
+                    }
+                }
+            }
+        });
+
+        function renderDiagnosticCharts(productKey) {
+            const data = activeData[productKey];
+            if (!data) {
+                destroyDiagnosticCharts();
+                syncActiveProductTitle('');
+                renderSourcingPanel('');
+                pipelineUrl.value = '';
+                document.getElementById('doughnut-container').classList.add('hidden');
+                document.getElementById('doughnut-placeholder').classList.remove('hidden');
+                document.getElementById('bar-container').classList.add('hidden');
+                document.getElementById('bar-placeholder').classList.remove('hidden');
+                const insightBox = document.getElementById('ai-insight-box');
+                insightBox.className = 'mt-4 p-4 rounded-lg border text-sm transition-all duration-300 bg-slate-50/80 border-slate-200 text-slate-700';
+                insightBox.innerHTML = '<span class="font-bold">⏳ 暂无监控商品：</span> 请先添加真实商品链接，再启动 AI 诊断。';
+                return;
+            }
+
+            syncActiveProductTitle(productKey);
+            renderSourcingPanel(productKey);
+
+            const doughnutContainer = document.getElementById('doughnut-container');
+            const doughnutPlaceholder = document.getElementById('doughnut-placeholder');
+            const barContainer = document.getElementById('bar-container');
+            const barPlaceholder = document.getElementById('bar-placeholder');
+            const insightBox = document.getElementById('ai-insight-box');
+            const sourceUrl = getProductSourceUrl(data);
+
+            pipelineUrl.value = sourceUrl;
+
+            if (!hasDiagnosticData(data)) {
+                destroyDiagnosticCharts();
+                doughnutContainer.classList.add('hidden');
+                doughnutPlaceholder.classList.remove('hidden');
+                barContainer.classList.add('hidden');
+                barPlaceholder.classList.remove('hidden');
+                insightBox.className = 'mt-4 p-4 rounded-lg border text-sm transition-all duration-300 bg-slate-50/80 border-slate-200 text-slate-700';
+                insightBox.innerHTML = `<span class="font-bold">⏳ 等待抓取数据中：</span> ${data.insight || '请选择商品并启动 AI 诊断管道。'}`;
+                return;
+            }
+
+            doughnutContainer.classList.remove('hidden');
+            doughnutPlaceholder.classList.add('hidden');
+            barContainer.classList.remove('hidden');
+            barPlaceholder.classList.add('hidden');
+
+            const wrappedLabels = wrapLabels(data.labels);
+            const wrappedKeywords = wrapLabels(data.keywordLabels);
+
+            if (sentimentChart) {
+                sentimentChart.data.labels = wrappedLabels;
+                sentimentChart.data.datasets[0].data = data.sentiment;
+                sentimentChart.update();
+            } else {
+                const ctxSentiment = document.getElementById('sentimentChart').getContext('2d');
+                sentimentChart = new Chart(ctxSentiment, {
+                    type: 'doughnut',
+                    data: {
+                        labels: wrappedLabels,
+                        datasets: [{
+                            data: data.sentiment,
+                            backgroundColor: ['#34D399', '#64748B', '#FB7185'],
+                            borderColor: 'rgba(255, 255, 255, 0.9)',
+                            borderWidth: 2,
+                            cutout: '70%'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'bottom', labels: { color: '#64748B' } },
+                            tooltip: tooltipFixConfig
+                        }
+                    }
+                });
+            }
+
+            if (keywordChart) {
+                keywordChart.data.labels = wrappedKeywords;
+                keywordChart.data.datasets[0].data = data.keywords;
+                keywordChart.data.datasets[0].backgroundColor = data.score < 70 ? '#FB7185' : (data.score < 90 ? '#FBBF24' : '#34D399');
+                keywordChart.update();
+            } else {
+                const ctxKeyword = document.getElementById('keywordChart').getContext('2d');
+                keywordChart = new Chart(ctxKeyword, {
+                    type: 'bar',
+                    data: {
+                        labels: wrappedKeywords,
+                        datasets: [{
+                            label: '差评提及频次',
+                            data: data.keywords,
+                            backgroundColor: '#FB7185',
+                            borderRadius: 4
+                        }]
+                    },
+                    options: {
+                        indexAxis: 'y',
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: tooltipFixConfig
+                        },
+                        scales: {
+                            x: {
+                                beginAtZero: true,
+                                grid: { color: 'rgba(148,163,184,0.16)' },
+                                ticks: { color: '#64748B' }
+                            },
+                            y: {
+                                grid: { display: false },
+                                ticks: { color: '#64748B' }
+                            }
+                        }
+                    }
+                });
+            }
+
+            insightBox.innerHTML = `<span class="font-bold">🤖 AI 诊断结论：</span> ${data.insight}`;
+            insightBox.className = 'mt-4 p-4 rounded-lg border text-sm transition-all duration-300 ';
+            if (data.score < 70) {
+                insightBox.classList.add('bg-rose-50/80', 'border-rose-100', 'text-rose-700');
+            } else if (data.score < 90) {
+                insightBox.classList.add('bg-amber-50/80', 'border-amber-100', 'text-amber-700');
+            } else {
+                insightBox.classList.add('bg-emerald-50/80', 'border-emerald-100', 'text-emerald-700');
+            }
+        }
+
+        function renderSelectorOptions(preferredKey) {
+            const currentValue = preferredKey || productSelector.value || '';
+            productSelector.innerHTML = '';
+
+            Object.keys(activeData).forEach(key => {
+                const item = activeData[key];
+                const option = document.createElement('option');
+                option.value = key;
+                option.innerText = `${item.product_name || key} (ID: ${item.product_id || key})`;
+                productSelector.appendChild(option);
+            });
+
+            if (activeData[currentValue]) {
+                productSelector.value = currentValue;
+            } else if (Object.keys(activeData).length > 0) {
+                productSelector.value = Object.keys(activeData)[0];
+            } else {
+                const option = document.createElement('option');
+                option.value = '';
+                option.innerText = '暂无监控商品，请先添加';
+                productSelector.appendChild(option);
+                productSelector.value = '';
+            }
+
+            syncActiveProductTitle(productSelector.value);
+            renderCompetitorCheckboxes();
+            renderMarketGapRadar();
+        }
+
+        function renderProductTable() {
+            const tableBody = document.getElementById('product-table-body');
+            tableBody.innerHTML = '';
+            renderLiveOverview();
+            updateRadarAlertState();
+            renderMarketGapRadar();
+
+            if (Object.keys(activeData).length === 0) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td colspan="4" class="px-6 py-10 text-center text-sm text-slate-500">
+                        暂无真实监控商品。请点击“添加新监控商品”注册链接后再启动诊断。
+                    </td>
+                `;
+                tableBody.appendChild(tr);
+                return;
+            }
+
+            Object.keys(activeData).forEach(key => {
+                const item = activeData[key];
+                const ready = hasDiagnosticData(item);
+                const radarCritical = isRadarCritical(item);
+                const score = Number(item.score || 0);
+                const scoreColor = !ready ? 'text-slate-400' : (score < 70 ? 'text-rose-600' : (score < 90 ? 'text-amber-500' : 'text-emerald-700'));
+                const barColor = !ready ? 'bg-slate-300' : (score < 70 ? 'bg-rose-500' : (score < 90 ? 'bg-amber-500' : 'bg-emerald-500'));
+                const badgeStyle = !ready ? 'bg-slate-100 text-slate-500 border-slate-200' : (score < 70 ? 'bg-rose-50 text-rose-700 border-rose-100' : (score < 90 ? 'bg-amber-50 text-amber-700 border-amber-100' : 'bg-emerald-50 text-emerald-700 border-emerald-100'));
+                const scoreDisplay = ready ? `${score}/100` : '未评级';
+                const radarTitle = radarCritical
+                    ? `雷达红线：${item.radar_alert_reason || '负面声量异常'}`
+                    : '雷达正常';
+                const radarLightMarkup = radarCritical
+                    ? `<span title="${radarTitle}" class="critical-light" aria-label="critical"></span>`
+                    : `<span title="${radarTitle}" class="normal-light" aria-label="normal"></span>`;
+                const actionButtons = ready
+                    ? `
+                        <div class="mt-2 flex flex-wrap gap-2">
+                            <button data-battlecard-product="${key}" class="btn-battlecard px-2.5 py-1 rounded-md bg-white/80 text-indigo-700 hover:bg-indigo-50 text-[11px] font-bold border border-indigo-100 transition-colors">📌 Battlecard</button>
+                            ${radarCritical
+                                ? `
+                                    <button data-sps-product="${key}" class="btn-sps-predict px-2.5 py-1 rounded-md bg-indigo-500/10 text-indigo-200 hover:bg-indigo-500/20 text-[11px] font-bold border border-indigo-400/20 transition-colors">🔮 绩效预测</button>
+                                    <button data-appeal-product="${key}" class="btn-appeal px-2.5 py-1 rounded-md bg-gradient-to-r from-indigo-600 to-violet-600 text-white text-[11px] font-bold shadow-[0_10px_20px_rgba(79,70,229,0.18)] transition-all hover:-translate-y-0.5">🛡️ 申诉抗辩</button>
+                                `
+                                : '<span class="text-[11px] font-semibold text-emerald-600 self-center">雷达状态正常</span>'}
+                        </div>
+                    `
+                    : '';
+
+                const tr = document.createElement('tr');
+                tr.className = radarCritical
+                    ? 'bg-rose-500/10 hover:bg-rose-500/15 transition-colors'
+                    : 'hover:bg-indigo-500/5 transition-colors';
+                tr.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="flex items-start gap-3">
+                            ${radarLightMarkup}
+                            <div>
+                                <div class="font-bold text-slate-900">${item.product_name || key}</div>
+                                <div class="text-xs text-slate-500">ID: ${item.product_id || key}</div>
+                                ${radarCritical ? `<div class="mt-1 text-[11px] font-semibold text-rose-600">🚨 ${item.radar_alert_reason || '实时雷达监测到异常波动'}</div>` : ''}
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="flex items-center">
+                            <span class="${scoreColor} font-bold mr-2">${scoreDisplay}</span>
+                            <div class="w-full bg-slate-100 rounded-full h-2 max-w-[80px] overflow-hidden">
+                                <div class="${barColor} h-2 rounded-full" style="width: ${ready ? score : 12}%"></div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 text-sm text-slate-700">${item.direction || '等待诊断生成优化方向'}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full border ${badgeStyle}">${item.action || '待诊断'}</span>
+                        ${actionButtons}
+                    </td>
+                `;
+                tableBody.appendChild(tr);
+            });
+        }
+
+        function clampScore(value) {
+            return Math.max(0, Math.min(100, Math.round(value)));
+        }
+
+        function estimateSpsCurve(item, removedBad, addedGood) {
+            const sentiment = Array.isArray(item.sentiment) ? item.sentiment : [0, 100, 0];
+            const positiveBase = Number(sentiment[0] || 0);
+            const negativeBase = Number(sentiment[2] || 0);
+            const labels = ['当前', '3天', '6天', '9天', '12天', '15天'];
+            const days = [0, 3, 6, 9, 12, 15];
+
+            return {
+                labels,
+                data: days.map(day => {
+                    const progress = Math.min(1, day / 15);
+                    const weightedAge = Math.pow(0.7, Math.floor(day / 15));
+                    const repairedNegative = Math.max(0, negativeBase - removedBad * progress);
+                    const positiveAfter = positiveBase + addedGood * progress;
+                    const virtualTotal = Math.max(1, 100 - removedBad * progress + addedGood * progress);
+                    const negativeRatio = (repairedNegative / virtualTotal) * 100 * weightedAge;
+                    const positiveRatio = (positiveAfter / virtualTotal) * 100;
+                    return clampScore(100 - negativeRatio * 0.68 + positiveRatio * 0.08);
+                })
+            };
+        }
+
+        function renderSpsChart(item) {
+            const removedBad = Number(spsRemoveSlider.value || 0);
+            const addedGood = Number(spsPositiveSlider.value || 0);
+            const curve = estimateSpsCurve(item, removedBad, addedGood);
+            const finalScore = curve.data[curve.data.length - 1];
+
+            spsRemoveValue.innerText = removedBad;
+            spsPositiveValue.innerText = addedGood;
+            spsProjectedScore.innerText = `${finalScore}/100`;
+            spsProjectedNote.innerText = `基于 15 天半衰权重 W(t)=0.7^floor(t/15)，模拟撤回 ${removedBad} 条差评并新增 ${addedGood} 条好评后的修复走势。`;
+
+            const ctx = document.getElementById('spsChart').getContext('2d');
+            const glowGradient = ctx.createLinearGradient(0, 0, 0, 270);
+            glowGradient.addColorStop(0, 'rgba(96, 165, 250, 0.26)');
+            glowGradient.addColorStop(0.46, 'rgba(99, 102, 241, 0.12)');
+            glowGradient.addColorStop(1, 'rgba(248, 250, 252, 0)');
+            if (spsChart) {
+                spsChart.data.labels = curve.labels;
+                spsChart.data.datasets[0].data = curve.data;
+                spsChart.data.datasets[0].backgroundColor = glowGradient;
+                spsChart.update();
+                return;
+            }
+
+            spsChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: curve.labels,
+                    datasets: [{
+                        label: 'SPS 预测修复曲线',
+                        data: curve.data,
+                        borderColor: '#60A5FA',
+                        backgroundColor: glowGradient,
+                        fill: true,
+                        tension: 0.42,
+                        borderWidth: 3,
+                        pointRadius: 4,
+                        pointBackgroundColor: '#FFFFFF',
+                        pointBorderColor: '#6366F1',
+                        pointBorderWidth: 2,
+                        pointHoverRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                color: '#64748B',
+                                boxWidth: 10,
+                                boxHeight: 10,
+                                usePointStyle: true,
+                                pointStyle: 'circle'
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: { stepSize: 20, color: '#64748B' },
+                            grid: { color: 'rgba(148,163,184,0.16)' }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#64748B' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function openSpsPredictor(productKey) {
+            const item = activeData[productKey];
+            if (!item) return;
+            currentSpsProductKey = productKey;
+            spsProductTitle.innerText = `${item.product_name || productKey} · 当前健康分 ${item.score || '--'}/100 · 负面率 ${(item.sentiment && item.sentiment[2]) || 0}%`;
+            spsPredictorModal.classList.remove('hidden');
+            renderSpsChart(item);
+        }
+
+        async function openAppealGenerator(productKey) {
+            const item = activeData[productKey];
+            if (!item) return;
+            appealModal.classList.remove('hidden');
+            appealLoading.classList.remove('hidden');
+            appealResultWrap.classList.add('hidden');
+            appealTextarea.value = '';
+            appealModalSubtitle.innerText = `AI 正在根据 ${item.product_name || productKey} 的近期负面声浪生成英文申诉抗辩书...`;
+
+            try {
+                const response = await authorizedFetch(`${API_BASE_URL}/api/generate-appeal`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ product_id: productKey })
+                });
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    throw new Error(payload.detail || '申诉抗辩书生成失败。');
+                }
+                appealTextarea.value = payload.appeal_text || '';
+                appealModalSubtitle.innerText = `${payload.product_name || item.product_name} · ${payload.source === 'openai' ? 'GPT-5.5 已生成' : '本地兜底模板已生成'} · ${payload.generated_at || ''}`;
+                appealLoading.classList.add('hidden');
+                appealResultWrap.classList.remove('hidden');
+                showToast('🛡️ 英文申诉抗辩书已生成。', 'success');
+            } catch (error) {
+                appealLoading.classList.add('hidden');
+                appealResultWrap.classList.remove('hidden');
+                appealTextarea.value = `Generation failed: ${error.message || error}`;
+                showToast(error.message || String(error), 'error');
+            }
+        }
+
+        async function openBriefGenerator(factoryName) {
+            const item = activeData[currentSourcingProductKey];
+            if (!item) return;
+            briefModal.classList.remove('hidden');
+            briefLoading.classList.remove('hidden');
+            briefResultWrap.classList.add('hidden');
+            briefTextarea.value = '';
+            briefModalSubtitle.innerText = `AI 正在为 ${factoryName} 生成 ${item.product_name || currentSourcingProductKey} 的 ISO 工艺/包材改良 Brief...`;
+
+            try {
+                const response = await authorizedFetch(`${API_BASE_URL}/api/generate-brief`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        product_id: currentSourcingProductKey,
+                        factory_name: factoryName
+                    })
+                });
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    throw new Error(payload.detail || '采购 Brief 生成失败。');
+                }
+                briefTextarea.value = payload.brief_text || '';
+                briefModalSubtitle.innerText = `${payload.factory_name || factoryName} · ${payload.source === 'openai' ? 'GPT-5.5 已生成' : '本地 ISO 模板已生成'} · ${payload.generated_at || ''}`;
+                briefLoading.classList.add('hidden');
+                briefResultWrap.classList.remove('hidden');
+                showToast('📄 ISO 采购 Brief 已生成。', 'success');
+            } catch (error) {
+                briefLoading.classList.add('hidden');
+                briefResultWrap.classList.remove('hidden');
+                briefTextarea.value = `生成失败：${error.message || error}`;
+                showToast(error.message || String(error), 'error');
+            }
+        }
+
+        productSelector.addEventListener('change', (e) => {
+            renderDiagnosticCharts(e.target.value);
+        });
+
+        factoryCardList.addEventListener('click', (event) => {
+            const button = event.target.closest('[data-brief-factory]');
+            if (button) {
+                openBriefGenerator(button.getAttribute('data-brief-factory'));
+            }
+        });
+
+        document.getElementById('product-table-body').addEventListener('click', (event) => {
+            const spsButton = event.target.closest('[data-sps-product]');
+            const appealButton = event.target.closest('[data-appeal-product]');
+            const battlecardButton = event.target.closest('[data-battlecard-product]');
+            if (battlecardButton) {
+                openBattlecard(battlecardButton.getAttribute('data-battlecard-product'));
+                return;
+            }
+            if (spsButton) {
+                openSpsPredictor(spsButton.getAttribute('data-sps-product'));
+                return;
+            }
+            if (appealButton) {
+                openAppealGenerator(appealButton.getAttribute('data-appeal-product'));
+            }
+        });
+
+        marketGapList.addEventListener('click', (event) => {
+            const battlecardButton = event.target.closest('[data-battlecard-product]');
+            if (battlecardButton) {
+                openBattlecard(battlecardButton.getAttribute('data-battlecard-product'));
+            }
+        });
+
+        btnRefreshMarketGap.addEventListener('click', () => {
+            renderMarketGapRadar();
+            showToast('机会雷达已重新计算。', 'success');
+        });
+
+        document.getElementById('btn-close-battlecard-modal').addEventListener('click', () => {
+            battlecardModal.classList.add('hidden');
+        });
+
+        battlecardModal.addEventListener('click', (event) => {
+            if (event.target === battlecardModal) {
+                battlecardModal.classList.add('hidden');
+            }
+        });
+
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && !battlecardModal.classList.contains('hidden')) {
+                battlecardModal.classList.add('hidden');
+            }
+        });
+
+        document.getElementById('btn-copy-battlecard').addEventListener('click', async () => {
+            const plainText = getBattlecardPlainText(currentBattlecardProductKey);
+            if (!plainText) {
+                showToast('当前没有可复制的 Battlecard。', 'info');
+                return;
+            }
+
+            try {
+                await navigator.clipboard.writeText(plainText);
+                showToast('Battlecard 已复制到剪贴板。', 'success');
+            } catch (error) {
+                const tempTextarea = document.createElement('textarea');
+                tempTextarea.value = plainText;
+                tempTextarea.setAttribute('readonly', '');
+                tempTextarea.style.position = 'fixed';
+                tempTextarea.style.opacity = '0';
+                document.body.appendChild(tempTextarea);
+                tempTextarea.select();
+                document.execCommand('copy');
+                tempTextarea.remove();
+                showToast('Battlecard 已复制。', 'success');
+            }
+        });
+
+        document.getElementById('btn-print-battlecard').addEventListener('click', () => {
+            const card = getBattlecard(currentBattlecardProductKey);
+            if (!card) {
+                showToast('当前没有可导出的 Battlecard。', 'info');
+                return;
+            }
+
+            const safeTitle = escapeHtml(`${card.productName} · AI 选品战术卡`);
+            const safeSubtitle = escapeHtml(`${card.gapType} · ${card.priority} · Product ID: ${card.productId}`);
+            const safeContent = battlecardContent.innerHTML;
+            const printWindow = window.open('', '_blank', 'width=920,height=980');
+            if (!printWindow) {
+                showToast('浏览器阻止了打印窗口，请允许弹窗后重试。', 'error');
+                return;
+            }
+
+            printWindow.document.write(`
+                <!DOCTYPE html>
+                <html lang="zh-CN">
+                <head>
+                    <meta charset="UTF-8">
+                    <title>${safeTitle}</title>
+                    <script src="https://cdn.tailwindcss.com"><\/script>
+                    <style>
+                        body { font-family: "Microsoft YaHei", system-ui, sans-serif; background: #F8FAFC; color: #0F172A; padding: 32px; }
+                        .print-shell { max-width: 920px; margin: 0 auto; background: rgba(255,255,255,0.86); border: 1px solid #E2E8F0; border-radius: 16px; padding: 28px; }
+                        @media print {
+                            body { background: #FFFFFF; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                            .print-shell { border: 0; border-radius: 0; }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <main class="print-shell">
+                        <div style="border-bottom: 2px solid #6366F1; padding-bottom: 16px; margin-bottom: 22px;">
+                            <div style="font-size: 12px; font-weight: 900; color: #4F46E5; letter-spacing: 0.12em;">[BATTLECARD] [MARKET GAP RADAR]</div>
+                            <h1 style="font-size: 26px; margin: 10px 0 4px; font-weight: 900;">${safeTitle}</h1>
+                            <p style="font-size: 13px; color: #64748B; margin: 0;">${safeSubtitle}</p>
+                        </div>
+                        ${safeContent}
+                    </main>
+                    <script>window.print();<\/script>
+                </body>
+                </html>
+            `);
+            printWindow.document.close();
+        });
+
+        document.getElementById('btn-close-sps-modal').addEventListener('click', () => {
+            spsPredictorModal.classList.add('hidden');
+        });
+
+        spsRemoveSlider.addEventListener('input', () => {
+            if (activeData[currentSpsProductKey]) {
+                renderSpsChart(activeData[currentSpsProductKey]);
+            }
+        });
+
+        spsPositiveSlider.addEventListener('input', () => {
+            if (activeData[currentSpsProductKey]) {
+                renderSpsChart(activeData[currentSpsProductKey]);
+            }
+        });
+
+        document.getElementById('btn-close-appeal-modal').addEventListener('click', () => {
+            appealModal.classList.add('hidden');
+        });
+
+        document.getElementById('btn-copy-appeal').addEventListener('click', async () => {
+            try {
+                await navigator.clipboard.writeText(appealTextarea.value);
+                showToast('申诉信已复制到剪贴板。', 'success');
+            } catch (error) {
+                appealTextarea.select();
+                document.execCommand('copy');
+                showToast('申诉信已复制。', 'success');
+            }
+        });
+
+        document.getElementById('btn-close-brief-modal').addEventListener('click', () => {
+            briefModal.classList.add('hidden');
+        });
+
+        document.getElementById('btn-copy-brief').addEventListener('click', async () => {
+            try {
+                await navigator.clipboard.writeText(briefTextarea.value);
+                showToast('采购 Brief 已复制到剪贴板。', 'success');
+            } catch (error) {
+                briefTextarea.select();
+                document.execCommand('copy');
+                showToast('采购 Brief 已复制。', 'success');
+            }
+        });
+
+        document.getElementById('btn-print-brief').addEventListener('click', () => {
+            const printWindow = window.open('', '_blank', 'width=820,height=900');
+            if (!printWindow) {
+                showToast('浏览器阻止了打印窗口，请允许弹窗后重试。', 'error');
+                return;
+            }
+            const safeText = briefTextarea.value
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+            printWindow.document.write(`
+                <!DOCTYPE html>
+                <html lang="zh-CN">
+                <head>
+                    <meta charset="UTF-8">
+                    <title>ISO 工艺/包材改良采购 Brief</title>
+                    <style>
+                        body { font-family: "Microsoft YaHei", system-ui, sans-serif; color: #0F172A; padding: 36px; line-height: 1.7; }
+                        pre { white-space: pre-wrap; font-size: 13px; }
+                    </style>
+                </head>
+                <body>
+                    <pre>${safeText}</pre>
+                    <script>window.print();<\/script>
+                </body>
+                </html>
+            `);
+            printWindow.document.close();
+        });
+
+        async function checkApiConnection() {
+            const badge = document.getElementById('api-status-badge');
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/health`, { method: 'GET' });
+                if (res.ok) {
+                    const healthPayload = await res.json().catch(() => ({}));
+                    operatorAuthEnabled = true;
+                    isLocalApiOnline = true;
+                    syncAuthStateFromSession();
+                    badge.className = 'ml-3 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-800 border border-emerald-100 flex items-center gap-1.5';
+                    badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> ${isAuthenticated ? '实时 API 在线 · 已登录' : '实时 API 在线 · 待登录'}`;
+                    if (isAuthenticated) {
+                        await fetchAndLoadRealData();
+                    }
+                } else {
+                    throw new Error(`Health check failed: ${res.status}`);
+                }
+            } catch (err) {
+                isLocalApiOnline = false;
+                operatorAuthEnabled = true;
+                isAuthenticated = false;
+                updateLogoutVisibility();
+                setLoginVisible(true);
+                badge.className = 'ml-3 px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-500/10 text-amber-200 border border-amber-400/20 flex items-center gap-1.5';
+                badge.innerHTML = `<span class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span> API 未连接`;
+                activeData = {};
+                console.log('API offline. Demo datasets are disabled.', err);
+            } finally {
+                renderSelectorOptions(productSelector.value);
+                renderDiagnosticCharts(productSelector.value);
+                renderProductTable();
+                if (isLocalApiOnline && isAuthenticated) {
+                    await refreshAdminAuditLogs();
+                    await refreshAlertStatus();
+                }
+            }
+        }
+
+        async function fetchAndLoadRealData(preferredKey) {
+            try {
+                const res = await authorizedFetch(`${API_BASE_URL}/api/products`);
+                if (res.ok) {
+                    const realData = await res.json();
+                    activeData = realData || {};
+                    renderSelectorOptions(preferredKey || productSelector.value);
+                }
+            } catch (error) {
+                console.error('Failed fetching live api products:', error);
+                if (error && error.message) {
+                    showToast(error.message, 'error');
+                }
+            }
+        }
+
+        async function refreshProductsForRadar() {
+            if (!isLocalApiOnline) return;
+            const currentKey = productSelector.value;
+            await fetchAndLoadRealData(currentKey);
+            const nextKey = activeData[currentKey] ? currentKey : productSelector.value;
+            renderDiagnosticCharts(nextKey);
+            renderProductTable();
+        }
+
+        function downloadJson(filename, payload) {
+            const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(url);
+        }
+
+        function renderAdminAuditLogs(logs) {
+            if (!adminAuditList) return;
+            if (!Array.isArray(logs) || logs.length === 0) {
+                adminAuditList.innerHTML = '<div class="rounded-lg border border-dashed border-slate-200 bg-slate-50/80 p-4 text-sm text-slate-400 md:col-span-2">暂无审计日志。</div>';
+                return;
+            }
+
+            adminAuditList.innerHTML = logs.slice().reverse().map(item => `
+                <div class="rounded-lg border border-slate-200 bg-white/75 p-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
+                    <div class="flex items-center justify-between gap-3">
+                        <span class="text-xs font-black text-indigo-600">${item.action || 'operation'}</span>
+                        <span class="text-[11px] text-slate-400">${item.timestamp || '--'}</span>
+                    </div>
+                    <div class="mt-2 text-sm text-slate-700 leading-relaxed">${item.detail || '无详情'}</div>
+                </div>
+            `).join('');
+        }
+
+        async function refreshAdminAuditLogs() {
+            if (!isLocalApiOnline) return;
+            try {
+                const response = await authorizedFetch(`${API_BASE_URL}/api/admin/audit-logs?limit=80`);
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    throw new Error(payload.detail || '审计日志读取失败。');
+                }
+                renderAdminAuditLogs(payload.logs || []);
+                adminBackupMeta.innerText = `最近审计记录 ${payload.count || 0} 条 · 云端商品 ${Object.keys(activeData).length} 个`;
+            } catch (error) {
+                adminBackupMeta.innerText = error.message || String(error);
+                showToast(error.message || String(error), 'error');
+            }
+        }
+
+        async function exportAdminBackup() {
+            try {
+                const response = await authorizedFetch(`${API_BASE_URL}/api/admin/export-data`);
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    throw new Error(payload.detail || '备份导出失败。');
+                }
+                const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+                downloadJson(`tk-ai-saas-backup-${stamp}.json`, payload);
+                adminBackupMeta.innerText = `已导出：商品 ${payload.products_count || 0} 个 · VS 报告 ${payload.vs_reports_count || 0} 条 · ${payload.exported_at || ''}`;
+                await refreshAdminAuditLogs();
+                showToast('⬇️ 云端备份已导出。', 'success');
+            } catch (error) {
+                showToast(error.message || String(error), 'error');
+            }
+        }
+
+        async function restoreAdminBackup(file) {
+            if (!file) return;
+            try {
+                const text = await file.text();
+                const backup = JSON.parse(text);
+                if (backup.schema !== 'tk-ai-saas-backup-v1' || !backup.products || typeof backup.products !== 'object') {
+                    throw new Error('备份文件格式不正确。');
+                }
+                const productCount = Object.keys(backup.products).length;
+                const confirmed = window.confirm(`确认恢复这份备份吗？当前云端商品数据会被覆盖。\n\n备份商品数：${productCount}\n导出时间：${backup.exported_at || '--'}`);
+                if (!confirmed) return;
+
+                const response = await authorizedFetch(`${API_BASE_URL}/api/admin/restore-data`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        products: backup.products || {},
+                        vs_reports: backup.vs_reports || []
+                    })
+                });
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    throw new Error(payload.detail || '备份恢复失败。');
+                }
+                await fetchAndLoadRealData(productSelector.value);
+                renderSelectorOptions(productSelector.value);
+                renderDiagnosticCharts(productSelector.value);
+                renderProductTable();
+                await refreshAdminAuditLogs();
+                showToast(`⬆️ 备份恢复完成：${payload.products_count || 0} 个商品。`, 'success');
+            } catch (error) {
+                showToast(error.message || String(error), 'error');
+            } finally {
+                adminRestoreFile.value = '';
+            }
+        }
+
+        function renderAlertStatus(payload) {
+            const enabledText = payload.enabled ? '已启用' : '未启用';
+            const signatureText = payload.token_configured ? '已启用通道签名' : '未启用通道签名';
+            alertStatusMeta.innerText = `Webhook ${enabledText} · ${signatureText} · 冷却 ${payload.cooldown_seconds || 0}s · 去重记录 ${payload.dedup_entries || 0} 条`;
+        }
+
+        async function refreshAlertStatus() {
+            if (!isLocalApiOnline) return;
+            try {
+                const response = await authorizedFetch(`${API_BASE_URL}/api/admin/alert-status`);
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    throw new Error(payload.detail || '报警状态读取失败。');
+                }
+                renderAlertStatus(payload);
+            } catch (error) {
+                alertStatusMeta.innerText = error.message || String(error);
+                showToast(error.message || String(error), 'error');
+            }
+        }
+
+        async function sendTestAlert() {
+            try {
+                const response = await authorizedFetch(`${API_BASE_URL}/api/admin/test-alert`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({})
+                });
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    throw new Error(payload.detail || '测试告警发送失败。');
+                }
+                renderAlertStatus(payload.alert_status || {});
+                await refreshAdminAuditLogs();
+                if (payload.status === 'success') {
+                    showToast('📣 测试告警已发送。', 'success');
+                } else {
+                    showToast(payload.alert_result?.reason || 'Webhook 未启用或发送失败。', 'error');
+                }
+            } catch (error) {
+                showToast(error.message || String(error), 'error');
+            }
+        }
+
+        const btnShowModal = document.getElementById('btn-show-add-modal');
+        const addModal = document.getElementById('add-product-modal');
+        const btnCloseModal = document.getElementById('btn-close-modal');
+        const btnCancelModal = document.getElementById('btn-cancel-modal');
+        const btnSubmitModal = document.getElementById('btn-submit-modal');
+
+        btnShowModal.addEventListener('click', () => {
+            if (!isLocalApiOnline) {
+                showToast('API 未连接，请稍后刷新页面重试。', 'error');
+                return;
+            }
+            addModal.classList.remove('hidden');
+        });
+
+        const hideAddModal = () => {
+            addModal.classList.add('hidden');
+            document.getElementById('modal-product-id').value = '';
+            document.getElementById('modal-product-name').value = '';
+            document.getElementById('modal-product-url').value = '';
+        };
+
+        btnCloseModal.addEventListener('click', hideAddModal);
+        btnCancelModal.addEventListener('click', hideAddModal);
+
+        btnAdminExport.addEventListener('click', exportAdminBackup);
+        btnAdminImport.addEventListener('click', () => adminRestoreFile.click());
+        btnAdminRefreshAudit.addEventListener('click', refreshAdminAuditLogs);
+        btnAlertStatus.addEventListener('click', refreshAlertStatus);
+        btnAlertTest.addEventListener('click', sendTestAlert);
+        adminRestoreFile.addEventListener('change', (event) => {
+            const file = event.target.files && event.target.files[0];
+            restoreAdminBackup(file);
+        });
+
+        async function runRadarPatrol() {
+            if (!isLocalApiOnline) {
+                showToast('API 未连接，请稍后刷新页面重试。', 'error');
+                return;
+            }
+
+            btnRunRadarPatrol.disabled = true;
+            radarPatrolSpinner.classList.remove('hidden');
+            liveWorkflowStatus.className = 'self-start md:self-center px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100 text-xs font-bold';
+            liveWorkflowStatus.innerText = '[PATROL RUNNING]';
+            setTerminalOpenState(true);
+            pipelineLoadingTitle.innerText = '正在执行 24H 雷达巡检';
+            pipelineLoadingDetail.innerText = '系统正在复查所有已注册商品，完成后会自动刷新红线状态。';
+            progressPercent.innerText = '10%';
+            logOffset = 0;
+            pollInterval = setInterval(fetchLogs, 800);
+
+            try {
+                const response = await authorizedFetch(`${API_BASE_URL}/api/run-radar-patrol`, {
+                    method: 'POST'
+                });
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    throw new Error(payload.detail || '雷达巡检执行失败。');
+                }
+
+                progressPercent.innerText = '100%';
+                showToast(`📡 雷达巡检完成：检查 ${payload.checked_count || 0} 个，红线 ${payload.critical_count || 0} 个。`, payload.critical_count > 0 ? 'error' : 'success');
+                await refreshProductsForRadar();
+                if (isLocalApiOnline && isAuthenticated) {
+                    await refreshAdminAuditLogs();
+                    await refreshAlertStatus();
+                }
+            } catch (error) {
+                showToast(error.message || String(error), 'error');
+            } finally {
+                if (pollInterval) {
+                    clearInterval(pollInterval);
+                    pollInterval = null;
+                }
+                await fetchLogs();
+                btnRunRadarPatrol.disabled = false;
+                radarPatrolSpinner.classList.add('hidden');
+                setTerminalOpenState(false);
+                renderLiveOverview();
+            }
+        }
+
+        btnRunRadarPatrol.addEventListener('click', runRadarPatrol);
+
+        btnSubmitModal.addEventListener('click', async () => {
+            const id = document.getElementById('modal-product-id').value.trim();
+            const name = document.getElementById('modal-product-name').value.trim();
+            const url = document.getElementById('modal-product-url').value.trim();
+
+            if (!id || !name || !url) {
+                showToast('请完整填写新产品 ID、显示名称以及评测链接！', 'error');
+                return;
+            }
+
+            try {
+                const response = await authorizedFetch(`${API_BASE_URL}/api/add-product`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ product_id: id, product_name: name, url: url })
+                });
+                const payload = await response.json().catch(() => ({}));
+
+                if (response.ok) {
+                    showToast(`➕ 商品 [${name}] 已成功写入云端监控大盘！`, 'success');
+                    hideAddModal();
+                    await fetchAndLoadRealData(id);
+                    productSelector.value = id;
+                    renderDiagnosticCharts(id);
+                    renderProductTable();
+                } else {
+                    showToast(payload.detail || '持久化注册失败，请检查参数或 ID 重复状态', 'error');
+                }
+            } catch (error) {
+                showToast('连接云端 API 失败，请检查后端服务运行状态。', 'error');
+            }
+        });
+
+        function setTerminalOpenState(isOpen) {
+            if (isOpen) {
+                pipelineLoadingState.classList.remove('hidden');
+            } else {
+                pipelineLoadingState.classList.add('hidden');
+            }
+        }
+
+        btnRunPipeline.addEventListener('click', async () => {
+            if (!isLocalApiOnline) {
+                showToast('API 未连接，请稍后刷新页面重试。', 'error');
+                return;
+            }
+
+            const url = pipelineUrl.value.trim();
+            if (!url) {
+                showToast('请输入合法的 YouTube / TikTok 评测视频链接！', 'error');
+                return;
+            }
+
+            const selectedKey = productSelector.value;
+            const selectedProduct = activeData[selectedKey] || {};
+
+            btnRunPipeline.disabled = true;
+            spinner.classList.remove('hidden');
+            setTerminalOpenState(true);
+            pipelineLoadingTitle.innerText = '正在抓取并分析评论';
+            pipelineLoadingDetail.innerText = '系统正在读取视频评论并生成 AI 舆情报告，请稍候。';
+            progressPercent.innerText = '15%';
+            logOffset = 0;
+            pollInterval = setInterval(fetchLogs, 800);
+
+            try {
+                const response = await authorizedFetch(`${API_BASE_URL}/api/run-pipeline`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        url: url,
+                        product_id: selectedProduct.product_id || selectedKey,
+                        product_name: selectedProduct.product_name || selectedKey
+                    })
+                });
+                const payload = await response.json().catch(() => ({}));
+
+                if (response.ok) {
+                    const updatedKey = payload.product_key || selectedKey;
+                    if (payload.product_name && activeData[updatedKey]) {
+                        activeData[updatedKey].product_name = payload.product_name;
+                    }
+                    progressPercent.innerText = '100%';
+                    showToast('🎉 AI 舆情诊断成功！报告已完美热更新。', 'success');
+                    await fetchAndLoadRealData(updatedKey);
+                    renderSelectorOptions(updatedKey);
+                    productSelector.value = updatedKey;
+                    renderDiagnosticCharts(updatedKey);
+                    renderProductTable();
+                } else {
+                    showToast(payload.detail || '抓取未采集到有效评论，或 AI 分析服务暂时不可用。', 'error');
+                }
+            } catch (error) {
+                showToast('网络数据通道遭遇波动，请检查 FastAPI 运行日志。', 'error');
+            } finally {
+                if (pollInterval) {
+                    clearInterval(pollInterval);
+                    pollInterval = null;
+                }
+                await fetchLogs();
+                btnRunPipeline.disabled = false;
+                spinner.classList.add('hidden');
+                setTerminalOpenState(false);
+            }
+        });
+
+        function normalizeLogLine(log) {
+            if (typeof log === 'string') {
+                const match = log.match(/^\[([^\]]+)\]\s*(.*)$/);
+                return {
+                    time: match ? match[1] : new Date().toLocaleTimeString('zh-CN', { hour12: false }),
+                    msg: match ? match[2] : log
+                };
+            }
+            return {
+                time: log && log.time ? log.time : new Date().toLocaleTimeString('zh-CN', { hour12: false }),
+                msg: log && log.msg ? log.msg : String(log || '')
+            };
+        }
+
+        async function fetchLogs() {
+            try {
+                const res = await authorizedFetch(`${API_BASE_URL}/api/pipeline-logs?offset=${logOffset}`);
+                if (!res.ok) return;
+                const data = await res.json();
+                if (data.logs && data.logs.length > 0) {
+                    data.logs.forEach(rawLog => {
+                        const log = normalizeLogLine(rawLog);
+                        const msg = log.msg || '';
+                        if (msg) {
+                            pipelineLoadingDetail.innerText = msg.replace(/^[\s\[]*[^\]]*\]\s*/, '');
+                        }
+                    });
+                    logOffset = data.next_offset ?? data.next_index ?? logOffset;
+
+                    if (logOffset < 5) progressPercent.innerText = '25%';
+                    else if (logOffset < 15) progressPercent.innerText = '55%';
+                    else if (logOffset < 25) progressPercent.innerText = '85%';
+                }
+            } catch (err) {
+                console.error('Failed pulling terminal pipeline logs:', err);
+            }
+        }
+
+        btnRunVsPipeline.addEventListener('click', async () => {
+            const selectedIds = getSelectedCompetitorIds();
+            if (selectedIds.length < 2 || selectedIds.length > 3) {
+                showToast('请选择 2-3 个商品启动横向 PK。', 'error');
+                return;
+            }
+            if (!isLocalApiOnline) {
+                showToast('API 未连接，请稍后刷新页面重试。', 'error');
+                return;
+            }
+
+            btnRunVsPipeline.disabled = true;
+            vsSpinner.classList.remove('hidden');
+            vsAiReport.classList.add('hidden');
+
+            try {
+                const response = await authorizedFetch(`${API_BASE_URL}/api/run-vs-pipeline`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ product_ids: selectedIds })
+                });
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    throw new Error(payload.detail || '竞品横向 PK 诊断失败。');
+                }
+
+                renderVsChart(payload.chart_labels || ['AI 健康分', '负面情绪占比'], payload.chart_datasets || []);
+                renderVsReport(payload);
+                showToast('📊 竞品横向 PK 对比报告已生成。', 'success');
+            } catch (error) {
+                showToast(error.message || String(error), 'error');
+            } finally {
+                btnRunVsPipeline.disabled = false;
+                vsSpinner.classList.add('hidden');
+            }
+        });
+
+        document.getElementById('btn-export-report').addEventListener('click', () => {
+            const selectedKey = productSelector.value;
+            const data = activeData[selectedKey];
+            if (!hasDiagnosticData(data)) {
+                showToast('当前商品尚未完成 AI 诊断，暂无可导出的意见书。', 'info');
+                return;
+            }
+
+            const printWindow = window.open('', '_blank', 'width=800,height=900');
+            if (!printWindow) {
+                showToast('浏览器阻止了新窗口，请允许弹窗后重试导出。', 'error');
+                return;
+            }
+
+            printWindow.document.write(`
+                <!DOCTYPE html>
+                <html lang="zh-CN">
+                <head>
+                    <meta charset="UTF-8">
+                    <title>AI 舆情分析意见书 - ${data.product_name}</title>
+                    <script src="https://cdn.tailwindcss.com"><\/script>
+                    <style>
+                        body { font-family: 'Segoe UI', system-ui, sans-serif; background-color: white; color: #1E293B; }
+                        @media print {
+                            .no-print { display: none !important; }
+                            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                        }
+                    </style>
+                </head>
+                <body class="p-8 max-w-3xl mx-auto">
+                    <div class="border-b-2 border-indigo-600 pb-5 mb-6 flex justify-between items-center">
+                        <div>
+                            <h1 class="text-2xl font-black text-slate-900">AI 舆情优化与供应链改良诊断书</h1>
+                            <p class="text-xs text-slate-500 mt-1">报告生成时间: ${new Date().toLocaleString()} | 系统版本: SaaS V4.0</p>
+                        </div>
+                        <button onclick="window.print()" class="no-print px-4 py-2 bg-gradient-to-r from-indigo-600 to-violet-600 text-white text-xs font-bold rounded-lg shadow transition-colors">🖨️ 一键打印报告</button>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4 mb-6">
+                        <div class="bg-slate-50 p-4 rounded-lg border border-slate-100">
+                            <span class="text-xs text-slate-400 font-bold block uppercase tracking-wide">监控商品名称</span>
+                            <span class="text-lg font-bold text-slate-800">${data.product_name}</span>
+                        </div>
+                        <div class="bg-slate-50 p-4 rounded-lg border border-slate-100">
+                            <span class="text-xs text-slate-400 font-bold block uppercase tracking-wide">商品识别 ID</span>
+                            <span class="text-lg font-bold text-slate-800">${data.product_id}</span>
+                        </div>
+                    </div>
+
+                    <div class="mb-6 p-5 rounded-lg border border-indigo-100 bg-indigo-50/20">
+                        <h3 class="text-sm font-bold text-indigo-900 mb-2">📊 情感指数健康分: ${data.score}/100</h3>
+                        <div class="w-full bg-slate-200 rounded-full h-3">
+                            <div class="bg-indigo-600 h-3 rounded-full" style="width: ${data.score}%"></div>
+                        </div>
+                        <p class="text-xs text-indigo-700 mt-2">诊断配比: 正面评级 ${data.sentiment[0]}% | 中性评级 ${data.sentiment[1]}% | 负面声量 ${data.sentiment[2]}%</p>
+                    </div>
+
+                    <div class="mb-6">
+                        <h3 class="text-sm font-bold text-slate-800 mb-3">🔥 TOP 5 海外客诉舆情痛点分布</h3>
+                        <div class="space-y-2">
+                            ${data.keywordLabels.map((label, idx) => `
+                                <div class="flex justify-between items-center text-xs p-2.5 bg-slate-50 rounded-lg">
+                                    <span class="font-semibold text-slate-700">${idx + 1}. ${label}</span>
+                                    <span class="px-2 py-0.5 bg-rose-100 text-rose-800 rounded font-bold">${data.keywords[idx]} 次提及</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <div class="p-5 rounded-lg border border-slate-200 bg-slate-50 leading-relaxed mb-6">
+                        <h3 class="text-sm font-bold text-slate-900 mb-2 flex items-center gap-1"><span>🤖</span> 决策治理建议</h3>
+                        <p class="text-sm text-slate-700">${data.insight}</p>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4 mb-8">
+                        <div class="p-4 rounded-lg border border-emerald-100 bg-emerald-50/20">
+                            <strong class="text-xs text-emerald-800 block">供应链优化动作</strong>
+                            <span class="text-sm font-semibold text-emerald-700">${data.direction}</span>
+                        </div>
+                        <div class="p-4 rounded-lg border border-indigo-100 bg-indigo-50/20">
+                            <strong class="text-xs text-indigo-800 block">投放策略决策</strong>
+                            <span class="text-sm font-semibold text-indigo-700">${data.action}</span>
+                        </div>
+                    </div>
+
+                    <div class="border-t border-slate-200 pt-5 text-center text-[10px] text-slate-400">
+                        * 本诊断数据及改进意见由 TK-AI 舆情中枢联合 GPT-5.5 大模型分析生成，仅供运营及供应链调款参考。
+                    </div>
+                </body>
+                </html>
+            `);
+            printWindow.document.close();
+        });
+
+        window.onload = function() {
+            checkApiConnection();
+            setInterval(refreshProductsForRadar, 60000);
+        };
+    </script>
+</body>
+</html>
+

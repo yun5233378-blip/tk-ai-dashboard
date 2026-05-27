@@ -54,6 +54,105 @@ FALLBACK_KEYWORD_LABELS = ["起球严重", "尺码偏小", "掉色", "线头多"
 FALLBACK_KEYWORD_COUNTS = [10, 8, 6, 4, 2]
 FALLBACK_SENTIMENT = [15, 20, 65]
 
+ASPECT_PATTERNS = [
+    {
+        "id": "fit_size",
+        "label": "Fit / size accuracy",
+        "terms": ["too small", "runs small", "tight", "size chart", "half a size", "one size up", "exchange"],
+        "gap_type": "Fit Localization Gap",
+        "baseline_negative_rate": 7,
+    },
+    {
+        "id": "material_quality",
+        "label": "Material / durability",
+        "terms": ["pilling", "pill", "thin", "fabric", "material", "see through", "stiff", "cheap", "quality"],
+        "gap_type": "Material Upgrade Gap",
+        "baseline_negative_rate": 9,
+    },
+    {
+        "id": "packaging_logistics",
+        "label": "Packaging / delivery trust",
+        "terms": ["package", "packaging", "box", "crushed", "damaged", "shipping", "delivery", "late"],
+        "gap_type": "Packaging Trust Gap",
+        "baseline_negative_rate": 6,
+    },
+    {
+        "id": "setup_onboarding",
+        "label": "Setup / onboarding",
+        "terms": ["manual", "instruction", "guide", "setup", "install", "bluetooth", "connect", "pairing"],
+        "gap_type": "Education & Onboarding Gap",
+        "baseline_negative_rate": 8,
+    },
+    {
+        "id": "color_expectation",
+        "label": "Color / listing accuracy",
+        "terms": ["color", "colour", "picture", "photo", "fade", "fading", "discolor"],
+        "gap_type": "Listing Accuracy Gap",
+        "baseline_negative_rate": 5,
+    },
+]
+
+PUBLIC_BENCHMARK_REFERENCE = {
+    "name": "Amazon Reviews 2023 public review corpus",
+    "url": "https://cseweb.ucsd.edu/~jmcauley/datasets.html#amazon_reviews",
+    "note": "Static category priors used for lift estimates; not a live category scrape.",
+}
+
+SENTIMENT_POSITIVE_TERMS = [
+    "good",
+    "great",
+    "love",
+    "perfect",
+    "soft",
+    "beautiful",
+    "comfortable",
+    "breathable",
+    "works",
+    "recommend",
+]
+
+SENTIMENT_NEGATIVE_TERMS = [
+    "bad",
+    "disappointed",
+    "horrible",
+    "too small",
+    "tight",
+    "pilling",
+    "thin",
+    "return",
+    "stiff",
+    "crushed",
+    "damaged",
+    "failed",
+    "broken",
+    "cheap",
+]
+
+NEGATIVE_CONTEXT_TERMS = [
+    "too small",
+    "runs small",
+    "tight",
+    "exchange",
+    "return",
+    "pilling",
+    "thin",
+    "see through",
+    "stiff",
+    "cheap",
+    "crushed",
+    "damaged",
+    "broken",
+    "late",
+    "delay",
+    "failed",
+    "cannot",
+    "can't",
+    "wrong",
+    "fade",
+    "fading",
+    "discolor",
+]
+
 
 SYSTEM_PROMPT = """
 你是“TK跨境电商高级产品体验官 (CPO)”，擅长从 TikTok 评论、TikTok Shop 商品评价和跨境电商用户反馈中识别产品体验问题、供应链缺陷和售后风险。
@@ -505,10 +604,177 @@ def trim_insight(text: Any, max_chars: int = 200) -> str:
     return insight
 
 
+def comment_sentiment_hint(text: str) -> str:
+    """Small local sentiment hint used only for evidence metadata."""
+    normalized = text.lower()
+    if any(term in normalized for term in NEGATIVE_CONTEXT_TERMS):
+        return "negative"
+    positive_hits = sum(1 for term in SENTIMENT_POSITIVE_TERMS if term in normalized)
+    negative_hits = sum(1 for term in SENTIMENT_NEGATIVE_TERMS if term in normalized)
+    if negative_hits > positive_hits:
+        return "negative"
+    if positive_hits > negative_hits:
+        return "positive"
+    return "neutral"
+
+
+def compact_evidence_text(value: Any, max_chars: int = 150) -> str:
+    text = re.sub(r"\s+", " ", str(value or "")).strip()
+    if len(text) <= max_chars:
+        return text
+    return text[: max_chars - 1].rstrip(" ,.;:") + "..."
+
+
+def match_aspect_from_label(label: str) -> Dict[str, Any] | None:
+    normalized = label.lower()
+    for pattern in ASPECT_PATTERNS:
+        haystack = " ".join([pattern["label"], pattern["gap_type"], " ".join(pattern["terms"])]).lower()
+        if any(term in normalized for term in pattern["terms"]):
+            return pattern
+        if any(token and token in haystack for token in normalized.split()):
+            return pattern
+    if any(term in normalized for term in ["size", "fit"]):
+        return ASPECT_PATTERNS[0]
+    if any(term in normalized for term in ["material", "quality", "fabric"]):
+        return ASPECT_PATTERNS[1]
+    if any(term in normalized for term in ["package", "shipping", "delivery", "box"]):
+        return ASPECT_PATTERNS[2]
+    if any(term in normalized for term in ["manual", "setup", "guide", "connect"]):
+        return ASPECT_PATTERNS[3]
+    if "color" in normalized or "colour" in normalized:
+        return ASPECT_PATTERNS[4]
+    return None
+
+
+def build_aspect_terms(
+    comments: List[Dict[str, Any]] | None,
+    keyword_labels: List[str],
+    keywords: List[int],
+) -> List[Dict[str, Any]]:
+    source_comments = comments or []
+    total_comments = len(source_comments)
+    aspects: List[Dict[str, Any]] = []
+
+    for pattern in ASPECT_PATTERNS:
+        matched_comments = []
+        for comment in source_comments:
+            text = str(comment.get("comment_text", ""))
+            normalized = text.lower()
+            if any(term in normalized for term in pattern["terms"]):
+                matched_comments.append(comment)
+
+        if matched_comments:
+            negative_comments = [
+                comment
+                for comment in matched_comments
+                if comment_sentiment_hint(str(comment.get("comment_text", ""))) == "negative"
+            ]
+            positive_count = sum(1 for comment in matched_comments if comment_sentiment_hint(str(comment.get("comment_text", ""))) == "positive")
+            negative_count = len(negative_comments)
+            evidence_comments = negative_comments or matched_comments
+            frequency = len(evidence_comments)
+            if negative_count == 0 and positive_count > 0:
+                continue
+            mention_rate = round(frequency / max(1, total_comments) * 100)
+            examples = [
+                {
+                    "text": compact_evidence_text(comment.get("comment_text", "")),
+                    "source": str(comment.get("username", "")).strip() or "comment",
+                    "time": str(comment.get("publish_time", "")).strip(),
+                    "likes": int(comment.get("like_count") or 0),
+                }
+                for comment in evidence_comments[:3]
+            ]
+            confidence = min(0.95, round(0.42 + min(frequency, 20) * 0.025 + min(total_comments, 100) * 0.002, 2))
+            aspects.append({
+                "aspect_id": pattern["id"],
+                "aspect": pattern["label"],
+                "gap_type": pattern["gap_type"],
+                "polarity": "negative" if negative_count >= positive_count else "mixed",
+                "frequency": frequency,
+                "mention_rate": mention_rate,
+                "baseline_negative_rate": pattern["baseline_negative_rate"],
+                "benchmark_lift": round(mention_rate / max(1, pattern["baseline_negative_rate"]), 1),
+                "confidence": confidence,
+                "examples": examples,
+                "method": "rule_absa_comment_match",
+            })
+
+    used_aspect_ids = {item["aspect_id"] for item in aspects}
+    for index, label in enumerate(keyword_labels):
+        pattern = match_aspect_from_label(label) or {
+            "id": f"keyword_{index + 1}",
+            "label": str(label),
+            "gap_type": "Differentiation Gap",
+            "baseline_negative_rate": 8,
+        }
+        if pattern["id"] in used_aspect_ids:
+            continue
+
+        frequency = int(keywords[index] if index < len(keywords) else 0)
+        if frequency <= 0:
+            continue
+
+        pseudo_total = max(total_comments, sum(max(0, int(value)) for value in keywords), frequency, 1)
+        mention_rate = round(frequency / pseudo_total * 100)
+        aspects.append({
+            "aspect_id": pattern["id"],
+            "aspect": pattern["label"],
+            "gap_type": pattern["gap_type"],
+            "polarity": "negative",
+            "frequency": frequency,
+            "mention_rate": mention_rate,
+            "baseline_negative_rate": pattern["baseline_negative_rate"],
+            "benchmark_lift": round(mention_rate / max(1, pattern["baseline_negative_rate"]), 1),
+            "confidence": min(0.82, round(0.36 + min(frequency, 20) * 0.018, 2)),
+            "examples": [],
+            "method": "keyword_frequency_fallback",
+        })
+        used_aspect_ids.add(pattern["id"])
+
+    aspects.sort(key=lambda item: (item.get("benchmark_lift", 0), item.get("frequency", 0)), reverse=True)
+    return aspects[:6]
+
+
+def build_evidence_contract(
+    comments: List[Dict[str, Any]] | None,
+    keyword_labels: List[str],
+    keywords: List[int],
+    sentiment: List[int],
+) -> Dict[str, Any]:
+    source_comments = comments or []
+    aspect_terms = build_aspect_terms(source_comments, keyword_labels, keywords)
+    top_aspect = aspect_terms[0] if aspect_terms else {}
+    comment_count = len(source_comments)
+    evidence_count = sum(len(item.get("examples", [])) for item in aspect_terms)
+    max_lift = max([float(item.get("benchmark_lift", 0)) for item in aspect_terms] or [0])
+    confidence_values = [float(item.get("confidence", 0)) for item in aspect_terms]
+    confidence = round(sum(confidence_values) / len(confidence_values), 2) if confidence_values else 0.35
+
+    return {
+        "schema": "tk_absa_evidence_v1",
+        "method": "ABSA-inspired aspect mining + keyword fallback",
+        "comment_count": comment_count,
+        "evidence_count": evidence_count,
+        "sample_window": "crawler_batch",
+        "confidence": confidence,
+        "top_aspect": top_aspect.get("aspect", keyword_labels[0] if keyword_labels else ""),
+        "top_gap_type": top_aspect.get("gap_type", "Differentiation Gap"),
+        "aspect_terms": aspect_terms,
+        "market_benchmark": {
+            "reference": PUBLIC_BENCHMARK_REFERENCE,
+            "negative_rate": int(sentiment[2] if len(sentiment) > 2 else 0),
+            "top_aspect_lift": max_lift,
+            "baseline_note": "Lift compares observed aspect mention rate with static public-review priors.",
+        },
+    }
+
+
 def normalize_contract(
     raw_report: Dict[str, Any],
     product_id: str,
     product_name: str,
+    comments: List[Dict[str, Any]] | None = None,
 ) -> Dict[str, Any]:
     """把模型输出强制整理成前端 Demo 所需的数据契约。"""
     sentiment = normalize_percentages(raw_report.get("sentiment"))
@@ -517,6 +783,7 @@ def normalize_contract(
         raw_report.get("keywordLabels"),
     )
     resolved_product_name = str(raw_report.get("product_name", "")).strip() or product_name
+    evidence_contract = build_evidence_contract(comments, keyword_labels, keywords, sentiment)
 
     return {
         "product_id": product_id,
@@ -530,6 +797,9 @@ def normalize_contract(
         "keywords": keywords,
         "keywordLabels": keyword_labels,
         "insight": trim_insight(raw_report.get("insight")),
+        "aspect_terms": evidence_contract["aspect_terms"],
+        "evidence_ledger": evidence_contract,
+        "market_benchmark": evidence_contract["market_benchmark"],
     }
 
 
@@ -599,6 +869,8 @@ def estimate_sentiment_from_comments(comments: List[Dict[str, Any]]) -> List[int
         "偏小",
     ]
 
+    negative_terms = sorted(set(negative_terms + NEGATIVE_CONTEXT_TERMS))
+
     positive = 0
     neutral = 0
     negative = 0
@@ -645,6 +917,7 @@ def build_fallback_report(
         },
         product_id,
         product_name,
+        comments,
     )
 
 
@@ -670,7 +943,7 @@ def diagnose_comments(
     prompt = build_user_prompt(product_id, product_name, comments)
     client = build_openai_client(api_key, base_url, timeout_seconds)
     raw_report = call_openai_with_retry(client, model_name, prompt, timeout_seconds, api_style)
-    return normalize_contract(raw_report, product_id, product_name)
+    return normalize_contract(raw_report, product_id, product_name, comments)
 
 
 def parse_args() -> argparse.Namespace:

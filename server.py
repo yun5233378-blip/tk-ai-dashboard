@@ -199,6 +199,51 @@ class ChannelConfig:
     display_name: str
 
 
+ASPECT_PRIORS: List[Dict[str, Any]] = [
+    {
+        "id": "fit_size",
+        "label": "Fit / size accuracy",
+        "terms": ["尺码", "尺寸", "偏小", "偏大", "size", "fit", "tight", "small", "one size up"],
+        "gap_type": "Fit Localization Gap",
+        "baseline_negative_rate": 7,
+    },
+    {
+        "id": "material_quality",
+        "label": "Material / durability",
+        "terms": ["材质", "面料", "起球", "质量", "耐用", "material", "fabric", "quality", "pilling", "thin"],
+        "gap_type": "Material Upgrade Gap",
+        "baseline_negative_rate": 9,
+    },
+    {
+        "id": "packaging_logistics",
+        "label": "Packaging / delivery trust",
+        "terms": ["包装", "破损", "物流", "外包装", "盒", "shipping", "package", "delivery", "box", "damaged"],
+        "gap_type": "Packaging Trust Gap",
+        "baseline_negative_rate": 6,
+    },
+    {
+        "id": "setup_onboarding",
+        "label": "Setup / onboarding",
+        "terms": ["说明", "说明书", "教程", "安装", "蓝牙", "连接", "manual", "guide", "setup", "connect", "pairing"],
+        "gap_type": "Education & Onboarding Gap",
+        "baseline_negative_rate": 8,
+    },
+    {
+        "id": "listing_accuracy",
+        "label": "Listing / expectation accuracy",
+        "terms": ["颜色", "色差", "图片", "描述", "listing", "picture", "photo", "color", "colour", "expectation"],
+        "gap_type": "Listing Accuracy Gap",
+        "baseline_negative_rate": 5,
+    },
+]
+
+PUBLIC_BENCHMARK_REFERENCE = {
+    "name": "Amazon Reviews 2023 public review corpus",
+    "url": "https://cseweb.ucsd.edu/~jmcauley/datasets.html#amazon_reviews",
+    "note": "Static category priors used for lift estimates; not a live category scrape.",
+}
+
+
 CHANNELS: Dict[str, ChannelConfig] = {
     "youtube": ChannelConfig(
         source_type="youtube",
@@ -688,6 +733,99 @@ def build_recommended_factories(product: Dict[str, Any]) -> List[Dict[str, Any]]
     return result
 
 
+def clamp_percent(value: Any) -> int:
+    return max(0, min(100, safe_int(value, 0)))
+
+
+def match_aspect_prior(label: str) -> Dict[str, Any]:
+    normalized = str(label or "").lower()
+    for prior in ASPECT_PRIORS:
+        if any(term.lower() in normalized for term in prior["terms"]):
+            return prior
+    return {
+        "id": f"keyword_{hashlib.sha1(normalized.encode('utf-8')).hexdigest()[:8]}",
+        "label": str(label or "Unclassified pain point"),
+        "terms": [],
+        "gap_type": "Differentiation Gap",
+        "baseline_negative_rate": 8,
+    }
+
+
+def build_compatible_aspect_terms(product: Dict[str, Any]) -> List[Dict[str, Any]]:
+    existing = product.get("aspect_terms")
+    if isinstance(existing, list) and existing:
+        return [item for item in existing[:6] if isinstance(item, dict)]
+
+    ledger = product.get("evidence_ledger")
+    if isinstance(ledger, dict) and isinstance(ledger.get("aspect_terms"), list) and ledger["aspect_terms"]:
+        return [item for item in ledger["aspect_terms"][:6] if isinstance(item, dict)]
+
+    labels = product.get("keywordLabels") if isinstance(product.get("keywordLabels"), list) else []
+    values = product.get("keywords") if isinstance(product.get("keywords"), list) else []
+    total_mentions = sum(max(0, safe_int(value, 0)) for value in values) or 1
+    aspect_terms: List[Dict[str, Any]] = []
+    used_ids: set[str] = set()
+
+    for index, label in enumerate(labels[:6]):
+        count = max(0, safe_int(values[index] if index < len(values) else 0, 0))
+        if count <= 0:
+            continue
+        prior = match_aspect_prior(str(label))
+        aspect_id = str(prior["id"])
+        if aspect_id in used_ids:
+            continue
+        used_ids.add(aspect_id)
+        mention_rate = clamp_percent(round(count / total_mentions * 100))
+        baseline = max(1, safe_int(prior.get("baseline_negative_rate"), 8))
+        confidence = min(0.82, round(0.36 + min(count, 20) * 0.018, 2))
+        aspect_terms.append({
+            "aspect_id": aspect_id,
+            "aspect": prior.get("label") or str(label),
+            "raw_label": str(label),
+            "gap_type": prior.get("gap_type", "Differentiation Gap"),
+            "polarity": "negative",
+            "frequency": count,
+            "mention_rate": mention_rate,
+            "baseline_negative_rate": baseline,
+            "benchmark_lift": round(mention_rate / baseline, 1),
+            "confidence": confidence,
+            "examples": [],
+            "method": "keyword_frequency_compat",
+        })
+
+    aspect_terms.sort(key=lambda item: (float(item.get("benchmark_lift", 0)), int(item.get("frequency", 0))), reverse=True)
+    return aspect_terms[:6]
+
+
+def build_compatible_evidence_ledger(product: Dict[str, Any]) -> Dict[str, Any]:
+    aspect_terms = build_compatible_aspect_terms(product)
+    existing = product.get("evidence_ledger")
+    ledger = copy.deepcopy(existing) if isinstance(existing, dict) else {}
+
+    sentiment = product.get("sentiment") if isinstance(product.get("sentiment"), list) else [0, 100, 0]
+    confidence_values = [float(item.get("confidence", 0)) for item in aspect_terms if isinstance(item, dict)]
+    confidence = round(sum(confidence_values) / len(confidence_values), 2) if confidence_values else 0.35
+    max_lift = max([float(item.get("benchmark_lift", 0)) for item in aspect_terms if isinstance(item, dict)] or [0])
+    top_aspect = aspect_terms[0] if aspect_terms else {}
+
+    ledger.setdefault("schema", "tk_absa_evidence_v1")
+    ledger.setdefault("method", "ABSA-inspired aspect mining + keyword fallback")
+    ledger.setdefault("comment_count", safe_int(ledger.get("comment_count"), 0))
+    ledger.setdefault("evidence_count", sum(len(item.get("examples", [])) for item in aspect_terms if isinstance(item, dict)))
+    ledger.setdefault("sample_window", ledger.get("sample_window") or "stored_product_snapshot")
+    ledger.setdefault("confidence", confidence)
+    ledger.setdefault("top_aspect", top_aspect.get("aspect", product.get("keywordLabels", [""])[0] if product.get("keywordLabels") else ""))
+    ledger.setdefault("top_gap_type", top_aspect.get("gap_type", "Differentiation Gap"))
+    ledger["aspect_terms"] = aspect_terms
+    ledger["market_benchmark"] = {
+        "reference": PUBLIC_BENCHMARK_REFERENCE,
+        "negative_rate": safe_int(sentiment[2] if len(sentiment) > 2 else 0, 0),
+        "top_aspect_lift": max_lift,
+        "baseline_note": "Lift compares observed aspect mention rate with static public-review priors.",
+    }
+    return ledger
+
+
 def enrich_product_for_dashboard(product: Dict[str, Any]) -> Dict[str, Any]:
     """补齐 score、direction、action 等前端表格字段。"""
     enriched = dict(product)
@@ -702,6 +840,9 @@ def enrich_product_for_dashboard(product: Dict[str, Any]) -> Dict[str, Any]:
         enriched["recommended_factories"] = build_recommended_factories(enriched)
     else:
         enriched.setdefault("recommended_factories", [])
+    enriched["aspect_terms"] = build_compatible_aspect_terms(enriched)
+    enriched["evidence_ledger"] = build_compatible_evidence_ledger(enriched)
+    enriched["market_benchmark"] = enriched["evidence_ledger"]["market_benchmark"]
     return enriched
 
 
@@ -1135,6 +1276,9 @@ def build_vs_snapshot(product_key: str, product: Dict[str, Any]) -> Dict[str, An
     negative_ratio = extract_negative_ratio(enriched)
     keyword_labels = enriched.get("keywordLabels", [])
     keywords = enriched.get("keywords", [])
+    evidence = enriched.get("evidence_ledger") if isinstance(enriched.get("evidence_ledger"), dict) else {}
+    aspect_terms = enriched.get("aspect_terms") if isinstance(enriched.get("aspect_terms"), list) else []
+    top_aspect = aspect_terms[0] if aspect_terms and isinstance(aspect_terms[0], dict) else {}
 
     top_complaints: List[Dict[str, Any]] = []
     if isinstance(keyword_labels, list):
@@ -1164,6 +1308,9 @@ def build_vs_snapshot(product_key: str, product: Dict[str, Any]) -> Dict[str, An
         "action": str(enriched.get("action") or "待诊断"),
         "insight": str(enriched.get("insight") or ""),
         "pending": bool(enriched.get("pending")),
+        "top_aspect": top_aspect.get("raw_label") or top_aspect.get("aspect") or "",
+        "benchmark_lift": top_aspect.get("benchmark_lift", 0),
+        "evidence_confidence": evidence.get("confidence", top_aspect.get("confidence", 0)),
     }
 
 
