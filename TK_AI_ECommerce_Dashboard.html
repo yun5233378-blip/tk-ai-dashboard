@@ -868,7 +868,7 @@
                     <span class="kicker-pill">排队</span>
                 </div>
                 <div class="flex flex-col md:flex-row gap-3">
-                    <input id="pipeline-url" type="text" placeholder="请输入 YouTube / TikTok 测评视频链接..." class="neo-input flex-grow px-4 py-2.5 rounded-lg text-sm focus:outline-none transition-all">
+                    <input id="pipeline-url" type="text" placeholder="请输入 YouTube / TikTok / 抖音 / 小红书链接，或 comments:// 粘贴评论..." class="neo-input flex-grow px-4 py-2.5 rounded-lg text-sm focus:outline-none transition-all">
                     <button id="btn-run-pipeline" class="primary-action px-6 py-2.5 rounded-lg text-sm font-medium flex items-center justify-center gap-2">
                         <span id="spinner" class="hidden w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
                         开始 AI 抓取与分析
@@ -4502,7 +4502,7 @@
 
             const url = pipelineUrl.value.trim();
             if (!url) {
-                showToast('请输入合法的 YouTube / TikTok 评测视频链接！', 'error');
+                showToast('请输入合法链接，或使用 comments:// 粘贴多行评论。', 'error');
                 return;
             }
 
@@ -4513,7 +4513,7 @@
             spinner.classList.remove('hidden');
             setTerminalOpenState(true);
             pipelineLoadingTitle.innerText = '正在抓取并分析评论';
-            pipelineLoadingDetail.innerText = '系统正在读取视频评论并生成 AI 舆情报告，请稍候。';
+            pipelineLoadingDetail.innerText = '系统正在读取多源讨论并生成 AI 舆情报告，请稍候。';
             progressPercent.innerText = '15%';
             logOffset = 0;
             pollInterval = setInterval(fetchLogs, 800);

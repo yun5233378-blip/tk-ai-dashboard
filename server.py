@@ -122,13 +122,14 @@ _STORAGE_REDIS_CLIENT: Any | None = None
 
 SCRAPE_TIKTOK_SCRIPT = BASE_DIR / "scrape_tiktok_comments.py"
 SCRAPE_YOUTUBE_SCRIPT = BASE_DIR / "scrape_youtube_comments.py"
+SCRAPE_MULTI_SOURCE_SCRIPT = BASE_DIR / "scrape_multi_source_comments.py"
 AI_DIAGNOSE_SCRIPT = BASE_DIR / "ai_diagnose.py"
 
 DEFAULT_LIMIT = 100
 CRAWLER_TIMEOUT_SECONDS = 180
 DIAGNOSE_TIMEOUT_SECONDS = 180
 RADAR_PATROL_INTERVAL_SECONDS = int(os.getenv("RADAR_PATROL_INTERVAL_SECONDS", "43200"))
-RADAR_PATROL_STARTUP_DELAY_SECONDS = int(os.getenv("RADAR_PATROL_STARTUP_DELAY_SECONDS", "60"))
+RADAR_PATROL_STARTUP_DELAY_SECONDS = int(os.getenv("RADAR_PATROL_STARTUP_DELAY_SECONDS", "600"))
 RADAR_NEGATIVE_SPIKE_THRESHOLD = 15
 RADAR_SCORE_CRITICAL_THRESHOLD = 60
 RADAR_HISTORY_MAX_POINTS = int(os.getenv("RADAR_HISTORY_MAX_POINTS", "96"))
@@ -367,6 +368,38 @@ CHANNELS: Dict[str, ChannelConfig] = {
         product_name="",
         display_name="TikTok 评论源",
     ),
+    "douyin": ChannelConfig(
+        source_type="douyin",
+        script_path=SCRAPE_MULTI_SOURCE_SCRIPT,
+        product_key="",
+        product_id="",
+        product_name="",
+        display_name="抖音讨论源",
+    ),
+    "xiaohongshu": ChannelConfig(
+        source_type="xiaohongshu",
+        script_path=SCRAPE_MULTI_SOURCE_SCRIPT,
+        product_key="",
+        product_id="",
+        product_name="",
+        display_name="小红书讨论源",
+    ),
+    "manual": ChannelConfig(
+        source_type="manual",
+        script_path=SCRAPE_MULTI_SOURCE_SCRIPT,
+        product_key="",
+        product_id="",
+        product_name="",
+        display_name="手动评论导入源",
+    ),
+    "public_web": ChannelConfig(
+        source_type="public_web",
+        script_path=SCRAPE_MULTI_SOURCE_SCRIPT,
+        product_key="",
+        product_id="",
+        product_name="",
+        display_name="公开网页讨论源",
+    ),
 }
 
 
@@ -377,7 +410,7 @@ CHANNELS: Dict[str, ChannelConfig] = {
 class PipelineRequest(BaseModel):
     """前端 POST /api/run-pipeline 的请求体。"""
 
-    url: str = Field(..., min_length=8, description="TikTok 或 YouTube 视频链接")
+    url: str = Field(..., min_length=4, description="YouTube / TikTok / 抖音 / 小红书链接，或 comments:// 手动评论导入")
     product_id: str | None = Field(None, description="本次诊断要写入的产品 ID")
     product_name: str | None = Field(None, description="本次诊断要写入的产品名称")
     limit: int = Field(DEFAULT_LIMIT, ge=1, le=500, description="本次最多抓取评论数")
@@ -3435,32 +3468,39 @@ def get_log_slice(after: int = 0) -> Dict[str, Any]:
 
 def detect_channel(url: str) -> ChannelConfig:
     """
-    根据 URL 自动选择爬虫通道。
+    根据 URL 自动选择采集通道。
 
     规则：
     - youtube.com / youtu.be -> YouTube 通道
     - tiktok.com -> TikTok 通道
-    - 无法识别 -> 默认降级到 YouTube 通道
+    - douyin.com / v.douyin.com -> 抖音安全适配器
+    - xiaohongshu.com / xhslink.com -> 小红书安全适配器
+    - comments:// 或多行文本 -> 手动评论导入
+    - 其他公开网页 -> 公共网页文本信号适配器
     """
     normalized_url = url.strip()
     lower_url = normalized_url.lower()
     parsed = urlparse(normalized_url)
     hostname = (parsed.hostname or "").lower()
 
-    is_youtube = "youtube.com" in lower_url or "youtu.be" in lower_url
-    is_tiktok = "tiktok.com" in lower_url
-
-    if is_youtube:
+    if normalized_url.startswith("comments://") or "\n" in normalized_url:
+        return CHANNELS["manual"]
+    if "youtube.com" in lower_url or "youtu.be" in lower_url:
         return CHANNELS["youtube"]
-
-    if is_tiktok:
+    if "tiktok.com" in lower_url:
         return CHANNELS["tiktok"]
+    if any(host in hostname for host in ("douyin.com", "v.douyin.com", "iesdouyin.com")):
+        return CHANNELS["douyin"]
+    if any(host in hostname for host in ("xiaohongshu.com", "xhslink.com")):
+        return CHANNELS["xiaohongshu"]
+    if parsed.scheme in {"http", "https"}:
+        return CHANNELS["public_web"]
 
     print(
-        f"[Gateway][WARN] 无法识别链接来源，已安全降级至 YouTube 通道。url={normalized_url}, host={hostname}",
+        f"[Gateway][WARN] 无法识别链接来源，已进入手动评论导入通道。url={normalized_url}, host={hostname}",
         flush=True,
     )
-    return CHANNELS["youtube"]
+    return CHANNELS["manual"]
 
 
 def build_auto_product_id(source_type: str, url: str) -> str:
@@ -4331,6 +4371,7 @@ def build_landing_readiness() -> Dict[str, Any]:
     scripts = {
         "tiktok": SCRAPE_TIKTOK_SCRIPT.exists(),
         "youtube": SCRAPE_YOUTUBE_SCRIPT.exists(),
+        "multi_source": SCRAPE_MULTI_SOURCE_SCRIPT.exists(),
         "diagnose": AI_DIAGNOSE_SCRIPT.exists(),
     }
     brief_templates_ready = all(key in BRIEF_TYPE_CONFIG for key in ("supply_chain", "appeal", "selection"))
@@ -4384,7 +4425,7 @@ def build_landing_readiness() -> Dict[str, Any]:
     add_check(
         "抓取与诊断脚本",
         "pass" if all(scripts.values()) else "fail",
-        f"脚本可用性：TikTok={scripts['tiktok']}，YouTube={scripts['youtube']}，诊断={scripts['diagnose']}。",
+        f"脚本可用性：TikTok={scripts['tiktok']}，YouTube={scripts['youtube']}，多源={scripts.get('multi_source')}，诊断={scripts['diagnose']}。",
         "缺失脚本会阻断数据闭环，需从仓库恢复并重新部署。",
     )
     add_check(
@@ -4493,6 +4534,7 @@ async def health() -> Dict[str, Any]:
         "scripts": {
             "tiktok": SCRAPE_TIKTOK_SCRIPT.exists(),
             "youtube": SCRAPE_YOUTUBE_SCRIPT.exists(),
+            "multi_source": SCRAPE_MULTI_SOURCE_SCRIPT.exists(),
             "diagnose": AI_DIAGNOSE_SCRIPT.exists(),
         },
     }
