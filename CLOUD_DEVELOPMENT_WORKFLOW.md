@@ -1,6 +1,14 @@
 # Cloud Development Workflow
 
-This repository is now developed directly on the cloud server. Treat `/opt/tk-ai` as the source of truth.
+This repository is developed directly on the cloud server. Treat `/opt/tk-ai` as the source of truth.
+
+## Cloud Entrypoints
+
+- Stable app/API host: `https://tk-api.void52.site`
+- Cloudflare Pages app host: `https://tk-ai-dashboard.pages.dev`
+- Legacy custom host: `https://dashboard.void52.site`
+
+`dashboard.void52.site` may still serve old Cloudflare edge cache until the cache is purged or the custom domain is bound to the new `tk-ai-dashboard` Pages project. For product verification, prefer `tk-api.void52.site` and `tk-ai-dashboard.pages.dev`.
 
 ## Standard Loop
 
@@ -23,13 +31,7 @@ git pull --ff-only
 4. Validate before committing.
 
 ```bash
-python3 -m py_compile server.py ai_diagnose.py
-python3 - <<'PY'
-from pathlib import Path
-html = Path("index.html").read_text(encoding="utf-8")
-assert "section-evidence" in html or "section-intelligence" in html
-print("HTML_STATIC_CHECK_OK")
-PY
+scripts/validate_cloud.sh
 ```
 
 5. Commit and push.
@@ -40,13 +42,39 @@ git commit -m "Describe the change"
 git push
 ```
 
-6. Rebuild and verify the cloud service.
+6. Deploy the full cloud stack.
 
 ```bash
-sudo docker compose up -d --build
-sudo docker compose ps
-curl -fsS https://tk-api.void52.site/api/health
+scripts/deploy_cloud.sh
 ```
+
+The deploy script now performs all of this in one pass:
+
+- Python and HTML static validation.
+- Docker rebuild/restart for FastAPI, Redis, and Caddy.
+- Public `/api/health` check.
+- Frontend marker check on `https://tk-api.void52.site`.
+- Cloudflare Pages deploy to `tk-ai-dashboard` when Wrangler is logged in.
+- Frontend marker check on `https://tk-ai-dashboard.pages.dev`.
+
+## Cloudflare Notes
+
+Wrangler OAuth is stored under the server user's `~/.config/.wrangler`. If Pages deploy is skipped, re-login from a local PowerShell session with port forwarding:
+
+```powershell
+ssh -L 8976:localhost:8976 tk-ai-cloud
+```
+
+Then run on the server:
+
+```bash
+cd /opt/tk-ai
+npx wrangler@3 login
+npx wrangler@3 whoami
+npx wrangler@3 pages project list
+```
+
+The current Pages project is `tk-ai-dashboard`. If `dashboard.void52.site` needs to become the primary frontend host, bind it as a custom domain to that Pages project or purge the existing cached host in Cloudflare.
 
 ## Rollback
 
@@ -54,7 +82,7 @@ curl -fsS https://tk-api.void52.site/api/health
 cd /opt/tk-ai
 git log --oneline -5
 git revert <commit>
-sudo docker compose up -d --build
+scripts/deploy_cloud.sh
 ```
 
 ## Do Not Commit
@@ -66,6 +94,7 @@ sudo docker compose up -d --build
 - `competitor_vs_reports.json`
 - `admin_audit_logs.json`
 - `backups/`
+- `.pages-deploy/`
 
 ## Remote
 

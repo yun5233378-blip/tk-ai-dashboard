@@ -16,3 +16,4 @@ admin_audit_logs.json
 backups/
 *.log
 *.out
+.pages-deploy/
