@@ -33,6 +33,7 @@ import threading
 import time
 import urllib.error
 import urllib.request
+import zipfile
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -4228,6 +4229,236 @@ app.add_middleware(
 
 
 # =========================
+# 落地上线体检
+# =========================
+
+def sha256_file(path: Path) -> str:
+    """计算文件 hash，用于确认前端多份静态入口是否同步。"""
+    if not path.exists():
+        return ""
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def build_static_artifact_readiness() -> Dict[str, Any]:
+    """检查 index、Dashboard 备份页和 Cloudflare Pages zip 是否一致。"""
+    index_path = BASE_DIR / "index.html"
+    dashboard_path = BASE_DIR / "TK_AI_ECommerce_Dashboard.html"
+    zip_path = BASE_DIR / "cloudflare-pages-platinum-dashboard.zip"
+    index_hash = sha256_file(index_path)
+    dashboard_hash = sha256_file(dashboard_path)
+    zip_hash = ""
+    zip_has_index = False
+    if zip_path.exists():
+        try:
+            with zipfile.ZipFile(zip_path) as zf:
+                zip_has_index = "index.html" in zf.namelist()
+                if zip_has_index:
+                    zip_hash = hashlib.sha256(zf.read("index.html")).hexdigest()
+        except Exception:
+            zip_hash = ""
+
+    synced = bool(index_hash and dashboard_hash and zip_hash and index_hash == dashboard_hash == zip_hash)
+    return {
+        "index_exists": index_path.exists(),
+        "dashboard_exists": dashboard_path.exists(),
+        "zip_exists": zip_path.exists(),
+        "zip_has_index": zip_has_index,
+        "synced": synced,
+        "index_hash": index_hash[:12],
+        "dashboard_hash": dashboard_hash[:12],
+        "zip_index_hash": zip_hash[:12],
+    }
+
+
+def build_landing_readiness() -> Dict[str, Any]:
+    """把当前项目是否能落地演示/试运营压缩成可执行体检结果。"""
+    products = load_products()
+    products, migrated = ensure_radar_fields_for_products(products)
+    if migrated:
+        save_products(products)
+
+    total_products = len(products)
+    diagnosed_count = 0
+    pending_count = 0
+    source_url_count = 0
+    evidence_items = 0
+    evidence_product_count = 0
+    critical_count = 0
+    scores: List[int] = []
+    product_gaps: List[Dict[str, str]] = []
+
+    for product_key, raw_product in products.items():
+        if not isinstance(raw_product, dict):
+            continue
+        product = enrich_product_for_dashboard(raw_product)
+        product_name = product_display_name(product_key, product)
+        has_url = bool(get_product_source_url(product))
+        if has_url:
+            source_url_count += 1
+        if product.get("pending") is True:
+            pending_count += 1
+        diagnosed = is_product_diagnosed(product)
+        if diagnosed:
+            diagnosed_count += 1
+            score = safe_int(product.get("score"), 0)
+            scores.append(score)
+            if product.get("radar_status") == "critical":
+                critical_count += 1
+            evidence = product.get("evidence_ledger") if isinstance(product.get("evidence_ledger"), dict) else {}
+            count = safe_int(evidence.get("evidence_count"), 0)
+            if count > 0:
+                evidence_items += count
+                evidence_product_count += 1
+        missing: List[str] = []
+        if not has_url:
+            missing.append("缺监控链接")
+        if not diagnosed:
+            missing.append("未完成诊断")
+        if diagnosed and not product.get("evidence_ledger"):
+            missing.append("证据账本不足")
+        if missing:
+            product_gaps.append({
+                "product_id": str(product.get("product_id") or product_key),
+                "product_name": product_name,
+                "gap": "、".join(missing),
+            })
+
+    average_score = round(sum(scores) / len(scores)) if scores else 0
+    diagnosis_coverage = round((diagnosed_count / total_products) * 100) if total_products else 0
+    source_url_coverage = round((source_url_count / total_products) * 100) if total_products else 0
+    evidence_coverage = round((evidence_product_count / diagnosed_count) * 100) if diagnosed_count else 0
+    static_artifacts = build_static_artifact_readiness()
+    scripts = {
+        "tiktok": SCRAPE_TIKTOK_SCRIPT.exists(),
+        "youtube": SCRAPE_YOUTUBE_SCRIPT.exists(),
+        "diagnose": AI_DIAGNOSE_SCRIPT.exists(),
+    }
+    brief_templates_ready = all(key in BRIEF_TYPE_CONFIG for key in ("supply_chain", "appeal", "selection"))
+
+    checks: List[Dict[str, str]] = []
+
+    def add_check(name: str, status: str, message: str, next_action: str = "") -> None:
+        checks.append({
+            "name": name,
+            "status": status,
+            "message": message,
+            "next_action": next_action,
+        })
+
+    add_check(
+        "账号密码与 Bearer 鉴权",
+        "pass" if bool(OPERATOR_TOKEN and OPERATOR_USERNAME and OPERATOR_PASSWORD) else "fail",
+        "内置账号密码登录与 API Bearer 鉴权已启用。" if bool(OPERATOR_TOKEN and OPERATOR_USERNAME and OPERATOR_PASSWORD) else "登录凭据或 OPERATOR_TOKEN 未配置完整。",
+        "在 .env 配置 OPERATOR_USERNAME、OPERATOR_PASSWORD、OPERATOR_TOKEN，并重启服务。",
+    )
+    add_check(
+        "云端数据存储",
+        "pass" if get_storage_backend_name() != "local_json" else "warn",
+        f"当前存储后端：{get_storage_backend_name()}。",
+        "生产环境建议使用 Redis/PostgreSQL，避免容器重建导致本地 JSON 状态漂移。",
+    )
+    add_check(
+        "真实商品数据",
+        "pass" if total_products > 0 else "fail",
+        f"当前监控商品 {total_products} 个，已诊断 {diagnosed_count} 个。",
+        "先注册 3-5 个真实商品链接，覆盖主推款、风险款和竞品参考款。",
+    )
+    add_check(
+        "诊断覆盖率",
+        "pass" if total_products > 0 and diagnosis_coverage >= 80 else ("warn" if diagnosed_count > 0 else "fail"),
+        f"诊断覆盖率 {diagnosis_coverage}%。",
+        "对未诊断商品运行抓取与 AI 诊断，避免首页报告只基于单个样本。",
+    )
+    add_check(
+        "监控链接覆盖",
+        "pass" if total_products > 0 and source_url_coverage >= 80 else ("warn" if source_url_count > 0 else "fail"),
+        f"有可复跑监控链接的商品占比 {source_url_coverage}%。",
+        "给每个商品保留 source_url/url，确保雷达巡检和复盘可重复。",
+    )
+    add_check(
+        "证据账本",
+        "pass" if diagnosed_count > 0 and evidence_coverage >= 60 else ("warn" if diagnosed_count > 0 else "fail"),
+        f"证据覆盖率 {evidence_coverage}%，证据条目 {evidence_items} 条。",
+        "补充真实评论样本，优先让核心商品形成 evidence_ledger。",
+    )
+    add_check(
+        "抓取与诊断脚本",
+        "pass" if all(scripts.values()) else "fail",
+        f"脚本可用性：TikTok={scripts['tiktok']}，YouTube={scripts['youtube']}，诊断={scripts['diagnose']}。",
+        "缺失脚本会阻断数据闭环，需从仓库恢复并重新部署。",
+    )
+    add_check(
+        "OpenAI / sub2api 诊断通道",
+        "pass" if bool(os.getenv("OPENAI_API_KEY", "").strip()) else "fail",
+        "模型 API Key 已配置。" if bool(os.getenv("OPENAI_API_KEY", "").strip()) else "模型 API Key 未配置，无法稳定生成真实 AI 诊断。",
+        "在 .env 配置 OPENAI_API_KEY、OPENAI_BASE_URL、OPENAI_MODEL_NAME 后重启。",
+    )
+    add_check(
+        "24H 雷达巡检",
+        "pass" if RADAR_TASK is not None and not RADAR_TASK.done() else "warn",
+        f"雷达任务 enabled={RADAR_TASK is not None and not RADAR_TASK.done()}，running={RADAR_LOCK.locked()}，last_run_at={RADAR_LAST_RUN_AT or '尚未完成'}。",
+        "保持商品 source_url 完整，等待巡检积累历史点；必要时手动触发 /api/run-radar-patrol。",
+    )
+    add_check(
+        "三类 Brief 导出",
+        "pass" if brief_templates_ready else "fail",
+        "供应链、申诉、选品三类即时证据 Brief 已就绪。" if brief_templates_ready else "Brief 类型配置缺失。",
+        "保持默认证据模板快速导出；只有需要深度润色时再打开模型 Brief。",
+    )
+    add_check(
+        "静态前端包同步",
+        "pass" if static_artifacts["synced"] else "fail",
+        "index.html、Dashboard 备份页和 Cloudflare zip 已同步。" if static_artifacts["synced"] else "前端入口或 zip 包不同步。",
+        "运行 scripts/deploy_cloud.sh 或重新打包 cloudflare-pages-platinum-dashboard.zip。",
+    )
+
+    statuses = [item["status"] for item in checks]
+    overall = "fail" if "fail" in statuses else ("warn" if "warn" in statuses else "pass")
+    next_actions: List[str] = []
+    for item in checks:
+        if item["status"] != "pass" and item.get("next_action"):
+            next_actions.append(item["next_action"])
+    if total_products < 3:
+        next_actions.append("落地前建议至少准备 3 个真实商品：主推款、风险款、竞品/替代款，用于验证诊断和 Brief 是否稳定。")
+    if product_gaps:
+        next_actions.append("优先补齐 product_gaps 中的监控链接、诊断结果和证据账本。")
+
+    return {
+        "status": overall,
+        "generated_at": current_timestamp(),
+        "ready_for_demo": overall != "fail" and total_products > 0 and diagnosed_count > 0,
+        "ready_for_pilot": overall == "pass" and total_products >= 3 and diagnosed_count >= 3,
+        "summary": {
+            "products": total_products,
+            "diagnosed_products": diagnosed_count,
+            "pending_products": pending_count,
+            "diagnosis_coverage": diagnosis_coverage,
+            "source_url_coverage": source_url_coverage,
+            "evidence_coverage": evidence_coverage,
+            "evidence_items": evidence_items,
+            "average_score": average_score if diagnosed_count else None,
+            "critical_products": critical_count,
+            "vs_reports": len(load_vs_reports()),
+            "audit_logs": len(load_admin_audit_logs()),
+        },
+        "checks": checks,
+        "product_gaps": product_gaps[:20],
+        "next_actions": list(dict.fromkeys(next_actions))[:10],
+        "static_artifacts": static_artifacts,
+        "method_boundaries": {
+            "usable_now": [
+                "真实抓取评论后的情感分、客诉标签、证据账本和经营 Brief。",
+                "24H 雷达在有历史点后用于发现异常上升，不直接等同销量预测。",
+                "证据可信度用于决定报告语气强弱，样本少时必须保守。",
+            ],
+            "not_claimed": [
+                "不编造 GMV、销量、市场份额或平台内部规则。",
+                "公开论文和 GitHub 项目只作为方法参考，不当作当前商品的真实市场数据。",
+            ],
+        },
+    }
+
+# =========================
 # API 路由
 # =========================
 
@@ -4265,6 +4496,12 @@ async def health() -> Dict[str, Any]:
             "diagnose": AI_DIAGNOSE_SCRIPT.exists(),
         },
     }
+
+
+@app.get("/api/readiness")
+async def readiness() -> Dict[str, Any]:
+    """受保护的上线体检接口，供云端脚本和后台检查当前落地状态。"""
+    return build_landing_readiness()
 
 
 @app.post("/api/login")
