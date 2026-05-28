@@ -770,6 +770,135 @@ def clamp_percent(value: Any) -> int:
     return max(0, min(100, safe_int(value, 0)))
 
 
+def safe_float(value: Any, default: float = 0.0) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def wilson_lower_bound(successes: int, total: int, z: float = 1.96) -> float:
+    """Return Wilson lower bound for a binomial proportion."""
+    if total <= 0:
+        return 0.0
+    phat = max(0.0, min(1.0, successes / total))
+    denominator = 1 + (z * z / total)
+    centre = phat + (z * z / (2 * total))
+    margin = z * ((phat * (1 - phat) + (z * z / (4 * total))) / total) ** 0.5
+    return max(0.0, (centre - margin) / denominator)
+
+
+def build_metric_lineage_entry(
+    metric_id: str,
+    label: str,
+    value: Any,
+    formula: str,
+    basis: str,
+    sample_size: int,
+    confidence: float,
+    sources: List[Dict[str, str]],
+    degradation: str = "",
+) -> Dict[str, Any]:
+    return {
+        "metric_id": metric_id,
+        "label": label,
+        "value": value,
+        "formula": formula,
+        "basis": basis,
+        "sample_size": max(0, safe_int(sample_size, 0)),
+        "confidence": round(max(0.0, min(1.0, safe_float(confidence))), 3),
+        "sources": sources,
+        "degradation": degradation or "样本量满足当前轻量判断要求。",
+    }
+
+
+def build_health_score_lineage(score: int, sentiment: List[Any], aspect_terms: List[Dict[str, Any]], evidence_count: int) -> Dict[str, Any]:
+    negative_ratio = safe_int(sentiment[2] if len(sentiment) > 2 else 0, 0)
+    critical_aspect = max([safe_float(item.get("mention_rate"), 0.0) for item in aspect_terms if isinstance(item, dict)] or [0.0])
+    sample_size = max(evidence_count, sum(safe_int(item.get("frequency"), 0) for item in aspect_terms if isinstance(item, dict)))
+    confidence = min(0.92, 0.35 + min(sample_size, 80) / 140)
+    degradation = "样本不足，健康分已按评论证据量降权解释。" if sample_size < 8 else "情感比例与方面级痛点共同支撑。"
+    return build_metric_lineage_entry(
+        "health_score",
+        "情感健康分",
+        score,
+        "100 - 负面率惩罚 - 核心痛点惩罚 - 近期波动惩罚 + 证据置信加成",
+        f"负面率 {negative_ratio}%，最高痛点提及率 {round(critical_aspect)}%。",
+        sample_size,
+        confidence,
+        [
+            {"name": "Hu & Liu customer review mining", "url": "https://www.cs.uic.edu/~liub/publications/kdd04-revSummary.pdf"},
+            {"name": "PyABSA aspect based sentiment analysis", "url": "https://github.com/yangheng95/PyABSA"},
+        ],
+        degradation,
+    )
+
+
+def build_evidence_trust_breakdown(comment_count: int, evidence_count: int, confidence: float, source_count: int = 1) -> Dict[str, Any]:
+    total = max(comment_count, evidence_count, 0)
+    if total <= 0:
+        total = evidence_count
+    positive_hits = max(0, min(total, round(total * max(0.0, min(1.0, confidence))))) if total > 0 else 0
+    wilson = wilson_lower_bound(positive_hits, total) if total > 0 else 0.0
+    coverage = min(1.0, total / 60) if total > 0 else 0.0
+    source_coverage = min(1.0, max(1, source_count) / 3) if total > 0 else 0.0
+    final_score = round((0.65 * wilson + 0.25 * coverage + 0.10 * source_coverage) * 100)
+    degradation = "样本不足，已使用 Wilson 下界抑制虚高。" if total < 20 else "样本覆盖达到轻量判断要求。"
+    return {
+        "score": max(0, min(100, final_score)),
+        "wilson_lower": round(wilson, 3),
+        "coverage": round(coverage, 3),
+        "source_coverage": round(source_coverage, 3),
+        "positive_hits": positive_hits,
+        "sample_size": total,
+        "degradation": degradation,
+    }
+
+
+def build_gap_score_lineage(gap_score: int, metrics: Dict[str, Any], sample_size: int) -> Dict[str, Any]:
+    confidence = min(0.9, 0.32 + min(sample_size, 80) / 130)
+    degradation = "机会分样本不足，仅作为后台观察信号。" if sample_size < 12 else "机会分由痛点强度、可修复性和证据置信共同支撑。"
+    basis = (
+        f"需求热度 {safe_int(metrics.get('demandHeat'), 0)}，痛点密度 {safe_int(metrics.get('painDensity'), 0)}，"
+        f"可修复性 {safe_int(metrics.get('fixability'), 0)}，证据置信 {safe_int(metrics.get('evidenceConfidence'), 0)}。"
+    )
+    return build_metric_lineage_entry(
+        "market_gap_score",
+        "机会分",
+        gap_score,
+        "需求热度*0.35 + 痛点强度*0.30 + 可修复性*0.20 + 证据置信*0.15",
+        basis,
+        sample_size,
+        confidence,
+        [
+            {"name": "mlxtend association rules", "url": "https://rasbt.github.io/mlxtend/user_guide/frequent_patterns/association_rules/"},
+            {"name": "Amazon Reviews 2023", "url": "https://amazon-reviews-2023.github.io/"},
+        ],
+        degradation,
+    )
+
+
+def build_radar_lineage(evaluated: Dict[str, Any], latest_score: int, sample_size: int = 0) -> Dict[str, Any]:
+    delta = safe_int(evaluated.get("radar_negative_delta"), 0)
+    latest_negative = safe_int(evaluated.get("radar_latest_negative_ratio"), 0)
+    confidence = 0.42 if sample_size <= 0 else min(0.88, 0.40 + min(sample_size, 60) / 125)
+    degradation = "缺少逐条时间戳，当前按巡检前后快照差分降级判断。" if sample_size <= 0 else "使用巡检窗口样本进行负面波动判断。"
+    return build_metric_lineage_entry(
+        "radar_risk",
+        "雷达风险",
+        evaluated.get("radar_status", "normal"),
+        "负面率快照差分 >= 阈值 或 健康分 < 阈值；后续升级 EWMA/CUSUM。",
+        f"最新负面率 {latest_negative}%，快照变化 {delta} 个百分点，健康分 {latest_score}。",
+        sample_size,
+        confidence,
+        [
+            {"name": "Numenta Anomaly Benchmark", "url": "https://github.com/numenta/NAB"},
+            {"name": "river online anomaly detection", "url": "https://github.com/online-ml/river"},
+        ],
+        degradation,
+    )
+
+
 def match_aspect_prior(label: str) -> Dict[str, Any]:
     normalized = str(label or "").lower()
     for prior in ASPECT_PRIORS:
@@ -836,17 +965,27 @@ def build_compatible_evidence_ledger(product: Dict[str, Any]) -> Dict[str, Any]:
     ledger = copy.deepcopy(existing) if isinstance(existing, dict) else {}
 
     sentiment = product.get("sentiment") if isinstance(product.get("sentiment"), list) else [0, 100, 0]
-    confidence_values = [float(item.get("confidence", 0)) for item in aspect_terms if isinstance(item, dict)]
+    confidence_values = [safe_float(item.get("confidence"), 0.0) for item in aspect_terms if isinstance(item, dict)]
     confidence = round(sum(confidence_values) / len(confidence_values), 2) if confidence_values else 0.35
-    max_lift = max([float(item.get("benchmark_lift", 0)) for item in aspect_terms if isinstance(item, dict)] or [0])
+    max_lift = max([safe_float(item.get("benchmark_lift"), 0.0) for item in aspect_terms if isinstance(item, dict)] or [0])
     top_aspect = aspect_terms[0] if aspect_terms else {}
+    derived_evidence_count = sum(len(item.get("examples", [])) for item in aspect_terms if isinstance(item, dict))
+    if derived_evidence_count <= 0:
+        derived_evidence_count = sum(safe_int(item.get("frequency"), 0) for item in aspect_terms if isinstance(item, dict))
+    comment_count = safe_int(ledger.get("comment_count"), 0)
+    source_count = safe_int(ledger.get("source_count"), 1)
+    evidence_count = safe_int(ledger.get("evidence_count"), derived_evidence_count)
+    trust_breakdown = build_evidence_trust_breakdown(comment_count, evidence_count, confidence, source_count)
 
     ledger.setdefault("schema", "tk_absa_evidence_v1")
     ledger.setdefault("method", "ABSA-inspired aspect mining + keyword fallback")
-    ledger.setdefault("comment_count", safe_int(ledger.get("comment_count"), 0))
-    ledger.setdefault("evidence_count", sum(len(item.get("examples", [])) for item in aspect_terms if isinstance(item, dict)))
+    ledger["comment_count"] = comment_count
+    ledger["evidence_count"] = evidence_count
+    ledger["source_count"] = max(1, source_count)
     ledger.setdefault("sample_window", ledger.get("sample_window") or "stored_product_snapshot")
-    ledger.setdefault("confidence", confidence)
+    ledger["confidence"] = confidence
+    ledger["evidence_trust_score"] = trust_breakdown["score"]
+    ledger["evidence_trust_breakdown"] = trust_breakdown
     ledger.setdefault("top_aspect", top_aspect.get("aspect", product.get("keywordLabels", [""])[0] if product.get("keywordLabels") else ""))
     ledger.setdefault("top_gap_type", top_aspect.get("gap_type", "Differentiation Gap"))
     ledger["aspect_terms"] = aspect_terms
@@ -855,6 +994,36 @@ def build_compatible_evidence_ledger(product: Dict[str, Any]) -> Dict[str, Any]:
         "negative_rate": safe_int(sentiment[2] if len(sentiment) > 2 else 0, 0),
         "top_aspect_lift": max_lift,
         "baseline_note": "Lift compares observed aspect mention rate with static public-review priors.",
+    }
+    ledger["metric_lineage"] = {
+        "evidence_trust": build_metric_lineage_entry(
+            "evidence_trust",
+            "证据可信度",
+            trust_breakdown["score"],
+            "0.65*Wilson下界 + 0.25*样本覆盖 + 0.10*来源覆盖",
+            f"Wilson 下界 {trust_breakdown['wilson_lower']}，样本覆盖 {trust_breakdown['coverage']}，来源覆盖 {trust_breakdown['source_coverage']}。",
+            trust_breakdown["sample_size"],
+            confidence,
+            [
+                {"name": "Wilson score interval", "url": "https://www.evanmiller.org/how-not-to-sort-by-average-rating.html"},
+                {"name": "Amazon Reviews 2023", "url": "https://amazon-reviews-2023.github.io/"},
+            ],
+            trust_breakdown["degradation"],
+        ),
+        "aspect_lift": build_metric_lineage_entry(
+            "aspect_lift",
+            "痛点基线偏离",
+            max_lift,
+            "当前痛点提及率 / 公开评论类目基线负面率",
+            f"Top aspect: {top_aspect.get('raw_label') or top_aspect.get('aspect') or 'N/A'}。",
+            evidence_count,
+            confidence,
+            [
+                {"name": "mlxtend association rules", "url": "https://rasbt.github.io/mlxtend/user_guide/frequent_patterns/association_rules/"},
+                {"name": "McAuley Lab public review datasets", "url": "https://cseweb.ucsd.edu/~jmcauley/datasets.html"},
+            ],
+            "静态公开评论先验，非实时全网类目爬取。",
+        ),
     }
     return ledger
 
@@ -876,6 +1045,15 @@ def enrich_product_for_dashboard(product: Dict[str, Any]) -> Dict[str, Any]:
     enriched["aspect_terms"] = build_compatible_aspect_terms(enriched)
     enriched["evidence_ledger"] = build_compatible_evidence_ledger(enriched)
     enriched["market_benchmark"] = enriched["evidence_ledger"]["market_benchmark"]
+    evidence_count = safe_int(enriched["evidence_ledger"].get("evidence_count"), 0)
+    enriched["metric_lineage"] = dict(enriched.get("metric_lineage") or {})
+    enriched["metric_lineage"]["health_score"] = build_health_score_lineage(
+        safe_int(enriched.get("score"), calculate_score(sentiment)),
+        sentiment if isinstance(sentiment, list) else [0, 100, 0],
+        enriched["aspect_terms"],
+        evidence_count,
+    )
+    enriched["metric_lineage"].update(enriched["evidence_ledger"].get("metric_lineage", {}))
     return enriched
 
 
@@ -1150,6 +1328,8 @@ def apply_radar_evaluation(
     evaluated["radar_negative_delta"] = negative_delta
     evaluated["radar_last_checked_at"] = current_timestamp()
     evaluated["radar_alert_reason"] = ""
+    evaluated["metric_lineage"] = dict(evaluated.get("metric_lineage") or {})
+    evaluated["metric_lineage"]["radar_risk"] = build_radar_lineage(evaluated, latest_score)
 
     if is_critical:
         reasons = []
@@ -1344,6 +1524,8 @@ def build_vs_snapshot(product_key: str, product: Dict[str, Any]) -> Dict[str, An
         "top_aspect": top_aspect.get("raw_label") or top_aspect.get("aspect") or "",
         "benchmark_lift": top_aspect.get("benchmark_lift", 0),
         "evidence_confidence": evidence.get("confidence", top_aspect.get("confidence", 0)),
+        "evidence_trust_score": evidence.get("evidence_trust_score", 0),
+        "metric_lineage": enriched.get("metric_lineage", {}),
     }
 
 
@@ -1605,10 +1787,13 @@ def build_executive_report_snapshot(products: Dict[str, Dict[str, Any]]) -> Dict
         snapshot = build_vs_snapshot(key, item)
         evidence = item.get("evidence_ledger") if isinstance(item.get("evidence_ledger"), dict) else {}
         aspect_terms = item.get("aspect_terms") if isinstance(item.get("aspect_terms"), list) else []
-        confidence = float(evidence.get("confidence") or 0)
+        trust_score = safe_float(evidence.get("evidence_trust_score"), 0.0)
+        confidence = safe_float(evidence.get("confidence"), 0.0)
         if confidence <= 0 and aspect_terms and isinstance(aspect_terms[0], dict):
-            confidence = float(aspect_terms[0].get("confidence") or 0)
-        if confidence > 0:
+            confidence = safe_float(aspect_terms[0].get("confidence"), 0.0)
+        if trust_score > 0:
+            evidence_confidences.append(trust_score / 100)
+        elif confidence > 0:
             evidence_confidences.append(confidence)
         evidence_items += safe_int(evidence.get("evidence_count"), 0)
         top_risks.append({
