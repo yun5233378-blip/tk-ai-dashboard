@@ -2115,77 +2115,114 @@
             }).join('');
         }
 
+        function normalizeServerMarketGap(key, item, evidence) {
+            const gap = item && item.market_gap && typeof item.market_gap === 'object' ? item.market_gap : null;
+            if (!gap || typeof gap.gap_score === 'undefined') {
+                return null;
+            }
+            const sentiment = Array.isArray(item.sentiment) ? item.sentiment : [0, 100, 0];
+            const topAspect = evidence.topAspect || getTopAspect(item) || {};
+            const metricLineage = {
+                ...(evidence.lineage || {}),
+                ...(gap.metric_lineage || {})
+            };
+            evidence.lineage = metricLineage;
+            return {
+                key,
+                item,
+                gapScore: clampScore(Number(gap.gap_score || gap.gapScore || 0)),
+                gapType: gap.gap_type || gap.gapType || getMarketGapType(item, gap.metrics || {}),
+                priority: gap.priority || 'P2 · 观察池',
+                topPain: gap.top_pain || gap.topPain || getTopPain(item),
+                keywordTotal: Number(gap.keyword_total || 0),
+                negative: Number(gap.negative || sentiment[2] || 0),
+                positive: Number(gap.positive || sentiment[0] || 0),
+                score: Number(gap.score || item.score || 0),
+                metrics: gap.metrics || {},
+                association: gap.association || {},
+                evidence,
+                topAspect,
+                benchmarkLift: Number(gap.benchmark_lift || gap.benchmarkLift || evidence.lift || 0),
+                thesis: gap.thesis || ''
+            };
+        }
+
+        function buildLocalOpportunityRecord(key, item) {
+            const sentiment = Array.isArray(item.sentiment) ? item.sentiment : [0, 100, 0];
+            const negative = Number(sentiment[2] || 0);
+            const positive = Number(sentiment[0] || 0);
+            const score = Number(item.score || 0);
+            const evidence = getEvidenceStats(item);
+            const topAspect = evidence.topAspect || {};
+            const keywordTotal = Array.isArray(item.keywords)
+                ? item.keywords.reduce((sum, value) => sum + Number(value || 0), 0)
+                : 0;
+            const topKeyword = Array.isArray(item.keywords) && item.keywords.length > 0
+                ? Number(item.keywords[0] || 0)
+                : 0;
+            const concentration = keywordTotal > 0 ? Math.round((topKeyword / keywordTotal) * 100) : 0;
+            const factories = Array.isArray(item.recommended_factories) ? item.recommended_factories : [];
+            const radarDelta = Number(item.radar_negative_delta || 0);
+            const evidenceConfidence = clampScore(evidence.confidence * 100);
+            const benchmarkLift = Math.max(0, Number(evidence.lift || 0));
+            const liftScore = clampScore(Math.min(benchmarkLift, 4) * 25);
+            const evidenceDepth = clampScore((evidence.evidenceCount * 18) + Math.min(evidence.commentCount, 120) * 0.22 + evidence.frequency * 0.55);
+            const aspectMentionRate = Number(evidence.mentionRate || 0);
+
+            const demandHeat = clampScore(negative * 0.85 + Math.min(keywordTotal, 100) * 0.15 + aspectMentionRate * 0.65 + liftScore * 0.32 + Math.max(0, radarDelta) * 1.4);
+            const painDensity = clampScore(concentration * 0.4 + negative * 0.28 + aspectMentionRate * 0.8 + liftScore * 0.22);
+            const fixability = clampScore(
+                factories.length > 0
+                    ? 68 + Math.min(22, factories.length * 8) + (isRadarCritical(item) ? 6 : 0)
+                    : 44 + Math.max(0, 100 - score) * 0.24
+            );
+            const riskDrag = clampScore(negative * 0.75 + Math.max(0, 72 - score) * 0.62 + (isRadarCritical(item) ? 18 : 0));
+            const timingWindow = clampScore(42 + Math.max(0, radarDelta) * 1.8 + (isRadarCritical(item) ? 18 : 0) + Math.max(0, negative - positive) * 0.25);
+            const gapScore = clampScore(
+                demandHeat * 0.22 +
+                painDensity * 0.18 +
+                liftScore * 0.16 +
+                evidenceConfidence * 0.14 +
+                evidenceDepth * 0.1 +
+                fixability * 0.12 +
+                timingWindow * 0.08
+            );
+            const metrics = { demandHeat, painDensity, fixability, riskDrag, timingWindow, evidenceConfidence, liftScore, evidenceDepth };
+            const gapType = getMarketGapType(item, metrics);
+            const priority = gapScore >= 78 ? 'P0 · 立即打样' : (gapScore >= 64 ? 'P1 · 本周验证' : 'P2 · 观察池');
+            const topPain = topAspect.raw_label || topAspect.aspect || getTopPain(item);
+            const evidenceLine = benchmarkLift > 0
+                ? `ABSA 证据显示“${topPain}”相对公开类目基线约 ${benchmarkLift.toFixed(1)}x`
+                : `ABSA 证据显示“${topPain}”是当前最高频属性级痛点`;
+            const thesis = `${gapType}：${evidenceLine}，置信度 ${Math.round(evidence.confidence * 100)}%，当前负面率 ${negative}%${radarDelta > 0 ? `，近 24H 抬升 ${radarDelta}%` : ''}。建议以“规避该痛点”的微创新版本切入，并用评论样例验证详情页卖点。`;
+
+            return {
+                key,
+                item,
+                gapScore,
+                gapType,
+                priority,
+                topPain,
+                keywordTotal,
+                negative,
+                positive,
+                score,
+                metrics,
+                association: {},
+                evidence,
+                topAspect,
+                benchmarkLift,
+                thesis
+            };
+        }
+
         function getOpportunityRecords() {
             return Object.keys(activeData || {})
                 .map(key => {
                     const item = activeData[key];
                     if (!hasDiagnosticData(item)) return null;
-
-                    const sentiment = Array.isArray(item.sentiment) ? item.sentiment : [0, 100, 0];
-                    const negative = Number(sentiment[2] || 0);
-                    const positive = Number(sentiment[0] || 0);
-                    const score = Number(item.score || 0);
                     const evidence = getEvidenceStats(item);
-                    const topAspect = evidence.topAspect || {};
-                    const keywordTotal = Array.isArray(item.keywords)
-                        ? item.keywords.reduce((sum, value) => sum + Number(value || 0), 0)
-                        : 0;
-                    const topKeyword = Array.isArray(item.keywords) && item.keywords.length > 0
-                        ? Number(item.keywords[0] || 0)
-                        : 0;
-                    const concentration = keywordTotal > 0 ? Math.round((topKeyword / keywordTotal) * 100) : 0;
-                    const factories = Array.isArray(item.recommended_factories) ? item.recommended_factories : [];
-                    const radarDelta = Number(item.radar_negative_delta || 0);
-                    const evidenceConfidence = clampScore(evidence.confidence * 100);
-                    const benchmarkLift = Math.max(0, Number(evidence.lift || 0));
-                    const liftScore = clampScore(Math.min(benchmarkLift, 4) * 25);
-                    const evidenceDepth = clampScore((evidence.evidenceCount * 18) + Math.min(evidence.commentCount, 120) * 0.22 + evidence.frequency * 0.55);
-                    const aspectMentionRate = Number(evidence.mentionRate || 0);
-
-                    const demandHeat = clampScore(negative * 0.85 + Math.min(keywordTotal, 100) * 0.15 + aspectMentionRate * 0.65 + liftScore * 0.32 + Math.max(0, radarDelta) * 1.4);
-                    const painDensity = clampScore(concentration * 0.4 + negative * 0.28 + aspectMentionRate * 0.8 + liftScore * 0.22);
-                    const fixability = clampScore(
-                        factories.length > 0
-                            ? 68 + Math.min(22, factories.length * 8) + (isRadarCritical(item) ? 6 : 0)
-                            : 44 + Math.max(0, 100 - score) * 0.24
-                    );
-                    const riskDrag = clampScore(negative * 0.75 + Math.max(0, 72 - score) * 0.62 + (isRadarCritical(item) ? 18 : 0));
-                    const timingWindow = clampScore(42 + Math.max(0, radarDelta) * 1.8 + (isRadarCritical(item) ? 18 : 0) + Math.max(0, negative - positive) * 0.25);
-                    const gapScore = clampScore(
-                        demandHeat * 0.22 +
-                        painDensity * 0.18 +
-                        liftScore * 0.16 +
-                        evidenceConfidence * 0.14 +
-                        evidenceDepth * 0.1 +
-                        fixability * 0.12 +
-                        timingWindow * 0.08
-                    );
-                    const metrics = { demandHeat, painDensity, fixability, riskDrag, timingWindow, evidenceConfidence, liftScore, evidenceDepth };
-                    const gapType = getMarketGapType(item, metrics);
-                    const priority = gapScore >= 78 ? 'P0 · 立即打样' : (gapScore >= 64 ? 'P1 · 本周验证' : 'P2 · 观察池');
-                    const topPain = topAspect.raw_label || topAspect.aspect || getTopPain(item);
-                    const evidenceLine = benchmarkLift > 0
-                        ? `ABSA 证据显示“${topPain}”相对公开类目基线约 ${benchmarkLift.toFixed(1)}x`
-                        : `ABSA 证据显示“${topPain}”是当前最高频属性级痛点`;
-                    const thesis = `${gapType}：${evidenceLine}，置信度 ${Math.round(evidence.confidence * 100)}%，当前负面率 ${negative}%${radarDelta > 0 ? `，近 24H 抬升 ${radarDelta}%` : ''}。建议以“规避该痛点”的微创新版本切入，并用评论样例验证详情页卖点。`;
-
-                    return {
-                        key,
-                        item,
-                        gapScore,
-                        gapType,
-                        priority,
-                        topPain,
-                        keywordTotal,
-                        negative,
-                        positive,
-                        score,
-                        metrics,
-                        evidence,
-                        topAspect,
-                        benchmarkLift,
-                        thesis
-                    };
+                    return normalizeServerMarketGap(key, item, evidence) || buildLocalOpportunityRecord(key, item);
                 })
                 .filter(Boolean)
                 .sort((a, b) => b.gapScore - a.gapScore);
@@ -2453,7 +2490,7 @@
             const benchmarkReference = prime.evidence && prime.evidence.benchmark
                 ? prime.evidence.benchmark.reference
                 : '';
-            const primeLineage = renderMetricLineage(prime.evidence.lineage, ['health_score', 'evidence_trust', 'aspect_lift', 'radar_risk']);
+            const primeLineage = renderMetricLineage(prime.evidence.lineage, ['market_gap_score', 'association_signal', 'health_score', 'evidence_trust', 'aspect_lift', 'radar_risk']);
             marketGapPrimeEvidence.innerHTML = `
                 <div class="flex items-center justify-between gap-3">
                     <span class="font-black text-indigo-700">证据账本</span>
@@ -2461,10 +2498,10 @@
                 </div>
                 <div class="mt-2 text-slate-700"><span class="font-black">Top Aspect:</span> ${escapeHtml(getAspectDisplayName(prime.topAspect))}</div>
                 <div class="mt-3 grid grid-cols-2 gap-2 text-[11px] font-bold">
-                    <span class="rounded-md bg-slate-50 px-2 py-1">Lift ${formatBenchmarkLift(prime.benchmarkLift)}</span>
-                    <span class="rounded-md bg-slate-50 px-2 py-1">Conf ${formatConfidence(prime.evidence.confidence)}</span>
-                    <span class="rounded-md bg-slate-50 px-2 py-1">Evidence ${prime.evidence.evidenceCount}</span>
-                    <span class="rounded-md bg-slate-50 px-2 py-1">Comments ${prime.evidence.commentCount || '--'}</span>
+                    <span class="rounded-md bg-slate-50 px-2 py-1">Lift ${formatBenchmarkLift(prime.association?.lift || prime.benchmarkLift)}</span>
+                    <span class="rounded-md bg-slate-50 px-2 py-1">Conf ${formatConfidence(prime.association?.confidence || prime.evidence.confidence)}</span>
+                    <span class="rounded-md bg-slate-50 px-2 py-1">Support ${prime.association?.support ? Number(prime.association.support).toFixed(3) : '--'}</span>
+                    <span class="rounded-md bg-slate-50 px-2 py-1">Sample ${prime.association?.sample_count || prime.evidence.evidenceCount || '--'}</span>
                 </div>
                 <div class="mt-3">${primeLineage}</div>
                 ${primeExamples.length > 0 ? `<div class="mt-3 space-y-2">${primeExamples.map(renderEvidenceExample).join('')}</div>` : '<div class="mt-3 rounded-lg border border-dashed border-slate-200 bg-slate-50/70 p-3 text-slate-400">当前为关键词兼容证据，下一次真实抓取后会补齐评论样例。</div>'}
@@ -2474,7 +2511,7 @@
             marketGapList.innerHTML = records.map((record, index) => {
                 const examples = Array.isArray(record.topAspect.examples) ? record.topAspect.examples : [];
                 const firstExample = examples[0];
-                const rowLineage = renderMetricLineage(record.evidence.lineage, ['evidence_trust', 'aspect_lift', 'radar_risk']);
+                const rowLineage = renderMetricLineage(record.evidence.lineage, ['market_gap_score', 'association_signal', 'evidence_trust', 'aspect_lift', 'radar_risk']);
                 return `
                 <div class="p-5 hover:bg-indigo-50/40 transition-colors">
                     <div class="flex flex-col xl:flex-row xl:items-start justify-between gap-4">
@@ -2490,9 +2527,10 @@
                                 <span class="rounded-md bg-slate-100 text-slate-600 px-2 py-1">Fix ${record.metrics.fixability}</span>
                                 <span class="rounded-md bg-slate-100 text-slate-600 px-2 py-1">Timing ${record.metrics.timingWindow}</span>
                                 <span class="rounded-md bg-rose-50 text-rose-700 px-2 py-1">Risk ${record.metrics.riskDrag}</span>
-                                <span class="rounded-md bg-indigo-50 text-indigo-700 px-2 py-1">Lift ${formatBenchmarkLift(record.benchmarkLift)}</span>
-                                <span class="rounded-md bg-violet-50 text-violet-700 px-2 py-1">Conf ${formatConfidence(record.evidence.confidence)}</span>
-                                <span class="rounded-md bg-emerald-50 text-emerald-700 px-2 py-1">Evidence ${record.evidence.evidenceCount}</span>
+                                <span class="rounded-md bg-indigo-50 text-indigo-700 px-2 py-1">Lift ${formatBenchmarkLift(record.association?.lift || record.benchmarkLift)}</span>
+                                <span class="rounded-md bg-violet-50 text-violet-700 px-2 py-1">Conf ${formatConfidence(record.association?.confidence || record.evidence.confidence)}</span>
+                                <span class="rounded-md bg-emerald-50 text-emerald-700 px-2 py-1">Support ${record.association?.support ? Number(record.association.support).toFixed(3) : '--'}</span>
+                                <span class="rounded-md bg-slate-100 text-slate-600 px-2 py-1">Sample ${record.association?.sample_count || record.evidence.evidenceCount || '--'}</span>
                             </div>
                             <div class="mt-3 text-[11px] font-bold text-slate-400 uppercase">Top Aspect · ${escapeHtml(getAspectDisplayName(record.topAspect))}</div>
                             <div class="mt-3">${rowLineage}</div>

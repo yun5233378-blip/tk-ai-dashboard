@@ -878,6 +878,33 @@ def build_gap_score_lineage(gap_score: int, metrics: Dict[str, Any], sample_size
     )
 
 
+def build_association_lineage(market_gap: Dict[str, Any]) -> Dict[str, Any]:
+    association = market_gap.get("association", {}) if isinstance(market_gap.get("association"), dict) else {}
+    sample_size = safe_int(association.get("sample_count"), 0)
+    confidence = min(0.9, 0.30 + min(sample_size, 80) / 120)
+    basis = (
+        f"support {safe_float(association.get('support'), 0.0):.3f}，"
+        f"confidence {safe_float(association.get('confidence'), 0.0):.3f}，"
+        f"lift {safe_float(association.get('lift'), 0.0):.2f}。"
+    )
+    degradation = "关联样本不足，当前仅作为后台辅助证据。" if sample_size < 12 else "痛点和负面结果存在可解释共现关系。"
+    return build_metric_lineage_entry(
+        "association_signal",
+        "关联规则信号",
+        round(safe_float(association.get("lift"), 0.0), 2),
+        "support = 痛点命中样本/总样本；confidence = 痛点命中中的负面比例；lift = confidence/基线负面率",
+        basis,
+        sample_size,
+        confidence,
+        [
+            {"name": "mlxtend association rules", "url": "https://rasbt.github.io/mlxtend/user_guide/frequent_patterns/association_rules/"},
+            {"name": "McAuley Lab review datasets", "url": "https://cseweb.ucsd.edu/~jmcauley/datasets.html"},
+        ],
+        degradation,
+    )
+
+
+
 def build_radar_lineage(evaluated: Dict[str, Any], latest_score: int, sample_size: int = 0) -> Dict[str, Any]:
     delta = safe_int(evaluated.get("radar_negative_delta"), 0)
     latest_negative = safe_int(evaluated.get("radar_latest_negative_ratio"), 0)
@@ -1028,6 +1055,132 @@ def build_compatible_evidence_ledger(product: Dict[str, Any]) -> Dict[str, Any]:
     return ledger
 
 
+
+def infer_market_gap_type_from_text(text: str, fixability: int = 50) -> str:
+    normalized = str(text or "").lower()
+    if any(term in normalized for term in ["尺码", "尺寸", "size", "fit", "偏小", "偏大"]):
+        return "Fit Localization Gap"
+    if any(term in normalized for term in ["材质", "面料", "质量", "起球", "material", "fabric", "pilling"]):
+        return "Material Upgrade Gap"
+    if any(term in normalized for term in ["包装", "物流", "破损", "shipping", "package", "delivery", "box"]):
+        return "Packaging Trust Gap"
+    if any(term in normalized for term in ["说明", "教程", "安装", "连接", "manual", "setup", "pairing"]):
+        return "Education & Onboarding Gap"
+    if any(term in normalized for term in ["颜色", "色差", "图片", "描述", "listing", "photo", "color"]):
+        return "Listing Accuracy Gap"
+    if fixability >= 72:
+        return "Supply Chain Fix Gap"
+    return "Differentiation Gap"
+
+
+def build_market_gap_snapshot(product_key: str, product: Dict[str, Any]) -> Dict[str, Any]:
+    sentiment = product.get("sentiment") if isinstance(product.get("sentiment"), list) else [0, 100, 0]
+    negative = clamp_percent(sentiment[2] if len(sentiment) > 2 else 0)
+    positive = clamp_percent(sentiment[0] if len(sentiment) > 0 else 0)
+    score = clamp_percent(product.get("score", calculate_score(sentiment)))
+    keywords = product.get("keywords") if isinstance(product.get("keywords"), list) else []
+    keyword_total = sum(max(0, safe_int(value, 0)) for value in keywords)
+    top_keyword = max([safe_int(value, 0) for value in keywords[:1]] or [0])
+    concentration = round((top_keyword / keyword_total) * 100) if keyword_total > 0 else 0
+    factories = product.get("recommended_factories") if isinstance(product.get("recommended_factories"), list) else []
+    radar_delta = safe_int(product.get("radar_negative_delta"), 0)
+    evidence = product.get("evidence_ledger") if isinstance(product.get("evidence_ledger"), dict) else {}
+    aspect_terms = product.get("aspect_terms") if isinstance(product.get("aspect_terms"), list) else []
+    top_aspect = aspect_terms[0] if aspect_terms and isinstance(aspect_terms[0], dict) else {}
+    evidence_confidence = clamp_percent(safe_float(evidence.get("confidence"), safe_float(top_aspect.get("confidence"), 0.0)) * 100)
+    benchmark_lift = max(0.0, safe_float(top_aspect.get("benchmark_lift"), safe_float(evidence.get("market_benchmark", {}).get("top_aspect_lift") if isinstance(evidence.get("market_benchmark"), dict) else 0.0, 0.0)))
+    lift_score = clamp_percent(min(benchmark_lift, 4.0) * 25)
+    evidence_count = safe_int(evidence.get("evidence_count"), 0)
+    comment_count = safe_int(evidence.get("comment_count"), 0)
+    frequency = safe_int(top_aspect.get("frequency"), 0)
+    aspect_mention_rate = safe_float(top_aspect.get("mention_rate"), 0.0)
+    sample_count = max(comment_count, evidence_count, keyword_total, frequency)
+    baseline_negative = max(1.0, safe_float(top_aspect.get("baseline_negative_rate"), 8.0)) / 100
+    support = round((frequency / max(sample_count, 1)), 4) if sample_count > 0 else 0.0
+    confidence_rule = round(min(1.0, max(0.0, (negative / 100) * (aspect_mention_rate / 100 if aspect_mention_rate > 0 else support))), 4)
+    if support > 0 and confidence_rule <= 0:
+        confidence_rule = round(min(1.0, negative / 100), 4)
+    association_lift = round((confidence_rule / baseline_negative), 2) if baseline_negative > 0 and confidence_rule > 0 else round(benchmark_lift, 2)
+    association_lift = max(0.0, association_lift)
+
+    evidence_depth = clamp_percent((evidence_count * 18) + min(comment_count, 120) * 0.22 + frequency * 0.55)
+    demand_heat = clamp_percent(negative * 0.85 + min(keyword_total, 100) * 0.15 + aspect_mention_rate * 0.65 + lift_score * 0.32 + max(0, radar_delta) * 1.4)
+    pain_density = clamp_percent(concentration * 0.4 + negative * 0.28 + aspect_mention_rate * 0.8 + lift_score * 0.22)
+    is_critical = product.get("radar_status") == "critical"
+    fixability = clamp_percent(
+        68 + min(22, len(factories) * 8) + (6 if is_critical else 0)
+        if factories
+        else 44 + max(0, 100 - score) * 0.24
+    )
+    risk_drag = clamp_percent(negative * 0.75 + max(0, 72 - score) * 0.62 + (18 if is_critical else 0))
+    timing_window = clamp_percent(42 + max(0, radar_delta) * 1.8 + (18 if is_critical else 0) + max(0, negative - positive) * 0.25)
+    gap_score = clamp_percent(
+        demand_heat * 0.22
+        + pain_density * 0.18
+        + lift_score * 0.16
+        + evidence_confidence * 0.14
+        + evidence_depth * 0.10
+        + fixability * 0.12
+        + timing_window * 0.08
+    )
+    metrics = {
+        "demandHeat": demand_heat,
+        "painDensity": pain_density,
+        "fixability": fixability,
+        "riskDrag": risk_drag,
+        "timingWindow": timing_window,
+        "evidenceConfidence": evidence_confidence,
+        "liftScore": lift_score,
+        "evidenceDepth": evidence_depth,
+    }
+    top_pain = str(top_aspect.get("raw_label") or top_aspect.get("aspect") or (product.get("keywordLabels", [""])[0] if product.get("keywordLabels") else "需求认知不清"))
+    gap_type = str(top_aspect.get("gap_type") or infer_market_gap_type_from_text(f"{top_pain} {product.get('direction', '')} {product.get('insight', '')}", fixability))
+    priority = "P0 · 立即打样" if gap_score >= 78 else ("P1 · 本周验证" if gap_score >= 64 else "P2 · 观察池")
+    evidence_line = (
+        f"ABSA 证据显示“{top_pain}”相对公开类目基线约 {benchmark_lift:.1f}x"
+        if benchmark_lift > 0
+        else f"ABSA 证据显示“{top_pain}”是当前最高频属性级痛点"
+    )
+    thesis = f"{gap_type}：{evidence_line}，置信度 {evidence_confidence}%，当前负面率 {negative}%"
+    if radar_delta > 0:
+        thesis += f"，近 24H 抬升 {radar_delta}%"
+    thesis += "。建议以“规避该痛点”的微创新版本切入，并用评论样例验证详情页卖点。"
+
+    market_gap = {
+        "schema": "tk_market_gap_v1",
+        "product_key": product_key,
+        "gap_score": gap_score,
+        "gapScore": gap_score,
+        "gap_type": gap_type,
+        "gapType": gap_type,
+        "priority": priority,
+        "top_pain": top_pain,
+        "topPain": top_pain,
+        "sample_count": sample_count,
+        "keyword_total": keyword_total,
+        "negative": negative,
+        "positive": positive,
+        "score": score,
+        "metrics": metrics,
+        "association": {
+            "support": support,
+            "confidence": confidence_rule,
+            "lift": association_lift,
+            "sample_count": sample_count,
+            "baseline_negative_rate": round(baseline_negative, 4),
+            "aspect_frequency": frequency,
+        },
+        "benchmark_lift": benchmark_lift,
+        "benchmarkLift": benchmark_lift,
+        "thesis": thesis,
+        "method": "server_association_weighted_gap_v1",
+    }
+    market_gap["metric_lineage"] = {
+        "market_gap_score": build_gap_score_lineage(gap_score, metrics, sample_count),
+        "association_signal": build_association_lineage(market_gap),
+    }
+    return market_gap
+
 def enrich_product_for_dashboard(product: Dict[str, Any]) -> Dict[str, Any]:
     """补齐 score、direction、action 等前端表格字段。"""
     enriched = dict(product)
@@ -1054,6 +1207,12 @@ def enrich_product_for_dashboard(product: Dict[str, Any]) -> Dict[str, Any]:
         evidence_count,
     )
     enriched["metric_lineage"].update(enriched["evidence_ledger"].get("metric_lineage", {}))
+    enriched["market_gap"] = build_market_gap_snapshot(str(enriched.get("product_id") or enriched.get("product_key") or "product"), enriched)
+    enriched["metric_lineage"].update(enriched["market_gap"].get("metric_lineage", {}))
+    enriched["market_gap"]["metric_lineage"] = {
+        **enriched["market_gap"].get("metric_lineage", {}),
+        **{key: value for key, value in enriched["metric_lineage"].items() if key in ("health_score", "evidence_trust", "aspect_lift", "radar_risk")},
+    }
     return enriched
 
 
@@ -1525,6 +1684,7 @@ def build_vs_snapshot(product_key: str, product: Dict[str, Any]) -> Dict[str, An
         "benchmark_lift": top_aspect.get("benchmark_lift", 0),
         "evidence_confidence": evidence.get("confidence", top_aspect.get("confidence", 0)),
         "evidence_trust_score": evidence.get("evidence_trust_score", 0),
+        "market_gap": enriched.get("market_gap", {}),
         "metric_lineage": enriched.get("metric_lineage", {}),
     }
 
