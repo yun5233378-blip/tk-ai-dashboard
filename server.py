@@ -270,6 +270,54 @@ PUBLIC_BENCHMARK_REFERENCE = {
     "note": "Static category priors used for lift estimates; not a live category scrape.",
 }
 
+ALGORITHM_REFERENCE_LIBRARY: Dict[str, Dict[str, str]] = {
+    "absa": {
+        "name": "PyABSA aspect based sentiment analysis",
+        "url": "https://github.com/yangheng95/PyABSA",
+        "role": "将评论拆成属性级痛点，支撑材质、尺码、包装等可执行归因。",
+    },
+    "review_mining": {
+        "name": "Hu & Liu customer review mining",
+        "url": "https://www.cs.uic.edu/~liub/publications/kdd04-revSummary.pdf",
+        "role": "评论挖掘与观点摘要的经典方法基础。",
+    },
+    "association_rules": {
+        "name": "mlxtend association rules",
+        "url": "https://rasbt.github.io/mlxtend/user_guide/frequent_patterns/association_rules/",
+        "role": "用 support / confidence / lift 判断痛点和负面结果是否稳定共现。",
+    },
+    "wilson": {
+        "name": "Wilson score interval",
+        "url": "https://www.evanmiller.org/how-not-to-sort-by-average-rating.html",
+        "role": "样本少时用下界抑制虚高，保护证据可信度。",
+    },
+    "nab": {
+        "name": "Numenta Anomaly Benchmark",
+        "url": "https://github.com/numenta/NAB",
+        "role": "流式异常检测和预警评分的公开基准。",
+    },
+    "river": {
+        "name": "river online anomaly detection",
+        "url": "https://github.com/online-ml/river",
+        "role": "在线学习场景下的流式异常检测参考实现。",
+    },
+    "amazon_reviews_2023": {
+        "name": "Amazon Reviews 2023",
+        "url": "https://amazon-reviews-2023.github.io/",
+        "role": "公开评论语料用于类目基线和评价分布先验。",
+    },
+    "mcauley": {
+        "name": "McAuley Lab public review datasets",
+        "url": "https://cseweb.ucsd.edu/~jmcauley/datasets.html",
+        "role": "电商评论数据集和推荐/评论挖掘研究入口。",
+    },
+}
+
+
+def reference_source(key: str) -> Dict[str, str]:
+    item = ALGORITHM_REFERENCE_LIBRARY[key]
+    return {"name": item["name"], "url": item["url"]}
+
 
 CHANNELS: Dict[str, ChannelConfig] = {
     "youtube": ChannelConfig(
@@ -827,8 +875,8 @@ def build_health_score_lineage(score: int, sentiment: List[Any], aspect_terms: L
         sample_size,
         confidence,
         [
-            {"name": "Hu & Liu customer review mining", "url": "https://www.cs.uic.edu/~liub/publications/kdd04-revSummary.pdf"},
-            {"name": "PyABSA aspect based sentiment analysis", "url": "https://github.com/yangheng95/PyABSA"},
+            reference_source("review_mining"),
+            reference_source("absa"),
         ],
         degradation,
     )
@@ -871,8 +919,8 @@ def build_gap_score_lineage(gap_score: int, metrics: Dict[str, Any], sample_size
         sample_size,
         confidence,
         [
-            {"name": "mlxtend association rules", "url": "https://rasbt.github.io/mlxtend/user_guide/frequent_patterns/association_rules/"},
-            {"name": "Amazon Reviews 2023", "url": "https://amazon-reviews-2023.github.io/"},
+            reference_source("association_rules"),
+            reference_source("amazon_reviews_2023"),
         ],
         degradation,
     )
@@ -897,12 +945,116 @@ def build_association_lineage(market_gap: Dict[str, Any]) -> Dict[str, Any]:
         sample_size,
         confidence,
         [
-            {"name": "mlxtend association rules", "url": "https://rasbt.github.io/mlxtend/user_guide/frequent_patterns/association_rules/"},
-            {"name": "McAuley Lab review datasets", "url": "https://cseweb.ucsd.edu/~jmcauley/datasets.html"},
+            reference_source("association_rules"),
+            reference_source("mcauley"),
         ],
         degradation,
     )
 
+
+
+def build_sps_lineage(product: Dict[str, Any], evidence_count: int) -> Dict[str, Any]:
+    sentiment = product.get("sentiment") if isinstance(product.get("sentiment"), list) else [0, 100, 0]
+    negative = safe_int(sentiment[2] if len(sentiment) > 2 else 0, 0)
+    positive = safe_int(sentiment[0] if len(sentiment) > 0 else 0, 0)
+    score = safe_int(product.get("score"), calculate_score(sentiment))
+    keyword_values = product.get("keywords") if isinstance(product.get("keywords"), list) else []
+    sample_size = max(evidence_count, sum(max(0, safe_int(value, 0)) for value in keyword_values))
+    confidence = min(0.86, 0.34 + min(sample_size, 80) / 150)
+    return build_metric_lineage_entry(
+        "sps_half_life",
+        "SPS 修复预测",
+        score,
+        "预测分 = 100 - 修复后负面率*0.68 + 新增好评率*0.08；近期差评权重 W(t)=0.7^floor(t/15)",
+        f"当前正面率 {positive}%，负面率 {negative}%，基础健康分 {score}。",
+        sample_size,
+        confidence,
+        [
+            reference_source("wilson"),
+            reference_source("nab"),
+        ],
+        "SPS 平台内部权重不可完全公开，当前使用可解释半衰近似模型。",
+    )
+
+
+def build_algorithm_support_pack(product: Dict[str, Any], market_gap: Dict[str, Any]) -> Dict[str, Any]:
+    lineage = product.get("metric_lineage") if isinstance(product.get("metric_lineage"), dict) else {}
+    evidence = product.get("evidence_ledger") if isinstance(product.get("evidence_ledger"), dict) else {}
+    aspect_terms = product.get("aspect_terms") if isinstance(product.get("aspect_terms"), list) else []
+    association = market_gap.get("association") if isinstance(market_gap.get("association"), dict) else {}
+    top_aspect = aspect_terms[0] if aspect_terms and isinstance(aspect_terms[0], dict) else {}
+    evidence_count = safe_int(evidence.get("evidence_count"), 0)
+    sample_size = max(
+        evidence_count,
+        safe_int(evidence.get("comment_count"), 0),
+        safe_int(association.get("sample_count"), 0),
+        safe_int(top_aspect.get("frequency"), 0),
+    )
+    lineage_items = [entry for entry in lineage.values() if isinstance(entry, dict)]
+    avg_confidence = round(
+        sum(safe_float(entry.get("confidence"), 0.0) for entry in lineage_items) / len(lineage_items),
+        3,
+    ) if lineage_items else 0.0
+    top_pain = str(market_gap.get("top_pain") or top_aspect.get("raw_label") or top_aspect.get("aspect") or "核心痛点待补样本")
+    gap_score = safe_int(market_gap.get("gap_score"), 0)
+    trust_score = safe_int(evidence.get("evidence_trust_score"), 0)
+    lift = safe_float(association.get("lift"), safe_float(top_aspect.get("benchmark_lift"), 0.0))
+    support = safe_float(association.get("support"), 0.0)
+    action = str(product.get("action") or "等待决策")
+
+    if sample_size <= 0:
+        verdict = "当前缺少真实评论样本，算法仅保留框架，不输出强结论。"
+    elif avg_confidence < 0.45:
+        verdict = f"样本仍偏薄，{top_pain} 只能作为观察信号；建议继续抓取评论后再决定投放。"
+    elif gap_score >= 70 and trust_score >= 55:
+        verdict = f"{top_pain} 已形成可解释机会：痛点强、证据可信度可用，可进入小批量打样或详情页验证。"
+    else:
+        verdict = f"{top_pain} 有信号但未到强机会阈值，建议维持后台监控并按 {action} 执行。"
+
+    return {
+        "schema": "tk_algorithm_support_v1",
+        "verdict": verdict,
+        "sample_size": sample_size,
+        "average_confidence": avg_confidence,
+        "primary_methods": [
+            {
+                "method_id": "absa",
+                "label": "方面级情感分析",
+                "why_it_matters": "把评论拆成尺码、材质、包装、说明等可改造痛点，而不是只看总分。",
+                "source": reference_source("absa"),
+            },
+            {
+                "method_id": "association_rules",
+                "label": "关联规则",
+                "why_it_matters": "用 support、confidence、lift 判断某个痛点是否和差评结果稳定共现。",
+                "source": reference_source("association_rules"),
+            },
+            {
+                "method_id": "wilson",
+                "label": "证据可信度下界",
+                "why_it_matters": "样本少时主动压低可信度，避免小样本误判。",
+                "source": reference_source("wilson"),
+            },
+            {
+                "method_id": "stream_anomaly",
+                "label": "流式异常预警",
+                "why_it_matters": "把近期负面抬升作为预警信号，适合后续扩展 EWMA/CUSUM。",
+                "source": reference_source("nab"),
+            },
+        ],
+        "observations": [
+            f"核心痛点：{top_pain}",
+            f"机会分：{gap_score}/100",
+            f"证据可信度：{trust_score}/100",
+            f"关联强度：support {support:.3f}，lift {lift:.2f}",
+        ],
+        "limitations": [
+            "公开类目基线来自静态评论语料，不等同于实时全网市场份额。",
+            "历史商品如缺少逐条评论样例，会降级使用关键词频次兼容证据。",
+            "SPS 修复曲线是可解释半衰近似，最终以平台真实考核口径为准。",
+        ],
+        "references": list(ALGORITHM_REFERENCE_LIBRARY.values()),
+    }
 
 
 def build_radar_lineage(evaluated: Dict[str, Any], latest_score: int, sample_size: int = 0) -> Dict[str, Any]:
@@ -919,8 +1071,8 @@ def build_radar_lineage(evaluated: Dict[str, Any], latest_score: int, sample_siz
         sample_size,
         confidence,
         [
-            {"name": "Numenta Anomaly Benchmark", "url": "https://github.com/numenta/NAB"},
-            {"name": "river online anomaly detection", "url": "https://github.com/online-ml/river"},
+            reference_source("nab"),
+            reference_source("river"),
         ],
         degradation,
     )
@@ -1032,8 +1184,8 @@ def build_compatible_evidence_ledger(product: Dict[str, Any]) -> Dict[str, Any]:
             trust_breakdown["sample_size"],
             confidence,
             [
-                {"name": "Wilson score interval", "url": "https://www.evanmiller.org/how-not-to-sort-by-average-rating.html"},
-                {"name": "Amazon Reviews 2023", "url": "https://amazon-reviews-2023.github.io/"},
+                reference_source("wilson"),
+                reference_source("amazon_reviews_2023"),
             ],
             trust_breakdown["degradation"],
         ),
@@ -1046,8 +1198,8 @@ def build_compatible_evidence_ledger(product: Dict[str, Any]) -> Dict[str, Any]:
             evidence_count,
             confidence,
             [
-                {"name": "mlxtend association rules", "url": "https://rasbt.github.io/mlxtend/user_guide/frequent_patterns/association_rules/"},
-                {"name": "McAuley Lab public review datasets", "url": "https://cseweb.ucsd.edu/~jmcauley/datasets.html"},
+                reference_source("association_rules"),
+                reference_source("mcauley"),
             ],
             "静态公开评论先验，非实时全网类目爬取。",
         ),
@@ -1207,11 +1359,14 @@ def enrich_product_for_dashboard(product: Dict[str, Any]) -> Dict[str, Any]:
         evidence_count,
     )
     enriched["metric_lineage"].update(enriched["evidence_ledger"].get("metric_lineage", {}))
+    enriched["metric_lineage"]["sps_half_life"] = build_sps_lineage(enriched, evidence_count)
     enriched["market_gap"] = build_market_gap_snapshot(str(enriched.get("product_id") or enriched.get("product_key") or "product"), enriched)
     enriched["metric_lineage"].update(enriched["market_gap"].get("metric_lineage", {}))
+    enriched["algorithm_support"] = build_algorithm_support_pack(enriched, enriched["market_gap"])
+    enriched["market_gap"]["algorithm_support"] = enriched["algorithm_support"]
     enriched["market_gap"]["metric_lineage"] = {
         **enriched["market_gap"].get("metric_lineage", {}),
-        **{key: value for key, value in enriched["metric_lineage"].items() if key in ("health_score", "evidence_trust", "aspect_lift", "radar_risk")},
+        **{key: value for key, value in enriched["metric_lineage"].items() if key in ("health_score", "evidence_trust", "aspect_lift", "radar_risk", "sps_half_life")},
     }
     return enriched
 
@@ -1956,6 +2111,8 @@ def build_executive_report_snapshot(products: Dict[str, Dict[str, Any]]) -> Dict
         elif confidence > 0:
             evidence_confidences.append(confidence)
         evidence_items += safe_int(evidence.get("evidence_count"), 0)
+        market_gap = item.get("market_gap") if isinstance(item.get("market_gap"), dict) else {}
+        support_pack = item.get("algorithm_support") if isinstance(item.get("algorithm_support"), dict) else {}
         top_risks.append({
             "product_id": snapshot["product_id"],
             "product_name": snapshot["product_name"],
@@ -1965,6 +2122,8 @@ def build_executive_report_snapshot(products: Dict[str, Dict[str, Any]]) -> Dict
             "direction": snapshot["direction"],
             "action": snapshot["action"],
             "radar_status": item.get("radar_status", "normal"),
+            "market_gap_score": market_gap.get("gap_score", 0),
+            "evidence_verdict": support_pack.get("verdict", ""),
         })
 
     top_risks.sort(key=lambda item: (item["radar_status"] != "critical", item["score"], -item["negative_ratio"]))
@@ -1981,6 +2140,20 @@ def build_executive_report_snapshot(products: Dict[str, Dict[str, Any]]) -> Dict
     elif average_score < 75:
         suggested_action = "收缩预算，集中修复低分商品的供应链问题。"
 
+    lineage_entries: Dict[str, Dict[str, Any]] = {}
+    support_methods: Dict[str, Dict[str, Any]] = {}
+    support_verdicts: List[str] = []
+    for _, item in diagnosed_items:
+        for metric_id, entry in (item.get("metric_lineage") or {}).items():
+            if isinstance(entry, dict) and metric_id not in lineage_entries:
+                lineage_entries[metric_id] = entry
+        support_pack = item.get("algorithm_support") if isinstance(item.get("algorithm_support"), dict) else {}
+        if support_pack.get("verdict"):
+            support_verdicts.append(str(support_pack["verdict"]))
+        for method in support_pack.get("primary_methods", []):
+            if isinstance(method, dict) and method.get("method_id"):
+                support_methods[str(method["method_id"])] = method
+
     return {
         "total_products": total_products,
         "diagnosed_count": diagnosed_count,
@@ -1990,6 +2163,13 @@ def build_executive_report_snapshot(products: Dict[str, Dict[str, Any]]) -> Dict
         "evidence_items": evidence_items,
         "suggested_action": suggested_action,
         "top_risks": top_risks[:5],
+        "metric_lineage": lineage_entries,
+        "algorithm_support": {
+            "schema": "tk_algorithm_support_summary_v1",
+            "methods": list(support_methods.values()),
+            "verdicts": support_verdicts[:5],
+            "references": list(ALGORITHM_REFERENCE_LIBRARY.values()),
+        },
     }
 
 
