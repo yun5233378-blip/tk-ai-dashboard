@@ -41,6 +41,7 @@ services:
             - ./Caddyfile:/etc/caddy/Caddyfile:ro
             - caddy_data:/data
             - caddy_config:/config
+            - ./index.html:/srv/index.html:ro
         depends_on:
             - api
 
