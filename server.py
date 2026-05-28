@@ -430,10 +430,14 @@ class ExecutiveReportRequest(BaseModel):
     force_model: bool = Field(False, description="是否强制尝试模型生成")
 
 
-class ExecutiveReportRequest(BaseModel):
-    """前端 POST /api/executive-report 的请求体。"""
+class ExecutiveBriefRequest(BaseModel):
+    """前端 POST /api/generate-executive-brief 的请求体。"""
 
+    brief_type: str = Field(..., min_length=1, description="brief 类型：supply_chain / appeal / selection")
+    product_id: str = Field("", description="可选的商品 ID；为空时由后端选择最高优先级商品")
     products: Dict[str, Dict[str, Any]] = Field(default_factory=dict, description="前端当前可见商品快照")
+    executive_report: Dict[str, Any] = Field(default_factory=dict, description="当前综合经营报告载荷")
+    force_model: bool = Field(False, description="是否强制尝试模型生成；默认关闭以保障导出速度")
 
 
 class PipelineRuntimeError(Exception):
@@ -2734,6 +2738,291 @@ def generate_executive_report(products: Dict[str, Dict[str, Any]]) -> Dict[str, 
     }
 
 # =========================
+# AI 决策 Brief 导出 2.0
+# =========================
+
+BRIEF_TYPE_CONFIG: Dict[str, Dict[str, str]] = {
+    "supply_chain": {
+        "label": "供应链改良 Brief",
+        "title": "《供应链改良执行 Brief》",
+        "role": "跨境电商供应链质量负责人",
+        "focus": "把评论证据转译为材料、结构、包材、质检和打样验收动作。",
+    },
+    "appeal": {
+        "label": "运营申诉 Brief",
+        "title": "《平台申诉证据准备 Brief》",
+        "role": "TikTok Shop 运营合规负责人",
+        "focus": "把异常负面声浪转译为申诉证据清单、平台沟通口径和内部整改记录。",
+    },
+    "selection": {
+        "label": "选品决策 Brief",
+        "title": "《选品决策与差异化 Brief》",
+        "role": "跨境选品策略负责人",
+        "focus": "把客诉缺口、竞品弱点和证据可信度转译为下一轮上新或调款策略。",
+    },
+}
+
+
+def normalize_brief_type(raw_type: str) -> str:
+    """把前端 brief 类型归一到白名单，避免任意 prompt 注入式类型扩散。"""
+    brief_type = (raw_type or "").strip().lower().replace("-", "_")
+    aliases = {
+        "supply": "supply_chain",
+        "factory": "supply_chain",
+        "sourcing": "supply_chain",
+        "operation": "appeal",
+        "ops": "appeal",
+        "appeals": "appeal",
+        "product": "selection",
+        "market": "selection",
+    }
+    brief_type = aliases.get(brief_type, brief_type)
+    if brief_type not in BRIEF_TYPE_CONFIG:
+        raise PipelineRuntimeError(400, "不支持的 Brief 类型，请选择 supply_chain / appeal / selection。")
+    return brief_type
+
+
+def choose_brief_product_id(products: Dict[str, Dict[str, Any]], requested_id: str = "") -> str:
+    """选择最适合生成 Brief 的商品：显式商品优先，其次红线/低分/有诊断数据商品。"""
+    requested_id = (requested_id or "").strip()
+    if requested_id and requested_id in products:
+        return requested_id
+    if not products:
+        raise PipelineRuntimeError(404, "当前没有可用于生成 Brief 的商品数据。")
+
+    def priority(item: tuple[str, Dict[str, Any]]) -> tuple[int, int, int, str]:
+        key, product = item
+        score = safe_int(product.get("score"), 100)
+        has_data = 1 if product.get("sentiment") or product.get("keywordLabels") else 0
+        radar_boost = 1 if product.get("radar_status") == "critical" else 0
+        return (radar_boost, has_data, 100 - score, key)
+
+    return max(products.items(), key=priority)[0]
+
+
+def build_executive_brief_context(payload: ExecutiveBriefRequest) -> Dict[str, Any]:
+    """合并商品、经营报告、算法依据，形成三类 Brief 共用证据包。"""
+    brief_type = normalize_brief_type(payload.brief_type)
+    products = payload.products if payload.products else load_products()
+    if not products:
+        raise PipelineRuntimeError(404, "当前没有可用于生成 Brief 的商品数据。")
+
+    product_id = choose_brief_product_id(products, payload.product_id)
+    product = products[product_id]
+    snapshot = build_executive_report_snapshot(products)
+    report = payload.executive_report if isinstance(payload.executive_report, dict) else {}
+    report_sections = report.get("sections") if isinstance(report.get("sections"), dict) else {}
+    top_complaints = [
+        {"label": str(label), "count": safe_int(count, 0)}
+        for label, count in zip(product.get("keywordLabels", [])[:5], product.get("keywords", [])[:5])
+    ]
+    evidence_sources = [
+        reference_source("review_mining"),
+        reference_source("absa"),
+        reference_source("wilson"),
+        reference_source("nab"),
+        reference_source("evidently"),
+        reference_source("ragas"),
+    ]
+    if brief_type == "selection":
+        evidence_sources.append(reference_source("recbole"))
+    if brief_type == "supply_chain":
+        evidence_sources.append(reference_source("association_rules"))
+
+    return {
+        "brief_type": brief_type,
+        "config": BRIEF_TYPE_CONFIG[brief_type],
+        "product_id": product_id,
+        "product": {
+            "product_id": product.get("product_id", product_id),
+            "product_name": product.get("product_name", product_id),
+            "score": safe_int(product.get("score"), 100),
+            "sentiment": product.get("sentiment", []),
+            "top_complaints": top_complaints,
+            "insight": product.get("insight", ""),
+            "direction": product.get("direction", ""),
+            "action": product.get("action", ""),
+            "radar_status": product.get("radar_status", "normal"),
+            "radar_alert_reason": product.get("radar_alert_reason", ""),
+        },
+        "executive_sections": {
+            "summary": str(report_sections.get("summary") or ""),
+            "risk": str(report_sections.get("risk") or ""),
+            "action": str(report_sections.get("action") or ""),
+        },
+        "scorecard": snapshot.get("scorecard", []),
+        "highlights": snapshot.get("highlights", []),
+        "method_lineage": snapshot.get("method_lineage", {}),
+        "evidence_sources": evidence_sources,
+        "generated_at": current_timestamp(),
+    }
+
+
+def build_executive_brief_prompt(context: Dict[str, Any]) -> str:
+    """构造三类经营 Brief 共用 Prompt，强制证据约束。"""
+    config = context["config"]
+    payload = json.dumps(context, ensure_ascii=False, indent=2)
+    return f"""
+你是{config['role']}。请基于证据包生成{config['title']}。
+
+核心目标：{config['focus']}
+
+证据包如下：
+{payload}
+
+输出要求：
+1. 只输出中文 Markdown/Text，不要代码块。
+2. 必须包含：标题、适用商品、关键判断、证据依据、执行动作、验收口径、风险备注。
+3. 每个关键动作必须对应证据包中的评论痛点、健康分、风险状态、经营报告或算法依据之一。
+4. 禁止编造 GMV、销量、市场份额、平台规则、真实供应商承诺或证据包之外的数据。
+5. 不要堆砌英文算法名；如果引用方法，请翻译成经营语言，例如“样本少时保守降权”“异常波动观察”。
+6. 风格要像能直接发给老板、运营或供应链同事执行的专业 Brief，简洁有力。
+""".strip()
+
+
+def build_rule_based_executive_brief(context: Dict[str, Any]) -> str:
+    """模型不可用时生成结构完整、证据约束的本地 Brief。"""
+    config = context["config"]
+    product = context["product"]
+    complaints = product.get("top_complaints", [])
+    complaint_text = "、".join(
+        f"{item.get('label')}({item.get('count', 0)})" for item in complaints if item.get("label")
+    ) or "当前评论痛点样本不足"
+    score = product.get("score", 100)
+    sentiment = product.get("sentiment", [])
+    negative_rate = sentiment[2] if len(sentiment) > 2 else "--"
+    evidence_names = "、".join(source["name"] for source in context.get("evidence_sources", [])[:4])
+    direction = product.get("direction") or "继续补充评论样本，并把高频客诉转为可验收动作。"
+    action = product.get("action") or "先复核证据，再小步执行。"
+
+    if context["brief_type"] == "supply_chain":
+        action_block = f"""1. 将“{complaint_text}”转为工艺、包材、结构或说明书的改良项。
+2. 打样阶段必须提供改良前后对照样，并把客诉点纳入复测。
+3. 首批大货采用小批量试产，出货前按关键客诉项逐项验收。
+4. 若涉及包装破损，补充跌落、抗压、边角缓冲和封箱记录；若涉及材质体验，补充耐用、色牢、起球或结构寿命测试。"""
+        acceptance = "供应链验收以改良样、测试照片、QC 记录、包装复测和买家体验复盘为准。"
+    elif context["brief_type"] == "appeal":
+        action_block = f"""1. 汇总异常评论截图、订单号、物流轨迹、客服聊天和仓库 QC 记录。
+2. 将负面原因拆分为卖家可控与第三方物流/异常评价两类。
+3. 对红线或集中爆发商品申请人工复核，同时提交已执行的整改动作。
+4. 申诉文案只陈述证据，不做无证据指控。"""
+        acceptance = "申诉包至少包含评价 ID、订单证据、处理记录、物流页面和内部整改说明。"
+    else:
+        action_block = f"""1. 以“{complaint_text}”作为下一轮差异化卖点反推，而不是继续堆同质化低价款。
+2. 新品候选必须避开当前高频差评点，并保留可被图片、短视频和详情页证明的改良证据。
+3. 先用小样本评论验证，再进入投放放量；证据可信度不足时不做重仓判断。
+4. 后台保留复杂算法指数，前台只输出“做/不做/怎么做”的结论。"""
+        acceptance = "选品通过条件为：痛点明确、改良可验证、素材可表达、风险可复盘。"
+
+    return f"""# {config['title']}
+
+## 1. 适用商品
+- 商品：{product.get('product_name')}（{product.get('product_id')}）
+- 当前健康分：{score}/100
+- 负面声量：{negative_rate}%
+- 雷达状态：{product.get('radar_status', 'normal')}
+
+## 2. 关键判断
+当前主要证据集中在：{complaint_text}。
+系统建议方向：{direction}
+当前执行建议：{action}
+
+## 3. 证据依据
+- 评论挖掘：来自商品诊断中的高频客诉标签与情感比例。
+- 可信度处理：样本不足时按保守口径降权，避免把偶发评论当成确定趋势。
+- 异常观察：若短期负面集中上升，优先进入人工复核与证据补采。
+- 参考方法：{evidence_names}
+
+## 4. 执行动作
+{action_block}
+
+## 5. 验收口径
+{acceptance}
+
+## 6. 风险备注
+本 Brief 只基于当前证据包生成，不包含未验证的 GMV、销量、市场份额或平台规则判断。若后续评论样本增加，需要重新生成并更新结论。"""
+
+
+def call_executive_brief_model(context: Dict[str, Any]) -> str:
+    """调用 GPT-5.5 生成经营 Brief，失败时由上层走本地模板。"""
+    api_key = os.getenv("OPENAI_API_KEY", "").strip()
+    if not api_key:
+        raise RuntimeError("未检测到 OPENAI_API_KEY，已切换本地 Brief 模板。")
+
+    from ai_diagnose import (
+        DEFAULT_MODEL,
+        DEFAULT_OPENAI_API_STYLE,
+        DEFAULT_OPENAI_BASE_URL,
+        DEFAULT_TIMEOUT_SECONDS,
+        build_openai_client,
+        extract_responses_text,
+    )
+
+    base_url = os.getenv("OPENAI_BASE_URL", DEFAULT_OPENAI_BASE_URL)
+    model_name = os.getenv("OPENAI_MODEL_NAME", DEFAULT_MODEL)
+    api_style = os.getenv("OPENAI_API_STYLE", DEFAULT_OPENAI_API_STYLE)
+    default_brief_timeout = min(DEFAULT_TIMEOUT_SECONDS, 25)
+    timeout_seconds = safe_int(os.getenv("OPENAI_EXECUTIVE_BRIEF_TIMEOUT_SECONDS"), default_brief_timeout)
+    timeout_seconds = max(8, min(timeout_seconds, 45))
+    client = build_openai_client(api_key, base_url, timeout_seconds)
+    prompt = build_executive_brief_prompt(context)
+
+    if api_style == "responses":
+        response = client.responses.create(model=model_name, input=prompt, timeout=timeout_seconds)
+        text = extract_responses_text(response).strip()
+    else:
+        response = client.chat.completions.create(
+            model=model_name,
+            messages=[
+                {"role": "system", "content": "你生成证据约束、简洁可执行的中文经营 Brief。"},
+                {"role": "user", "content": prompt},
+            ],
+            timeout=timeout_seconds,
+        )
+        text = (response.choices[0].message.content or "").strip()
+
+    if not text:
+        raise RuntimeError("GPT-5.5 返回的 Brief 为空。")
+    return text
+
+
+def generate_executive_brief(payload: ExecutiveBriefRequest) -> Dict[str, Any]:
+    """生成供应链、运营申诉、选品三类可执行 Brief。"""
+    context = build_executive_brief_context(payload)
+    brief_type = context["brief_type"]
+    model_enabled = os.getenv("EXECUTIVE_BRIEF_MODEL_ENABLED", "0").strip() == "1" or payload.force_model
+
+    if model_enabled:
+        try:
+            brief_text = call_executive_brief_model(context)
+            source = "openai"
+            append_log(f"📄 {context['config']['label']} 已由 GPT-5.5 生成：{context['product']['product_name']}。")
+        except Exception as exc:
+            brief_text = build_rule_based_executive_brief(context)
+            source = "local_evidence_template"
+            append_log(f"📄 {context['config']['label']} 已启用即时证据模板：{exc}")
+    else:
+        brief_text = build_rule_based_executive_brief(context)
+        source = "local_evidence_template"
+        append_log(f"📄 {context['config']['label']} 已由即时证据模板生成：{context['product']['product_name']}。")
+
+    return {
+        "status": "success",
+        "schema": "tk_action_brief_v2",
+        "brief_type": brief_type,
+        "brief_label": context["config"]["label"],
+        "title": context["config"]["title"],
+        "product_id": context["product_id"],
+        "product_name": context["product"].get("product_name", context["product_id"]),
+        "brief_text": brief_text,
+        "evidence_sources": context.get("evidence_sources", []),
+        "source": source,
+        "model_used": os.getenv("OPENAI_MODEL_NAME", "gpt-5.5") if source == "openai" else "evidence_template_v2",
+        "generated_at": current_timestamp(),
+    }
+
+
+# =========================
 # AI 一键英文申诉抗辩书生成逻辑
 # =========================
 
@@ -4163,6 +4452,25 @@ async def post_generate_appeal(payload: AppealRequest) -> Dict[str, Any]:
             status_code=500,
             detail=f"申诉抗辩书生成失败：{exc}",
         ) from exc
+
+
+@app.post("/api/generate-executive-brief")
+async def post_generate_executive_brief(payload: ExecutiveBriefRequest) -> Dict[str, Any]:
+    """生成供应链、申诉、选品三类经营 Brief。"""
+    try:
+        result = generate_executive_brief(payload)
+        append_admin_audit(
+            "generate_executive_brief",
+            f"生成{result.get('brief_label', '经营 Brief')}：{result.get('product_name', '')}。",
+            {"brief_type": result.get("brief_type", ""), "product_id": result.get("product_id", "")},
+        )
+        return result
+    except PipelineRuntimeError as exc:
+        append_log(f"经营 Brief 生成失败：{exc.detail}")
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    except Exception as exc:
+        append_log(f"经营 Brief 生成发生未处理异常：{exc}")
+        raise HTTPException(status_code=500, detail=f"经营 Brief 生成失败：{exc}") from exc
 
 
 @app.post("/api/generate-brief")

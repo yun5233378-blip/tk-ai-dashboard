@@ -660,7 +660,12 @@
                         </div>
                         <h2 class="text-2xl font-black text-slate-900">AI 综合经营报告</h2>
                     </div>
-                    <button id="btn-refresh-executive-report" class="quiet-button px-4 py-2 rounded-lg text-sm font-bold">重新生成</button>
+                    <div class="flex flex-wrap gap-2">
+                        <button id="btn-refresh-executive-report" class="quiet-button px-4 py-2 rounded-lg text-sm font-bold">重新生成</button>
+                        <button data-executive-brief="supply_chain" class="quiet-button px-4 py-2 rounded-lg text-sm font-bold">供应链 Brief</button>
+                        <button data-executive-brief="appeal" class="quiet-button px-4 py-2 rounded-lg text-sm font-bold">申诉 Brief</button>
+                        <button data-executive-brief="selection" class="quiet-button px-4 py-2 rounded-lg text-sm font-bold">选品 Brief</button>
+                    </div>
                 </div>
                 <div class="executive-report-box mt-6 rounded-lg p-5">
                     <p id="ai-executive-report" class="hidden">登录后将基于健康分、风险商品、证据可信度和建议动作生成综合经营报告。</p>
@@ -1265,7 +1270,7 @@
         <div class="modal-panel rounded-lg max-w-4xl w-full p-6 md:p-8 mx-4">
             <div class="flex justify-between items-start gap-4 mb-5">
                 <div>
-                    <h3 class="text-lg font-black text-slate-900 flex items-center gap-2">
+                    <h3 id="brief-modal-title" class="text-lg font-black text-slate-900 flex items-center gap-2">
                         <span>📄</span> ISO 工艺/包材改良采购 Brief
                     </h3>
                     <p id="brief-modal-subtitle" class="text-sm text-slate-500 mt-1">AI 正在将海外客诉转译为 1688 工厂可执行的中文工业采购规范...</p>
@@ -1497,6 +1502,7 @@
         const sourcingPanelNote = document.getElementById('sourcing-panel-note');
         const factoryCardList = document.getElementById('factory-card-list');
         const briefModal = document.getElementById('brief-modal');
+        const briefModalTitle = document.getElementById('brief-modal-title');
         const briefModalSubtitle = document.getElementById('brief-modal-subtitle');
         const briefLoading = document.getElementById('brief-loading');
         const briefResultWrap = document.getElementById('brief-result-wrap');
@@ -3804,14 +3810,88 @@
             }
         }
 
-        async function openBriefGenerator(factoryName) {
-            const item = activeData[currentSourcingProductKey];
-            if (!item) return;
+        function setBriefModalState(title, subtitle, loadingText) {
+            if (briefModalTitle) {
+                briefModalTitle.innerHTML = `<span>📄</span> ${escapeHtml(title)}`;
+            }
             briefModal.classList.remove('hidden');
             briefLoading.classList.remove('hidden');
             briefResultWrap.classList.add('hidden');
             briefTextarea.value = '';
-            briefModalSubtitle.innerText = `AI 正在为 ${factoryName} 生成 ${item.product_name || currentSourcingProductKey} 的 ISO 工艺/包材改良 Brief...`;
+            briefModalSubtitle.innerText = subtitle;
+            briefLoading.innerHTML = `
+                <span class="inline-block w-4 h-4 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin align-[-3px] mr-2"></span>
+                ${escapeHtml(loadingText)}
+            `;
+        }
+
+        function chooseExecutiveBriefProductId(briefType) {
+            const selectedKey = productSelector.value;
+            if (selectedKey && activeData[selectedKey] && hasDiagnosticData(activeData[selectedKey])) {
+                return selectedKey;
+            }
+            const ranked = Object.keys(activeData)
+                .filter(key => hasDiagnosticData(activeData[key]))
+                .sort((a, b) => {
+                    const itemA = activeData[a] || {};
+                    const itemB = activeData[b] || {};
+                    const radarA = isRadarCritical(itemA) ? 1 : 0;
+                    const radarB = isRadarCritical(itemB) ? 1 : 0;
+                    if (radarA !== radarB) return radarB - radarA;
+                    return Number(itemA.score || 100) - Number(itemB.score || 100);
+                });
+            return ranked[0] || selectedKey || Object.keys(activeData)[0] || '';
+        }
+
+        async function openExecutiveBriefGenerator(briefType) {
+            const labelMap = {
+                supply_chain: '供应链改良 Brief',
+                appeal: '运营申诉 Brief',
+                selection: '选品决策 Brief'
+            };
+            const label = labelMap[briefType] || '经营 Brief';
+            const productId = chooseExecutiveBriefProductId(briefType);
+            if (!productId || !activeData[productId]) {
+                showToast('暂无可用于生成 Brief 的商品数据。', 'info');
+                return;
+            }
+            setBriefModalState(label, `AI 正在基于综合经营报告和商品证据生成 ${label}...`, `正在生成 ${label}，请稍候...`);
+
+            try {
+                const response = await authorizedFetch(`${API_BASE_URL}/api/generate-executive-brief`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        brief_type: briefType,
+                        product_id: productId,
+                        products: activeData,
+                        executive_report: latestExecutiveReportPayload || {}
+                    })
+                });
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    throw new Error(payload.detail || `${label} 生成失败。`);
+                }
+                briefTextarea.value = payload.brief_text || '';
+                if (briefModalTitle) {
+                    briefModalTitle.innerHTML = `<span>📄</span> ${escapeHtml(payload.brief_label || label)}`;
+                }
+                briefModalSubtitle.innerText = `${payload.product_name || activeData[productId].product_name || productId} · ${payload.source === 'openai' ? `${payload.model_used || 'GPT-5.5'} 已生成` : '本地证据模板已生成'} · ${payload.generated_at || ''}`;
+                briefLoading.classList.add('hidden');
+                briefResultWrap.classList.remove('hidden');
+                showToast(`${label} 已生成。`, 'success');
+            } catch (error) {
+                briefLoading.classList.add('hidden');
+                briefResultWrap.classList.remove('hidden');
+                briefTextarea.value = `生成失败：${error.message || error}`;
+                showToast(error.message || String(error), 'error');
+            }
+        }
+
+        async function openBriefGenerator(factoryName) {
+            const item = activeData[currentSourcingProductKey];
+            if (!item) return;
+            setBriefModalState('ISO 工艺/包材改良采购 Brief', `AI 正在为 ${factoryName} 生成 ${item.product_name || currentSourcingProductKey} 的 ISO 工艺/包材改良 Brief...`, '正在生成 ISO 采购技术 Brief，请稍候...');
 
             try {
                 const response = await authorizedFetch(`${API_BASE_URL}/api/generate-brief`, {
@@ -4053,7 +4133,7 @@
                 <html lang="zh-CN">
                 <head>
                     <meta charset="UTF-8">
-                    <title>ISO 工艺/包材改良采购 Brief</title>
+                    <title>${(briefModalTitle ? briefModalTitle.innerText : 'AI Brief').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</title>
                     <style>
                         body { font-family: "Microsoft YaHei", system-ui, sans-serif; color: #0F172A; padding: 36px; line-height: 1.7; }
                         pre { white-space: pre-wrap; font-size: 13px; }
@@ -4066,6 +4146,10 @@
                 </html>
             `);
             printWindow.document.close();
+        });
+
+        document.querySelectorAll('[data-executive-brief]').forEach(button => {
+            button.addEventListener('click', () => openExecutiveBriefGenerator(button.getAttribute('data-executive-brief')));
         });
 
         async function checkApiConnection() {
