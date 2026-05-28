@@ -1648,39 +1648,109 @@ def build_executive_report_snapshot(products: Dict[str, Dict[str, Any]]) -> Dict
     }
 
 
-def build_rule_based_executive_report(snapshot: Dict[str, Any]) -> str:
-    """模型不可用时生成稳定的中文经营复盘。"""
+def build_rule_based_executive_sections(snapshot: Dict[str, Any]) -> Dict[str, str]:
+    """模型不可用时生成稳定的三段式中文经营复盘。"""
     if snapshot["diagnosed_count"] == 0:
-        return "当前还没有完成诊断的商品。建议先为核心 SKU 执行一次 AI 抓取与舆情诊断，再生成完整经营复盘。"
+        return {
+            "summary": "当前还没有完成诊断的商品，首页经营结论暂不具备足够样本支撑。",
+            "risk": "风险原因尚未形成有效归因，需要先完成核心 SKU 的评论抓取、情感诊断与证据沉淀。",
+            "action": "先选择 1-3 个核心商品启动 AI 诊断，再回到首页生成完整经营复盘。",
+        }
 
     score = snapshot["average_score"]
     critical = snapshot["critical_count"]
     trust = snapshot["evidence_trust"]
     risk_names = "、".join(item["product_name"] for item in snapshot["top_risks"][:3]) or "暂无明确风险商品"
-    health_line = "整体健康分偏稳，可继续小步放量。" if score >= 85 else ("整体健康分处于修复区间，需要先控预算再优化。" if score >= 70 else "整体健康分偏低，应暂停高风险商品放量。")
-    risk_line = f"当前有 {critical} 个商品触发红线，优先关注 {risk_names}。" if critical else "当前未发现红线商品，可把重点放在补齐证据与放量验证。"
-    trust_line = f"证据可信度约 {trust}%，足够支撑经营判断。" if trust >= 65 else f"证据可信度约 {trust}%，建议继续抓取评论样本，提高报告可信度。"
-    return f"{health_line}{risk_line}{trust_line}下一步建议：{snapshot['suggested_action']}"
+
+    if score >= 85:
+        summary = f"当前已诊断商品平均健康分为 {score}，整体处于可控放量区间。"
+    elif score >= 70:
+        summary = f"当前已诊断商品平均健康分为 {score}，经营盘面处于修复区间，需要先稳住预算节奏。"
+    else:
+        summary = f"当前已诊断商品平均健康分为 {score}，盘面风险偏高，应暂停高风险商品的继续放量。"
+
+    if critical:
+        risk = f"当前有 {critical} 个商品触发红线，优先关注 {risk_names}；主要问题集中在负面评论聚集和供应链体验波动。"
+    else:
+        risk = f"当前未发现红线商品，重点风险来自样本覆盖不足与证据沉淀深度，需继续验证 {risk_names} 的真实用户反馈。"
+    if trust >= 65:
+        risk += f" 证据可信度约 {trust}%，已能支撑本轮经营判断。"
+    else:
+        trust_label = trust if trust > 0 else "不足"
+        risk += f" 证据可信度约 {trust_label}，建议继续抓取评论样本，提高结论稳定性。"
+
+    action = snapshot["suggested_action"]
+    return {
+        "summary": summary,
+        "risk": risk,
+        "action": action,
+    }
+
+
+def flatten_executive_sections(sections: Dict[str, str]) -> str:
+    """把三段式报告压平，兼容旧版 report 字段。"""
+    ordered = [sections.get("summary", ""), sections.get("risk", ""), sections.get("action", "")]
+    return "".join(part.strip() for part in ordered if part and part.strip())
+
+
+def normalize_executive_sections(value: Any, fallback: Dict[str, str]) -> Dict[str, str]:
+    """校验模型返回的结构化报告，缺字段时回落本地兜底。"""
+    if not isinstance(value, dict):
+        return fallback
+
+    normalized: Dict[str, str] = {}
+    for key in ("summary", "risk", "action"):
+        text = str(value.get(key, "")).strip()
+        normalized[key] = text or fallback[key]
+    return normalized
+
+
+def parse_executive_sections(raw_text: str, fallback: Dict[str, str]) -> Dict[str, str]:
+    """解析模型 JSON 输出；失败时把纯文本放入摘要并保留兜底动作。"""
+    cleaned = raw_text.strip()
+    if cleaned.startswith("```"):
+        cleaned = cleaned.strip("`").strip()
+        if cleaned.lower().startswith("json"):
+            cleaned = cleaned[4:].strip()
+
+    try:
+        payload = json.loads(cleaned)
+        return normalize_executive_sections(payload, fallback)
+    except Exception:
+        if cleaned:
+            return {
+                "summary": cleaned,
+                "risk": fallback["risk"],
+                "action": fallback["action"],
+            }
+        return fallback
+
+
+def build_rule_based_executive_report(snapshot: Dict[str, Any]) -> str:
+    """模型不可用时生成稳定的中文经营复盘，兼容旧调用。"""
+    return flatten_executive_sections(build_rule_based_executive_sections(snapshot))
 
 
 def build_executive_report_prompt(snapshot: Dict[str, Any]) -> str:
     """构造 GPT-5.5 综合经营报告 Prompt。"""
     compact_payload = json.dumps(snapshot, ensure_ascii=False, indent=2)
     return f"""
-你是 TK 跨境电商 AI 经营分析官。请基于以下简化经营快照，输出一段中文 SaaS 看板首页可展示的综合经营报告。
+你是 TK 跨境电商 AI 经营分析官。请基于以下简化经营快照，输出首页可展示的三段式中文经营报告。
 
 经营快照：
 {compact_payload}
 
 输出要求：
-1. 只输出中文自然段，不要 Markdown，不要列表符号。
-2. 180-260 字，语气专业、克制、可执行。
-3. 必须依次解释：整体健康分、风险商品、证据可信度、建议动作。
-4. 不要堆砌 Lift、Confidence、ABSA 等后台术语；如果必须提及，请转译成中文经营含义。
+1. 只输出严格 JSON，不要 Markdown，不要代码块，不要额外解释。
+2. JSON 必须包含三个字符串字段：summary、risk、action。
+3. summary 写经营摘要，解释整体健康分和当前盘面状态，控制在 45-80 字。
+4. risk 写风险原因，解释风险商品和证据可信度，控制在 60-110 字。
+5. action 写下一步动作，只给清晰可执行的运营建议，控制在 35-70 字。
+6. 不要堆砌 Lift、Confidence、ABSA 等后台术语；如果必须提及，请转译成中文经营含义。
 """.strip()
 
 
-def call_executive_report_model(snapshot: Dict[str, Any]) -> str:
+def call_executive_report_model(snapshot: Dict[str, Any]) -> Dict[str, str]:
     """调用 OpenAI/sub2api 的 GPT-5.5 生成首页综合经营报告。"""
     api_key = os.getenv("OPENAI_API_KEY", "").strip()
     if not api_key:
@@ -1709,7 +1779,7 @@ def call_executive_report_model(snapshot: Dict[str, Any]) -> str:
         response = client.chat.completions.create(
             model=model_name,
             messages=[
-                {"role": "system", "content": "你输出简洁、可信、可执行的中文经营分析。"},
+                {"role": "system", "content": "你输出简洁、可信、可执行的三段式中文经营分析，并严格返回 JSON。"},
                 {"role": "user", "content": prompt},
             ],
             timeout=timeout_seconds,
@@ -1718,7 +1788,8 @@ def call_executive_report_model(snapshot: Dict[str, Any]) -> str:
 
     if not text:
         raise RuntimeError("GPT-5.5 返回的综合经营报告为空。")
-    return text
+    fallback = build_rule_based_executive_sections(snapshot)
+    return parse_executive_sections(text, fallback)
 
 
 def generate_executive_report(products: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
@@ -1726,21 +1797,23 @@ def generate_executive_report(products: Dict[str, Dict[str, Any]]) -> Dict[str, 
     snapshot = build_executive_report_snapshot(products)
     model_used = os.getenv("OPENAI_MODEL_NAME", "gpt-5.5")
     try:
-        report = call_executive_report_model(snapshot)
+        sections = call_executive_report_model(snapshot)
         source = "openai"
     except Exception as exc:
-        report = build_rule_based_executive_report(snapshot)
+        sections = build_rule_based_executive_sections(snapshot)
         source = "local_fallback"
         append_log(f"AI 综合经营报告已启用本地兜底：{exc}")
 
     return {
         "status": "success",
-        "report": report,
+        "report": flatten_executive_sections(sections),
+        "sections": sections,
         "summary": snapshot,
         "source": source,
         "model_used": model_used,
         "generated_at": current_timestamp(),
     }
+
 # =========================
 # AI 一键英文申诉抗辩书生成逻辑
 # =========================

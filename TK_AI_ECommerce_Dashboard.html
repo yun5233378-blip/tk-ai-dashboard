@@ -663,7 +663,21 @@
                     <button id="btn-refresh-executive-report" class="quiet-button px-4 py-2 rounded-lg text-sm font-bold">重新生成</button>
                 </div>
                 <div class="executive-report-box mt-6 rounded-lg p-5">
-                    <p id="ai-executive-report" class="text-sm md:text-base leading-8 text-slate-700">登录后将基于健康分、风险商品、证据可信度和建议动作生成综合经营报告。</p>
+                    <p id="ai-executive-report" class="hidden">登录后将基于健康分、风险商品、证据可信度和建议动作生成综合经营报告。</p>
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                        <div class="bg-white/70 border border-slate-200/70 rounded-lg p-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
+                            <div class="text-xs font-black text-indigo-600 mb-2">经营摘要</div>
+                            <p id="ai-executive-summary" class="text-sm leading-7 text-slate-700">等待同步。</p>
+                        </div>
+                        <div class="bg-white/70 border border-slate-200/70 rounded-lg p-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
+                            <div class="text-xs font-black text-rose-600 mb-2">风险原因</div>
+                            <p id="ai-executive-risk" class="text-sm leading-7 text-slate-700">等待同步。</p>
+                        </div>
+                        <div class="bg-white/70 border border-slate-200/70 rounded-lg p-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
+                            <div class="text-xs font-black text-emerald-600 mb-2">下一步动作</div>
+                            <p id="ai-executive-action" class="text-sm leading-7 text-slate-700">等待同步。</p>
+                        </div>
+                    </div>
                     <div id="ai-executive-report-meta" class="mt-4 text-xs font-bold text-slate-400">等待同步</div>
                 </div>
             </div>
@@ -1418,6 +1432,9 @@
         const executiveEvidenceTrust = document.getElementById('executive-evidence-trust');
         const executiveEvidenceMeta = document.getElementById('executive-evidence-meta');
         const aiExecutiveReport = document.getElementById('ai-executive-report');
+        const aiExecutiveSummary = document.getElementById('ai-executive-summary');
+        const aiExecutiveRisk = document.getElementById('ai-executive-risk');
+        const aiExecutiveAction = document.getElementById('ai-executive-action');
         const aiExecutiveReportMeta = document.getElementById('ai-executive-report-meta');
         const btnRefreshExecutiveReport = document.getElementById('btn-refresh-executive-report');
         const marketGapEmpty = document.getElementById('market-gap-empty');
@@ -1708,22 +1725,75 @@
             };
         }
 
-        function buildLocalExecutiveReport(snapshot) {
+        function buildLocalExecutiveSections(snapshot) {
             if (snapshot.diagnosedCount === 0) {
-                return '当前还没有完成诊断的商品。建议先为核心 SKU 执行一次 AI 抓取与舆情诊断，再生成完整经营复盘。';
+                return {
+                    summary: '当前还没有完成诊断的商品，首页经营结论暂不具备足够样本支撑。',
+                    risk: '风险原因尚未形成有效归因，需要先完成核心 SKU 的评论抓取、情感诊断与证据沉淀。',
+                    action: '先选择 1-3 个核心商品启动 AI 诊断，再回到首页生成完整经营复盘。'
+                };
             }
+
             const score = snapshot.averageScore || 0;
             const riskNames = snapshot.riskProducts.slice(0, 3).map(item => item.product_name || item.product_id).join('、') || '暂无明确风险商品';
-            const healthLine = score >= 85
-                ? '整体健康分偏稳，可继续小步放量。'
-                : (score >= 70 ? '整体健康分处于修复区间，需要先控预算再优化。' : '整体健康分偏低，应暂停高风险商品放量。');
-            const riskLine = snapshot.criticalProducts.length > 0
-                ? `当前有 ${snapshot.criticalProducts.length} 个商品触发红线，优先关注 ${riskNames}。`
-                : '当前未发现红线商品，可把重点放在补齐证据与放量验证。';
-            const trustLine = snapshot.evidenceTrust >= 65
-                ? `证据可信度约 ${snapshot.evidenceTrust}%，足够支撑经营判断。`
-                : `证据可信度约 ${snapshot.evidenceTrust || '--'}%，建议继续抓取评论样本，提高报告可信度。`;
-            return `${healthLine}${riskLine}${trustLine}下一步建议：${snapshot.suggestedAction}`;
+            const summary = score >= 85
+                ? `当前已诊断商品平均健康分为 ${score}，整体处于可控放量区间。`
+                : (score >= 70
+                    ? `当前已诊断商品平均健康分为 ${score}，经营盘面处于修复区间，需要先稳住预算节奏。`
+                    : `当前已诊断商品平均健康分为 ${score}，盘面风险偏高，应暂停高风险商品的继续放量。`);
+            let risk = snapshot.criticalProducts.length > 0
+                ? `当前有 ${snapshot.criticalProducts.length} 个商品触发红线，优先关注 ${riskNames}；主要问题集中在负面评论聚集和供应链体验波动。`
+                : `当前未发现红线商品，重点风险来自样本覆盖不足与证据沉淀深度，需继续验证 ${riskNames} 的真实用户反馈。`;
+            risk += snapshot.evidenceTrust >= 65
+                ? ` 证据可信度约 ${snapshot.evidenceTrust}%，已能支撑本轮经营判断。`
+                : ` 证据可信度约 ${snapshot.evidenceTrust || '不足'}，建议继续抓取评论样本，提高结论稳定性。`;
+            return {
+                summary,
+                risk,
+                action: snapshot.suggestedAction
+            };
+        }
+
+        function buildLocalExecutiveReport(snapshot) {
+            return flattenExecutiveSections(buildLocalExecutiveSections(snapshot));
+        }
+
+        function flattenExecutiveSections(sections) {
+            return [sections.summary, sections.risk, sections.action]
+                .filter(value => value && String(value).trim())
+                .map(value => String(value).trim())
+                .join('');
+        }
+
+        function normalizeExecutiveSections(value, snapshot) {
+            const fallback = buildLocalExecutiveSections(snapshot);
+            if (value && typeof value === 'object') {
+                return {
+                    summary: String(value.summary || fallback.summary).trim(),
+                    risk: String(value.risk || fallback.risk).trim(),
+                    action: String(value.action || fallback.action).trim()
+                };
+            }
+            if (typeof value === 'string' && value.trim()) {
+                return {
+                    summary: value.trim(),
+                    risk: fallback.risk,
+                    action: fallback.action
+                };
+            }
+            return fallback;
+        }
+
+        function renderExecutiveSections(sections) {
+            const safeSections = {
+                summary: sections.summary || '等待同步。',
+                risk: sections.risk || '等待同步。',
+                action: sections.action || '等待同步。'
+            };
+            if (aiExecutiveSummary) aiExecutiveSummary.innerText = safeSections.summary;
+            if (aiExecutiveRisk) aiExecutiveRisk.innerText = safeSections.risk;
+            if (aiExecutiveAction) aiExecutiveAction.innerText = safeSections.action;
+            if (aiExecutiveReport) aiExecutiveReport.innerText = flattenExecutiveSections(safeSections);
         }
 
         function updateExecutiveCards(snapshot) {
@@ -1736,7 +1806,7 @@
                     : '等待证据账本同步。';
             }
             if (aiExecutiveReport && aiExecutiveReport.dataset.remoteReady !== '1') {
-                aiExecutiveReport.innerText = buildLocalExecutiveReport(snapshot);
+                renderExecutiveSections(buildLocalExecutiveSections(snapshot));
                 aiExecutiveReportMeta.innerText = '本地经营规则 · 等待 GPT 汇总';
             }
         }
@@ -1761,8 +1831,9 @@
                 if (!response.ok) {
                     throw new Error(payload.detail || '综合经营报告生成失败。');
                 }
+                const sections = normalizeExecutiveSections(payload.sections || payload.report, snapshot);
+                renderExecutiveSections(sections);
                 if (aiExecutiveReport) {
-                    aiExecutiveReport.innerText = payload.report || buildLocalExecutiveReport(snapshot);
                     aiExecutiveReport.dataset.remoteReady = '1';
                 }
                 if (aiExecutiveReportMeta) {
@@ -1775,8 +1846,8 @@
             } catch (error) {
                 if (aiExecutiveReport) {
                     aiExecutiveReport.dataset.remoteReady = '';
-                    aiExecutiveReport.innerText = buildLocalExecutiveReport(snapshot);
                 }
+                renderExecutiveSections(buildLocalExecutiveSections(snapshot));
                 if (aiExecutiveReportMeta) {
                     aiExecutiveReportMeta.innerText = '本地规则兜底 · GPT 通道暂不可用';
                 }
