@@ -25,6 +25,7 @@ import hashlib
 import hmac
 import json
 import os
+import secrets
 import subprocess
 import sys
 import threading
@@ -54,6 +55,32 @@ if hasattr(sys.stderr, "reconfigure"):
 # =========================
 
 BASE_DIR = Path(__file__).resolve().parent
+
+
+def load_local_env_file() -> None:
+    """Load simple KEY=VALUE pairs from .env before reading runtime settings."""
+    env_path = BASE_DIR / ".env"
+    if not env_path.exists():
+        return
+
+    try:
+        lines = env_path.read_text(encoding="utf-8").splitlines()
+    except UnicodeDecodeError:
+        lines = env_path.read_text(encoding="utf-8-sig").splitlines()
+
+    for raw_line in lines:
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        if not key or key in os.environ:
+            continue
+        value = value.strip().strip("\"").strip("'")
+        os.environ[key] = value
+
+
+load_local_env_file()
 RAW_COMMENTS_PATH = BASE_DIR / "raw_comments.json"
 DIAGNOSED_PRODUCTS_PATH = BASE_DIR / "diagnosed_products.json"
 TEMP_DIAGNOSED_PRODUCT_PATH = BASE_DIR / "_diagnosed_product_tmp.json"
@@ -76,9 +103,9 @@ CORS_EXTRA_ORIGINS = [
 ]
 ALLOW_LOCAL_CORS = os.getenv("ALLOW_LOCAL_CORS", "0").strip() == "1"
 ENABLE_DEMO_PRODUCTS = os.getenv("ENABLE_DEMO_PRODUCTS", "0").strip() == "1"
-OPERATOR_TOKEN = os.getenv("OPERATOR_TOKEN", "").strip()
+OPERATOR_TOKEN = os.getenv("OPERATOR_TOKEN", secrets.token_urlsafe(48)).strip()
 OPERATOR_USERNAME = os.getenv("OPERATOR_USERNAME", "admin").strip() or "admin"
-OPERATOR_PASSWORD = os.getenv("OPERATOR_PASSWORD", "").strip()
+OPERATOR_PASSWORD = os.getenv("OPERATOR_PASSWORD", "你的登录密码").strip()
 ALERT_WEBHOOK_URL = os.getenv("ALERT_WEBHOOK_URL", "").strip()
 ALERT_WEBHOOK_TOKEN = os.getenv("ALERT_WEBHOOK_TOKEN", "").strip()
 ALERT_WEBHOOK_TIMEOUT_SECONDS = int(os.getenv("ALERT_WEBHOOK_TIMEOUT_SECONDS", "8"))
@@ -316,6 +343,12 @@ class AdminRestoreRequest(BaseModel):
 
     products: Dict[str, Dict[str, Any]] = Field(default_factory=dict, description="要恢复的商品诊断大盘")
     vs_reports: List[Dict[str, Any]] = Field(default_factory=list, description="要恢复的竞品 PK 历史报告")
+
+
+class ExecutiveReportRequest(BaseModel):
+    """前端 POST /api/executive-report 的请求体。"""
+
+    products: Dict[str, Dict[str, Any]] = Field(default_factory=dict, description="前端当前可见商品快照")
 
 
 class PipelineRuntimeError(Exception):
@@ -1536,6 +1569,178 @@ def restore_admin_backup(payload: AdminRestoreRequest) -> Dict[str, Any]:
     }
 
 
+
+
+# =========================
+# AI 综合经营报告生成逻辑
+# =========================
+
+def is_product_diagnosed(product: Dict[str, Any]) -> bool:
+    """判断商品是否已经完成真实诊断，过滤待抓取占位节点。"""
+    if product.get("pending") is True:
+        return False
+    sentiment = product.get("sentiment", [])
+    if not isinstance(sentiment, list) or len(sentiment) < 3:
+        return False
+    score = safe_int(product.get("score"), 100)
+    return not (score >= 100 and safe_int(sentiment[1], 0) >= 100)
+
+
+def build_executive_report_snapshot(products: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+    """压缩全盘商品指标，只保留首页经营报告需要的核心信号。"""
+    diagnosed_items = [
+        (key, enrich_product_for_dashboard(value))
+        for key, value in products.items()
+        if isinstance(value, dict) and is_product_diagnosed(value)
+    ]
+    total_products = len(products)
+    diagnosed_count = len(diagnosed_items)
+    average_score = round(sum(safe_int(item.get("score"), 0) for _, item in diagnosed_items) / diagnosed_count) if diagnosed_count else 0
+    critical_items = [(key, item) for key, item in diagnosed_items if item.get("radar_status") == "critical"]
+
+    evidence_confidences: List[float] = []
+    evidence_items = 0
+    top_risks: List[Dict[str, Any]] = []
+    for key, item in diagnosed_items:
+        snapshot = build_vs_snapshot(key, item)
+        evidence = item.get("evidence_ledger") if isinstance(item.get("evidence_ledger"), dict) else {}
+        aspect_terms = item.get("aspect_terms") if isinstance(item.get("aspect_terms"), list) else []
+        confidence = float(evidence.get("confidence") or 0)
+        if confidence <= 0 and aspect_terms and isinstance(aspect_terms[0], dict):
+            confidence = float(aspect_terms[0].get("confidence") or 0)
+        if confidence > 0:
+            evidence_confidences.append(confidence)
+        evidence_items += safe_int(evidence.get("evidence_count"), 0)
+        top_risks.append({
+            "product_id": snapshot["product_id"],
+            "product_name": snapshot["product_name"],
+            "score": snapshot["score"],
+            "negative_ratio": snapshot["negative_ratio"],
+            "top_complaints": snapshot["top_complaints"][:3],
+            "direction": snapshot["direction"],
+            "action": snapshot["action"],
+            "radar_status": item.get("radar_status", "normal"),
+        })
+
+    top_risks.sort(key=lambda item: (item["radar_status"] != "critical", item["score"], -item["negative_ratio"]))
+    evidence_trust = round((sum(evidence_confidences) / len(evidence_confidences)) * 100) if evidence_confidences else 0
+    if evidence_trust == 0 and evidence_items > 0:
+        evidence_trust = min(88, 48 + evidence_items * 4)
+
+    suggested_action = "保持巡检，优先放大健康商品。"
+    if critical_items:
+        names = "、".join(item.get("product_name") or key for key, item in critical_items[:3])
+        suggested_action = f"先处理 {names} 的红线客诉，再恢复投放。"
+    elif diagnosed_count < total_products:
+        suggested_action = "先补齐未诊断商品，再做横向选品判断。"
+    elif average_score < 75:
+        suggested_action = "收缩预算，集中修复低分商品的供应链问题。"
+
+    return {
+        "total_products": total_products,
+        "diagnosed_count": diagnosed_count,
+        "average_score": average_score,
+        "critical_count": len(critical_items),
+        "evidence_trust": evidence_trust,
+        "evidence_items": evidence_items,
+        "suggested_action": suggested_action,
+        "top_risks": top_risks[:5],
+    }
+
+
+def build_rule_based_executive_report(snapshot: Dict[str, Any]) -> str:
+    """模型不可用时生成稳定的中文经营复盘。"""
+    if snapshot["diagnosed_count"] == 0:
+        return "当前还没有完成诊断的商品。建议先为核心 SKU 执行一次 AI 抓取与舆情诊断，再生成完整经营复盘。"
+
+    score = snapshot["average_score"]
+    critical = snapshot["critical_count"]
+    trust = snapshot["evidence_trust"]
+    risk_names = "、".join(item["product_name"] for item in snapshot["top_risks"][:3]) or "暂无明确风险商品"
+    health_line = "整体健康分偏稳，可继续小步放量。" if score >= 85 else ("整体健康分处于修复区间，需要先控预算再优化。" if score >= 70 else "整体健康分偏低，应暂停高风险商品放量。")
+    risk_line = f"当前有 {critical} 个商品触发红线，优先关注 {risk_names}。" if critical else "当前未发现红线商品，可把重点放在补齐证据与放量验证。"
+    trust_line = f"证据可信度约 {trust}%，足够支撑经营判断。" if trust >= 65 else f"证据可信度约 {trust}%，建议继续抓取评论样本，提高报告可信度。"
+    return f"{health_line}{risk_line}{trust_line}下一步建议：{snapshot['suggested_action']}"
+
+
+def build_executive_report_prompt(snapshot: Dict[str, Any]) -> str:
+    """构造 GPT-5.5 综合经营报告 Prompt。"""
+    compact_payload = json.dumps(snapshot, ensure_ascii=False, indent=2)
+    return f"""
+你是 TK 跨境电商 AI 经营分析官。请基于以下简化经营快照，输出一段中文 SaaS 看板首页可展示的综合经营报告。
+
+经营快照：
+{compact_payload}
+
+输出要求：
+1. 只输出中文自然段，不要 Markdown，不要列表符号。
+2. 180-260 字，语气专业、克制、可执行。
+3. 必须依次解释：整体健康分、风险商品、证据可信度、建议动作。
+4. 不要堆砌 Lift、Confidence、ABSA 等后台术语；如果必须提及，请转译成中文经营含义。
+""".strip()
+
+
+def call_executive_report_model(snapshot: Dict[str, Any]) -> str:
+    """调用 OpenAI/sub2api 的 GPT-5.5 生成首页综合经营报告。"""
+    api_key = os.getenv("OPENAI_API_KEY", "").strip()
+    if not api_key:
+        raise RuntimeError("未检测到 OPENAI_API_KEY，使用本地经营报告兜底。")
+
+    from ai_diagnose import (
+        DEFAULT_MODEL,
+        DEFAULT_OPENAI_API_STYLE,
+        DEFAULT_OPENAI_BASE_URL,
+        DEFAULT_TIMEOUT_SECONDS,
+        build_openai_client,
+        extract_responses_text,
+    )
+
+    base_url = os.getenv("OPENAI_BASE_URL", DEFAULT_OPENAI_BASE_URL)
+    model_name = os.getenv("OPENAI_MODEL_NAME", DEFAULT_MODEL)
+    api_style = os.getenv("OPENAI_API_STYLE", DEFAULT_OPENAI_API_STYLE)
+    timeout_seconds = safe_int(os.getenv("OPENAI_TIMEOUT_SECONDS"), DEFAULT_TIMEOUT_SECONDS)
+    client = build_openai_client(api_key, base_url, timeout_seconds)
+    prompt = build_executive_report_prompt(snapshot)
+
+    if api_style == "responses":
+        response = client.responses.create(model=model_name, input=prompt, timeout=timeout_seconds)
+        text = extract_responses_text(response).strip()
+    else:
+        response = client.chat.completions.create(
+            model=model_name,
+            messages=[
+                {"role": "system", "content": "你输出简洁、可信、可执行的中文经营分析。"},
+                {"role": "user", "content": prompt},
+            ],
+            timeout=timeout_seconds,
+        )
+        text = (response.choices[0].message.content or "").strip()
+
+    if not text:
+        raise RuntimeError("GPT-5.5 返回的综合经营报告为空。")
+    return text
+
+
+def generate_executive_report(products: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+    """生成首页 AI 综合经营报告，优先模型、失败走本地兜底。"""
+    snapshot = build_executive_report_snapshot(products)
+    model_used = os.getenv("OPENAI_MODEL_NAME", "gpt-5.5")
+    try:
+        report = call_executive_report_model(snapshot)
+        source = "openai"
+    except Exception as exc:
+        report = build_rule_based_executive_report(snapshot)
+        source = "local_fallback"
+        append_log(f"AI 综合经营报告已启用本地兜底：{exc}")
+
+    return {
+        "status": "success",
+        "report": report,
+        "summary": snapshot,
+        "source": source,
+        "model_used": model_used,
+        "generated_at": current_timestamp(),
+    }
 # =========================
 # AI 一键英文申诉抗辩书生成逻辑
 # =========================
@@ -2873,6 +3078,19 @@ async def add_product(payload: AddProductRequest) -> Dict[str, Any]:
     }
 
 
+
+
+@app.post("/api/executive-report")
+async def post_executive_report(payload: ExecutiveReportRequest) -> Dict[str, Any]:
+    """生成首页 AI 综合经营报告。"""
+    products = payload.products if payload.products else load_products()
+    try:
+        result = generate_executive_report(products)
+        append_admin_audit("executive_report", "生成首页 AI 综合经营报告。")
+        return result
+    except Exception as exc:
+        append_log(f"AI 综合经营报告生成失败：{exc}")
+        raise HTTPException(status_code=500, detail=f"AI 综合经营报告生成失败：{exc}") from exc
 @app.post("/api/run-vs-pipeline")
 async def post_run_vs_pipeline(payload: VsPipelineRequest) -> Dict[str, Any]:
     """

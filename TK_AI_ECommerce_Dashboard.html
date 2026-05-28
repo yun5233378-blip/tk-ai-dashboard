@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN" class="scroll-smooth">
 <head>
     <meta charset="UTF-8">
@@ -19,19 +19,18 @@
             --tk-rose: #FB7185;
             --tk-emerald: #34D399;
             --tk-ease: cubic-bezier(0.16, 1, 0.3, 1);
-            --tk-card-shadow: 0 1px 3px rgba(0, 0, 0, 0.03), 0 10px 40px -10px rgba(0, 0, 0, 0.04);
-            --tk-card-shadow-hover: 0 20px 50px -12px rgba(99, 102, 241, 0.12), 0 0 26px rgba(139, 92, 246, 0.08);
+            --tk-card-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+            --tk-card-shadow-hover: 0 18px 46px -14px rgba(99, 102, 241, 0.18), 0 0 28px rgba(139, 92, 246, 0.10);
         }
         * {
             letter-spacing: 0;
         }
         body {
             font-family: 'PingFang SC', 'SF Pro Display', 'Inter', system-ui, sans-serif;
-            background:
-                radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.055) 0px, transparent 50%),
-                radial-gradient(at 100% 100%, rgba(236, 72, 153, 0.035) 0px, transparent 50%),
-                radial-gradient(at 72% 8%, rgba(79, 70, 229, 0.045) 0px, transparent 38%),
-                #F8FAFC;
+            background-color: #F8FAFC;
+            background-image:
+                radial-gradient(at 0% 0%, rgba(79, 70, 229, 0.05) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(236, 72, 153, 0.03) 0px, transparent 50%);
             color: var(--tk-ink);
             text-rendering: geometricPrecision;
         }
@@ -70,8 +69,8 @@
             box-shadow: 0 4px 20px -2px rgba(99, 102, 241, 0.12), 0 2px 6px -1px rgba(99, 102, 241, 0.08);
         }
         .glass-card {
-            background: var(--tk-surface);
-            backdrop-filter: blur(20px) saturate(1.25);
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(16px) saturate(1.25);
             border: 1px solid rgba(226, 232, 240, 0.6);
             box-shadow: var(--tk-card-shadow);
             transition: transform 0.3s var(--tk-ease), box-shadow 0.3s var(--tk-ease), border-color 0.3s var(--tk-ease), background-color 0.3s var(--tk-ease);
@@ -80,6 +79,38 @@
             transform: translateY(-2px);
             box-shadow: var(--tk-card-shadow-hover);
             border-color: rgba(99, 102, 241, 0.22);
+        }
+
+        .metric-card {
+            min-height: 11rem;
+        }
+        .metric-label {
+            color: #64748B;
+            font-size: 0.75rem;
+            font-weight: 800;
+        }
+        .metric-value {
+            color: #0F172A;
+            font-size: 2.15rem;
+            font-weight: 900;
+            line-height: 1;
+        }
+        .executive-report-box {
+            background: linear-gradient(180deg, rgba(255,255,255,0.92), rgba(248,250,252,0.72));
+            border: 1px solid rgba(226, 232, 240, 0.72);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.9);
+        }
+        .backend-accordion > summary::-webkit-details-marker {
+            display: none;
+        }
+        .backend-accordion > summary {
+            list-style: none;
+        }
+        .backend-module {
+            display: block;
+        }
+        .backend-module.hidden {
+            display: none;
         }
         .fade-in {
             animation: fadeIn 0.42s var(--tk-ease);
@@ -499,7 +530,7 @@
                     <span class="kicker-pill">[PLATINUM]</span>
                 </div>
                 <h2 class="text-xl font-black text-slate-900">TK-AI 安全登入</h2>
-                <p class="mt-2 text-xs font-semibold text-slate-400">Operator Console Access</p>
+                <p class="mt-2 text-xs font-semibold text-slate-400">系统内置账号校验</p>
             </div>
             <div class="space-y-4">
                 <div>
@@ -535,13 +566,11 @@
                 </span>
                 <button id="btn-logout" class="hidden quiet-button ml-1 px-3 py-1 rounded-full text-xs font-bold">登出 🔓</button>
             </div>
-            <nav class="w-full lg:w-auto flex gap-6 overflow-x-auto pb-1 lg:pb-0">
-                <button data-target="section-market" class="nav-btn nav-active whitespace-nowrap pb-1 text-sm transition-colors hover:text-indigo-500">运营驾驶舱</button>
-                <button data-target="section-intelligence" class="nav-btn whitespace-nowrap pb-1 text-sm text-slate-500 transition-colors hover:text-indigo-500">机会雷达</button>
-                <button data-target="section-evidence" class="nav-btn whitespace-nowrap pb-1 text-sm text-slate-500 transition-colors hover:text-indigo-500">证据审计</button>
-                <button data-target="section-sentiment" class="nav-btn whitespace-nowrap pb-1 text-sm text-slate-500 transition-colors hover:text-indigo-500">AI 舆情诊断</button>
-                <button data-target="section-products" class="nav-btn whitespace-nowrap pb-1 text-sm text-slate-500 transition-colors hover:text-indigo-500">选品优化</button>
-                <button data-target="section-architecture" class="nav-btn whitespace-nowrap pb-1 text-sm text-slate-500 transition-colors hover:text-indigo-500">技术架构</button>
+            <nav class="w-full lg:w-auto flex gap-2 overflow-x-auto rounded-full border border-slate-200/70 bg-white/60 p-1 shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
+                <button data-target="section-market" class="nav-btn nav-active whitespace-nowrap text-sm transition-colors hover:text-indigo-500">运营总览</button>
+                <button data-target="section-sentiment" class="nav-btn whitespace-nowrap text-sm text-slate-500 transition-colors hover:text-indigo-500">AI诊断</button>
+                <button data-target="section-products" class="nav-btn whitespace-nowrap text-sm text-slate-500 transition-colors hover:text-indigo-500">选品建议</button>
+                <button data-target="section-details" class="nav-btn whitespace-nowrap text-sm text-slate-500 transition-colors hover:text-indigo-500">后台明细</button>
             </nav>
         </div>
     </header>
@@ -567,112 +596,92 @@
                         <span class="kicker-pill">[SYNCED]</span>
                         <span class="kicker-pill">[SECURED]</span>
                     </div>
-                    <h1 class="text-3xl font-bold text-slate-900 mb-2">TK-AI 白金微光舆情中枢</h1>
+                    <h1 class="text-3xl font-bold text-slate-900 mb-2">运营总览</h1>
                 </div>
                 <div class="flex flex-wrap gap-3">
                     <button id="btn-run-radar-patrol" class="quiet-button px-5 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-1.5">
                         <span id="radar-patrol-spinner" class="hidden w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></span>
-                        <span>📡 雷达巡检</span>
+                        <span>雷达巡检</span>
                     </button>
                     <button id="btn-show-add-modal" class="primary-action px-5 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-1.5">
-                        <span>➕</span> 添加新监控商品
+                        <span>➕</span> 添加监控商品
                     </button>
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-6 mb-8">
-                <div class="glass-card rounded-lg overflow-hidden border border-slate-100">
-                    <div class="px-6 py-5 md:px-8 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3">
-                        <div>
-                            <h3 class="text-lg font-black text-slate-900">实时云端监控大盘</h3>
-                            <div class="mt-2 flex flex-wrap gap-2">
-                                <span class="kicker-pill">Redis Cloud</span>
-                                <span class="kicker-pill">Caddy TLS</span>
-                            </div>
-                        </div>
-                        <span id="live-workflow-status" class="self-start md:self-center px-3 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-bold">等待 API 同步</span>
+            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5 mb-8">
+                <div class="glass-card metric-card rounded-lg p-6 border border-slate-200/60">
+                    <div class="flex items-center justify-between gap-3">
+                        <span class="metric-label">整体健康分</span>
+                        <span class="kicker-pill">健康</span>
                     </div>
-                    <div class="grid grid-cols-2 lg:grid-cols-4 divide-x divide-y lg:divide-y-0 divide-slate-100">
-                        <div class="p-6">
-                            <div class="text-xs font-bold text-slate-400 uppercase tracking-wide">云端商品</div>
-                            <div id="live-product-count" class="mt-2 text-3xl font-black text-slate-900">0</div>
-                            <div class="mt-1 text-xs text-slate-500">已注册监控节点</div>
-                        </div>
-                        <div class="p-6">
-                            <div class="text-xs font-bold text-slate-400 uppercase tracking-wide">已诊断</div>
-                            <div id="live-diagnosed-count" class="mt-2 text-3xl font-black text-indigo-600">0</div>
-                            <div class="mt-2 h-1.5 rounded-full bg-slate-100 overflow-hidden">
-                                <div id="live-diagnostic-coverage" class="h-full w-0 bg-indigo-500 transition-all duration-500"></div>
-                            </div>
-                        </div>
-                        <div class="p-6">
-                            <div class="text-xs font-bold text-slate-400 uppercase tracking-wide">平均健康分</div>
-                            <div id="live-average-score" class="mt-2 text-3xl font-black text-emerald-600">--</div>
-                            <div class="mt-1 text-xs text-slate-500">AI 选品健康度</div>
-                        </div>
-                        <div class="p-6">
-                            <div class="text-xs font-bold text-slate-400 uppercase tracking-wide">雷达红线</div>
-                            <div id="live-critical-count" class="mt-2 text-3xl font-black text-rose-600">0</div>
-                            <div class="mt-1 text-xs text-slate-500">需优先处理商品</div>
-                        </div>
+                    <div id="live-average-score" class="metric-value mt-5">--</div>
+                    <div class="mt-4 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                        <div id="live-diagnostic-coverage" class="h-full w-0 bg-indigo-500 transition-all duration-500"></div>
+                    </div>
+                    <div class="mt-3 text-xs text-slate-500">
+                        已诊断 <span id="live-diagnosed-count" class="font-black text-slate-700">0</span> / <span id="live-product-count" class="font-black text-slate-700">0</span> 个商品
                     </div>
                 </div>
 
-                <div class="glass-card rounded-lg p-6 md:p-8 border border-slate-100">
-                    <div class="text-xs font-bold text-slate-400 uppercase tracking-wide">闭环状态</div>
-                    <div class="mt-4 flex flex-wrap gap-2">
-                        <span class="px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-bold">真实评论抓取</span>
-                        <span class="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold">品类自愈识别</span>
-                        <span class="px-3 py-1 rounded-full bg-rose-50 text-rose-700 text-xs font-bold">雷达红线预警</span>
-                        <span class="px-3 py-1 rounded-full bg-purple-500/10 text-purple-200 text-xs font-bold border border-purple-400/20">竞品横向 PK</span>
-                        <span class="px-3 py-1 rounded-full bg-amber-50 text-amber-700 text-xs font-bold">闭环改良建议</span>
+                <div class="glass-card metric-card rounded-lg p-6 border border-slate-200/60">
+                    <div class="flex items-center justify-between gap-3">
+                        <span class="metric-label">风险商品</span>
+                        <span class="kicker-pill">红线</span>
                     </div>
-                    <div class="mt-5 rounded-lg bg-slate-50/80 border border-slate-100 p-4">
-                        <div class="text-xs text-slate-400 font-bold">当前优先动作</div>
-                        <div id="live-next-action" class="mt-2 text-sm leading-relaxed">等待云端商品数据同步。</div>
+                    <div id="live-critical-count" class="metric-value mt-5 text-rose-600">0</div>
+                    <div id="live-risk-list" class="mt-4 text-xs text-slate-500 leading-relaxed">暂无风险商品。</div>
+                </div>
+
+                <div class="glass-card metric-card rounded-lg p-6 border border-slate-200/60">
+                    <div class="flex items-center justify-between gap-3">
+                        <span class="metric-label">证据可信度</span>
+                        <span class="kicker-pill">审计</span>
                     </div>
-                    <div id="live-risk-list" class="mt-4 text-xs text-slate-500 leading-relaxed">
-                        暂无风险商品。
+                    <div id="executive-evidence-trust" class="metric-value mt-5 text-emerald-600">--</div>
+                    <div id="executive-evidence-meta" class="mt-4 text-xs text-slate-500 leading-relaxed">等待证据账本同步。</div>
+                </div>
+
+                <div class="glass-card metric-card rounded-lg p-6 border border-slate-200/60">
+                    <div class="flex items-center justify-between gap-3">
+                        <span class="metric-label">建议动作</span>
+                        <span id="live-workflow-status" class="px-3 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-bold">等待同步</span>
                     </div>
+                    <div id="live-next-action" class="mt-5 text-base font-black leading-relaxed text-slate-900">等待云端商品数据同步。</div>
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <div class="glass-card p-6 md:p-8 rounded-lg border-l-4 border-indigo-500">
-                    <div class="text-sm text-slate-500 mb-1">TK美区电商品牌增长率</div>
-                    <div class="text-3xl font-bold text-slate-800">+145% <span class="text-sm text-emerald-500 font-normal">📈 极速扩张</span></div>
+            <div class="glass-card rounded-lg p-6 md:p-8 border border-slate-200/60">
+                <div class="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
+                    <div>
+                        <div class="flex flex-wrap gap-2 mb-3">
+                            <span class="kicker-pill">GPT汇总</span>
+                            <span class="kicker-pill">经营复盘</span>
+                        </div>
+                        <h2 class="text-2xl font-black text-slate-900">AI 综合经营报告</h2>
+                    </div>
+                    <button id="btn-refresh-executive-report" class="quiet-button px-4 py-2 rounded-lg text-sm font-bold">重新生成</button>
                 </div>
-                <div class="glass-card p-6 md:p-8 rounded-lg border-l-4 border-rose-500">
-                    <div class="text-sm text-slate-500 mb-1">鞋包/服饰/3C类目平均退货率</div>
-                    <div class="text-3xl font-bold text-slate-800">22.4% <span class="text-sm text-rose-500 font-normal">⚠️ 利润吞噬者</span></div>
-                </div>
-                <div class="glass-card p-6 md:p-8 rounded-lg border-l-4 border-amber-500">
-                    <div class="text-sm text-slate-500 mb-1">因差评导致的流量降权概率</div>
-                    <div class="text-3xl font-bold text-slate-800">68% <span class="text-sm text-amber-500 font-normal">📉 核心痛点</span></div>
-                </div>
-            </div>
-
-            <div class="glass-card p-6 md:p-8 rounded-lg">
-                <h3 class="text-lg font-semibold mb-4 text-slate-800">TK电商 GMV 增长与退货率趋势对比 (2023-2025预测)</h3>
-                <div class="chart-container">
-                    <canvas id="marketChart"></canvas>
+                <div class="executive-report-box mt-6 rounded-lg p-5">
+                    <p id="ai-executive-report" class="text-sm md:text-base leading-8 text-slate-700">登录后将基于健康分、风险商品、证据可信度和建议动作生成综合经营报告。</p>
+                    <div id="ai-executive-report-meta" class="mt-4 text-xs font-bold text-slate-400">等待同步</div>
                 </div>
             </div>
         </div>
 
-        <div id="section-intelligence" class="page-section hidden fade-in">
+        <div id="section-intelligence" class="backend-module hidden fade-in">
             <div class="mb-8 flex flex-col xl:flex-row xl:items-end justify-between gap-5">
                 <div>
                     <div class="flex flex-wrap gap-2 mb-3">
-                        <span class="kicker-pill">[MARKET GAP]</span>
-                        <span class="kicker-pill">[BATTLECARD]</span>
-                        <span class="kicker-pill">[ABSA EVIDENCE]</span>
+                        <span class="kicker-pill">机会雷达</span>
+                        <span class="kicker-pill">战术卡</span>
+                        <span class="kicker-pill">证据追溯</span>
                     </div>
-                    <h1 class="text-3xl font-bold text-slate-900 mb-2">Market Gap Radar · 选品机会雷达</h1>
-                    <p class="text-sm text-slate-500 max-w-3xl">基于 ABSA 属性级舆情、评论样例、公开类目基线 lift 和供应链可修复度生成机会分，避免只凭漂亮图表做空心判断。</p>
+                    <h1 class="text-3xl font-bold text-slate-900 mb-2">机会雷达（后台明细）</h1>
+                    <p class="text-sm text-slate-500 max-w-3xl">把复杂机会分、证据样例和战术卡收纳在后台，供复盘与采购决策使用。</p>
                 </div>
                 <button id="btn-refresh-market-gap" class="quiet-button px-5 py-2.5 rounded-lg text-sm font-bold">
-                    🔄 重算机会分
+                    重新计算机会分
                 </button>
             </div>
 
@@ -689,27 +698,27 @@
                         <div class="relative">
                             <div class="flex items-center justify-between gap-3">
                                 <div>
-                                    <div class="text-xs font-black text-slate-400 uppercase tracking-wide">Prime Opportunity</div>
+                                    <div class="text-xs font-black text-slate-400 uppercase tracking-wide">首选机会</div>
                                     <div id="market-gap-prime-product" class="mt-2 text-xl font-black text-slate-900">--</div>
                                 </div>
                                 <div class="text-right">
                                     <div id="market-gap-prime-score" class="text-5xl font-black text-indigo-600">--</div>
-                                    <div class="text-xs font-bold text-slate-400">GAP SCORE</div>
+                                    <div class="text-xs font-bold text-slate-400">机会分</div>
                                 </div>
                             </div>
                             <div id="market-gap-prime-type" class="mt-4 inline-flex rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100 px-3 py-1 text-xs font-black">--</div>
                             <p id="market-gap-prime-thesis" class="mt-4 text-sm leading-relaxed text-slate-600">等待机会模型计算。</p>
                             <div class="mt-5 grid grid-cols-3 gap-3">
                                 <div class="rounded-lg bg-slate-50/80 border border-slate-100 p-3">
-                                    <div class="text-[10px] font-bold text-slate-400 uppercase">Demand</div>
+                                    <div class="text-[10px] font-bold text-slate-400 uppercase">需求热度</div>
                                     <div id="market-gap-prime-demand" class="mt-1 text-lg font-black text-slate-900">--</div>
                                 </div>
                                 <div class="rounded-lg bg-slate-50/80 border border-slate-100 p-3">
-                                    <div class="text-[10px] font-bold text-slate-400 uppercase">Risk</div>
+                                    <div class="text-[10px] font-bold text-slate-400 uppercase">风险拖拽</div>
                                     <div id="market-gap-prime-risk" class="mt-1 text-lg font-black text-slate-900">--</div>
                                 </div>
                                 <div class="rounded-lg bg-slate-50/80 border border-slate-100 p-3">
-                                    <div class="text-[10px] font-bold text-slate-400 uppercase">Fixability</div>
+                                    <div class="text-[10px] font-bold text-slate-400 uppercase">可修复度</div>
                                     <div id="market-gap-prime-fix" class="mt-1 text-lg font-black text-slate-900">--</div>
                                 </div>
                             </div>
@@ -722,11 +731,11 @@
                     <div class="glass-card rounded-lg p-6 md:p-8 border border-slate-100">
                         <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-5">
                             <div>
-                                <h3 class="text-lg font-black text-slate-900">证据加权机会因子</h3>
+                                <h3 class="text-lg font-black text-slate-900">证据加权机会判断</h3>
                                 <div class="mt-2 flex flex-wrap gap-2">
-                                    <span class="kicker-pill">Demand Heat</span>
-                                    <span class="kicker-pill">Benchmark Lift</span>
-                                    <span class="kicker-pill">Evidence Confidence</span>
+                                    <span class="kicker-pill">需求热度</span>
+                                    <span class="kicker-pill">基线偏离</span>
+                                    <span class="kicker-pill">证据可信度</span>
                                 </div>
                             </div>
                             <div id="market-gap-summary" class="text-xs font-bold text-slate-500">等待同步</div>
@@ -740,7 +749,7 @@
                 <div class="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-6">
                     <div class="glass-card rounded-lg overflow-hidden border border-slate-100">
                         <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between gap-3">
-                            <h3 class="text-lg font-black text-slate-900">Top Market Gaps</h3>
+                            <h3 class="text-lg font-black text-slate-900">高优先级机会</h3>
                             <span class="text-xs font-bold text-slate-400">按机会分排序</span>
                         </div>
                         <div id="market-gap-list" class="divide-y divide-slate-100">
@@ -749,8 +758,8 @@
                     </div>
 
                     <div class="glass-card rounded-lg p-6 border border-slate-100">
-                        <h3 class="text-lg font-black text-slate-900">ABSA Evidence Matrix</h3>
-                        <p class="mt-2 text-sm text-slate-500">聚合属性级负面证据、样例评论和公开基线倍数，确认缺口不是模型臆测。</p>
+                        <h3 class="text-lg font-black text-slate-900">属性级证据矩阵</h3>
+                        <p class="mt-2 text-sm text-slate-500">后台保留属性级证据、样例评论和类目基线，用于解释机会来源。</p>
                         <div id="market-gap-signal-grid" class="mt-5 space-y-3">
                             <!-- Pain signals rendered by JS -->
                         </div>
@@ -759,16 +768,17 @@
             </div>
         </div>
 
-        <div id="section-evidence" class="page-section hidden fade-in">
+        <div id="section-evidence" class="backend-module hidden fade-in">
             <div class="mb-8 flex flex-col xl:flex-row xl:items-end justify-between gap-5">
                 <div>
                     <div class="flex flex-wrap gap-2 mb-3">
-                        <span class="kicker-pill">[EVIDENCE AUDIT]</span>
-                        <span class="kicker-pill">[ABSA LEDGER]</span>
-                        <span class="kicker-pill">[BENCHMARK LIFT]</span>
+                        <span class="kicker-pill">证据审计</span>
+                        <span class="kicker-pill">属性账本</span>
+                        <span class="kicker-pill">基线偏离</span>
                     </div>
-                    <h1 class="text-3xl font-bold text-slate-900 mb-2">Evidence Audit Center · 证据审计中心</h1>
-                    <p class="text-sm text-slate-500 max-w-3xl">把每个机会分拆成属性级证据、公开基线倍数、置信度和评论样例，便于复盘、答辩和采购决策。</p>
+                    <!-- Evidence Audit Center -->
+                    <h1 class="text-3xl font-bold text-slate-900 mb-2">证据审计（后台明细）</h1>
+                    <p class="text-sm text-slate-500 max-w-3xl">复杂证据默认折叠，展开后可追溯样例评论、可信度和基线来源。</p>
                 </div>
                 <button id="btn-copy-evidence-audit" class="quiet-button px-5 py-2.5 rounded-lg text-sm font-bold">📋 复制审计摘要</button>
             </div>
@@ -782,19 +792,19 @@
             <div id="evidence-audit-content" class="space-y-6">
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div class="glass-card rounded-lg p-5 border border-slate-100">
-                        <div class="text-xs font-black text-slate-400 uppercase">Audited Products</div>
+                        <div class="text-xs font-black text-slate-400 uppercase">审计商品</div>
                         <div id="evidence-stat-products" class="mt-2 text-3xl font-black text-slate-900">--</div>
                     </div>
                     <div class="glass-card rounded-lg p-5 border border-slate-100">
-                        <div class="text-xs font-black text-slate-400 uppercase">Evidence Items</div>
+                        <div class="text-xs font-black text-slate-400 uppercase">证据条目</div>
                         <div id="evidence-stat-items" class="mt-2 text-3xl font-black text-indigo-600">--</div>
                     </div>
                     <div class="glass-card rounded-lg p-5 border border-slate-100">
-                        <div class="text-xs font-black text-slate-400 uppercase">Avg Confidence</div>
+                        <div class="text-xs font-black text-slate-400 uppercase">平均可信度</div>
                         <div id="evidence-stat-confidence" class="mt-2 text-3xl font-black text-emerald-600">--</div>
                     </div>
                     <div class="glass-card rounded-lg p-5 border border-slate-100">
-                        <div class="text-xs font-black text-slate-400 uppercase">Peak Lift</div>
+                        <div class="text-xs font-black text-slate-400 uppercase">最高偏离</div>
                         <div id="evidence-stat-lift" class="mt-2 text-3xl font-black text-rose-600">--</div>
                     </div>
                 </div>
@@ -802,16 +812,16 @@
                 <div class="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-6">
                     <div class="glass-card rounded-lg overflow-hidden border border-slate-100">
                         <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between gap-3">
-                            <h3 class="text-lg font-black text-slate-900">Evidence Ledger</h3>
+                            <h3 class="text-lg font-black text-slate-900">证据账本</h3>
                             <span id="evidence-audit-method" class="text-xs font-bold text-slate-400">等待同步</span>
                         </div>
                         <div id="evidence-ledger-list" class="divide-y divide-slate-100"></div>
                     </div>
                     <div class="glass-card rounded-lg p-6 border border-slate-100">
-                        <h3 class="text-lg font-black text-slate-900">Benchmark Source</h3>
+                        <h3 class="text-lg font-black text-slate-900">基线来源</h3>
                         <div id="evidence-benchmark-box" class="mt-4 rounded-lg border border-indigo-100 bg-indigo-50/50 p-4 text-sm leading-relaxed text-slate-700">等待证据基线同步。</div>
                         <div class="mt-6 rounded-lg border border-slate-100 bg-white/70 p-4">
-                            <div class="text-xs font-black text-slate-400 uppercase">Audit Rule</div>
+                            <div class="text-xs font-black text-slate-400 uppercase">审计规则</div>
                             <p class="mt-2 text-sm text-slate-600 leading-relaxed">优先展示真实评论匹配的属性证据；若历史商品缺少评论样例，则使用关键词频次兼容证据，并显式标记为 fallback。</p>
                         </div>
                     </div>
@@ -822,21 +832,21 @@
         <div id="section-sentiment" class="page-section hidden fade-in">
             <div class="mb-8">
                 <div class="flex flex-wrap gap-2 mb-3">
-                    <span class="kicker-pill">[STREAM]</span>
+                    <span class="kicker-pill">抓取中</span>
                     <span class="kicker-pill">[GPT-5.5]</span>
-                    <span class="kicker-pill">[AUTO CATEGORY]</span>
+                    <span class="kicker-pill">自动识别</span>
                 </div>
-                <h1 class="text-3xl font-bold text-slate-900 mb-2">AI 负面舆情实时诊断面板</h1>
+                <h1 class="text-3xl font-bold text-slate-900 mb-2">AI 舆情诊断</h1>
             </div>
 
             <div class="glass-card p-6 md:p-8 rounded-lg mb-8">
                 <h3 class="text-lg font-bold text-indigo-900 mb-2 flex items-center gap-2">
-                    <span>🚀</span> 启动实时 AI 抓取与诊断管道 (Pipeline)
+                    <span>🚀</span> 启动实时 AI 抓取与诊断管道
                 </h3>
                 <div class="flex flex-wrap gap-2 mb-4">
                     <span class="kicker-pill">YouTube</span>
                     <span class="kicker-pill">TikTok</span>
-                    <span class="kicker-pill">[QUEUED]</span>
+                    <span class="kicker-pill">排队</span>
                 </div>
                 <div class="flex flex-col md:flex-row gap-3">
                     <input id="pipeline-url" type="text" placeholder="请输入 YouTube / TikTok 测评视频链接..." class="neo-input flex-grow px-4 py-2.5 rounded-lg text-sm focus:outline-none transition-all">
@@ -916,7 +926,7 @@
             <!-- 竞品横向 PK 折叠面板：复用当前数据库中的商品诊断结果做多维对比 -->
             <details id="competitor-vs-panel" class="glass-card rounded-lg overflow-hidden border border-indigo-100 group">
                 <summary class="cursor-pointer select-none list-none px-6 py-4 transition-colors flex items-center justify-between hover:bg-indigo-500/5">
-                    <span class="text-lg font-bold text-slate-900">📊 竞品横向 PK 对比大盘 (Competitor Head-to-Head)</span>
+                    <span class="text-lg font-bold text-slate-900">📊 竞品横向对比</span>
                     <span class="text-xs font-semibold text-indigo-600 group-open:hidden">展开</span>
                     <span class="text-xs font-semibold text-indigo-600 hidden group-open:inline">收起</span>
                 </summary>
@@ -929,7 +939,7 @@
                             </div>
                     <button id="btn-run-vs-pipeline" class="primary-action mt-4 w-full px-4 py-2.5 text-sm font-bold rounded-lg flex items-center justify-center gap-2">
                                 <span id="vs-spinner" class="hidden w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                                一键启动多维 PK 诊断
+                                启动多维对比诊断
                             </button>
                         </div>
                         <div class="flex-1 min-w-0">
@@ -953,11 +963,11 @@
         <div id="section-products" class="page-section hidden fade-in">
             <div class="mb-8">
                 <div class="flex flex-wrap gap-2 mb-3">
-                    <span class="kicker-pill">[RADAR]</span>
+                    <span class="kicker-pill">雷达</span>
                     <span class="kicker-pill">[SPS]</span>
-                    <span class="kicker-pill">[APPEAL]</span>
+                    <span class="kicker-pill">申诉</span>
                 </div>
-                <h1 class="text-3xl font-bold text-slate-900 mb-4">数据驱动的选品优化建议库</h1>
+                <h1 class="text-3xl font-bold text-slate-900 mb-4">选品建议</h1>
             </div>
 
             <div class="glass-card rounded-lg overflow-hidden">
@@ -982,9 +992,9 @@
                     <div>
                         <h3 class="text-base font-black text-slate-900">系统维护与告警设置</h3>
                         <div class="mt-2 flex flex-wrap gap-2">
-                            <span class="kicker-pill">Backup</span>
-                            <span class="kicker-pill">Audit</span>
-                            <span class="kicker-pill">Webhook</span>
+                            <span class="kicker-pill">备份</span>
+                            <span class="kicker-pill">审计</span>
+                            <span class="kicker-pill">告警</span>
                         </div>
                     </div>
                     <span class="text-xs font-bold text-indigo-600 group-open:hidden">展开</span>
@@ -1013,7 +1023,7 @@
                     <div class="glass-card rounded-lg p-6 md:p-8 border border-rose-400/20 bg-rose-500/5">
                         <div class="flex flex-col lg:flex-row lg:items-start justify-between gap-5">
                             <div>
-                                <h3 class="text-lg font-black text-slate-900">📣 雷达红线 Webhook 报警通知</h3>
+                                <h3 class="text-lg font-black text-slate-900">📣 雷达红线 告警 报警通知</h3>
                                 <div id="alert-status-meta" class="mt-3 text-xs text-slate-500">等待读取报警通道状态...</div>
                             </div>
                             <div class="flex flex-wrap gap-2">
@@ -1026,18 +1036,78 @@
             </details>
         </div>
 
-        <div id="section-architecture" class="page-section hidden fade-in">
+
+        <div id="section-details" class="page-section hidden fade-in">
+            <div class="mb-8 flex flex-col lg:flex-row lg:items-end justify-between gap-4">
+                <div>
+                    <div class="flex flex-wrap gap-2 mb-3">
+                        <span class="kicker-pill">后台</span>
+                        <span class="kicker-pill">默认折叠</span>
+                    </div>
+                    <h1 class="text-3xl font-bold text-slate-900 mb-2">后台明细</h1>
+                </div>
+            </div>
+
+            <div class="space-y-4">
+                <details class="backend-accordion glass-card rounded-lg overflow-hidden border border-slate-200/60">
+                    <summary class="cursor-pointer select-none px-6 py-4 flex items-center justify-between gap-4 hover:bg-indigo-50/40 transition-colors">
+                        <span class="font-black text-slate-900">机会雷达与战术卡</span>
+                        <span class="text-xs font-bold text-indigo-600">展开</span>
+                    </summary>
+                    <div id="backend-market-slot" class="border-t border-slate-100 p-6"></div>
+                </details>
+
+                <details class="backend-accordion glass-card rounded-lg overflow-hidden border border-slate-200/60">
+                    <summary class="cursor-pointer select-none px-6 py-4 flex items-center justify-between gap-4 hover:bg-indigo-50/40 transition-colors">
+                        <span class="font-black text-slate-900">证据审计与样例评论</span>
+                        <span class="text-xs font-bold text-indigo-600">展开</span>
+                    </summary>
+                    <div id="backend-evidence-slot" class="border-t border-slate-100 p-6"></div>
+                </details>
+
+                <details class="backend-accordion glass-card rounded-lg overflow-hidden border border-slate-200/60">
+                    <summary class="cursor-pointer select-none px-6 py-4 flex items-center justify-between gap-4 hover:bg-indigo-50/40 transition-colors">
+                        <span class="font-black text-slate-900">市场趋势图</span>
+                        <span class="text-xs font-bold text-indigo-600">展开</span>
+                    </summary>
+                    <div class="border-t border-slate-100 p-6">
+                        <h3 class="text-lg font-semibold mb-4 text-slate-800">TK电商 GMV 增长与退货率趋势</h3>
+                        <div class="chart-container">
+                            <canvas id="marketChart"></canvas>
+                        </div>
+                    </div>
+                </details>
+
+                <details class="backend-accordion glass-card rounded-lg overflow-hidden border border-slate-200/60">
+                    <summary class="cursor-pointer select-none px-6 py-4 flex items-center justify-between gap-4 hover:bg-indigo-50/40 transition-colors">
+                        <span class="font-black text-slate-900">系统维护与告警</span>
+                        <span class="text-xs font-bold text-indigo-600">展开</span>
+                    </summary>
+                    <div id="backend-maintenance-slot" class="border-t border-slate-100 p-6"></div>
+                </details>
+
+                <details class="backend-accordion glass-card rounded-lg overflow-hidden border border-slate-200/60">
+                    <summary class="cursor-pointer select-none px-6 py-4 flex items-center justify-between gap-4 hover:bg-indigo-50/40 transition-colors">
+                        <span class="font-black text-slate-900">技术架构</span>
+                        <span class="text-xs font-bold text-indigo-600">展开</span>
+                    </summary>
+                    <div id="backend-architecture-slot" class="border-t border-slate-100 p-6"></div>
+                </details>
+            </div>
+        </div>
+
+        <div id="section-architecture" class="backend-module hidden fade-in">
             <div class="mb-8">
                 <div class="flex flex-wrap gap-2 mb-3">
-                    <span class="kicker-pill">[CLOUDFLARE]</span>
-                    <span class="kicker-pill">[FASTAPI]</span>
-                    <span class="kicker-pill">[REDIS]</span>
+                    <span class="kicker-pill">云端入口</span>
+                    <span class="kicker-pill">接口网关</span>
+                    <span class="kicker-pill">云端同步</span>
                 </div>
-                <h1 class="text-3xl font-bold text-slate-900 mb-4">系统架构与数据流设计思路</h1>
+                <h1 class="text-3xl font-bold text-slate-900 mb-4">系统后台架构</h1>
             </div>
 
             <div class="glass-card p-6 md:p-8 rounded-lg">
-                <h3 class="text-xl font-semibold mb-8 text-center text-indigo-300">业务数据流拓扑图</h3>
+                <h3 class="text-xl font-semibold mb-8 text-center text-indigo-300">业务数据流</h3>
                 <div class="flex flex-col items-center max-w-4xl mx-auto space-y-6">
                     <div class="flex flex-col md:flex-row gap-4 w-full justify-center">
                         <div class="dark-panel p-4 rounded-lg w-full md:w-48 text-center">
@@ -1195,8 +1265,8 @@
             <div class="flex justify-between items-start gap-4 mb-5">
                 <div>
                     <div class="flex flex-wrap gap-2 mb-3">
-                        <span class="kicker-pill">[BATTLECARD]</span>
-                        <span class="kicker-pill">[GO-TO-MARKET]</span>
+                        <span class="kicker-pill">战术卡</span>
+                        <span class="kicker-pill">投放策略</span>
                     </div>
                     <h3 id="battlecard-title" class="text-xl font-black text-slate-900">AI 选品战术卡</h3>
                     <p id="battlecard-subtitle" class="text-sm text-slate-500 mt-1">基于舆情、痛点和供应链修复难度生成。</p>
@@ -1345,6 +1415,11 @@
         const liveWorkflowStatus = document.getElementById('live-workflow-status');
         const liveNextAction = document.getElementById('live-next-action');
         const liveRiskList = document.getElementById('live-risk-list');
+        const executiveEvidenceTrust = document.getElementById('executive-evidence-trust');
+        const executiveEvidenceMeta = document.getElementById('executive-evidence-meta');
+        const aiExecutiveReport = document.getElementById('ai-executive-report');
+        const aiExecutiveReportMeta = document.getElementById('ai-executive-report-meta');
+        const btnRefreshExecutiveReport = document.getElementById('btn-refresh-executive-report');
         const marketGapEmpty = document.getElementById('market-gap-empty');
         const marketGapContent = document.getElementById('market-gap-content');
         const marketGapPrimeProduct = document.getElementById('market-gap-prime-product');
@@ -1579,11 +1654,11 @@
             }
 
             const names = criticalProducts.map(item => item.product_name || item.product_id).join('、');
-            radarAlertMessage.innerText = `CRITICAL x${criticalProducts.length} · ${names}`;
+            radarAlertMessage.innerText = `红线商品 ${criticalProducts.length} 个 · ${names}`;
             radarAlertBanner.classList.remove('hidden');
         }
 
-        function renderLiveOverview() {
+        function buildExecutiveSnapshot() {
             const products = Object.values(activeData || {});
             const diagnosedProducts = products.filter(hasDiagnosticData);
             const criticalProducts = products.filter(isRadarCritical);
@@ -1592,44 +1667,160 @@
             const averageScore = diagnosedCount > 0
                 ? Math.round(diagnosedProducts.reduce((sum, item) => sum + Number(item.score || 0), 0) / diagnosedCount)
                 : null;
-            const coverage = productCount > 0 ? Math.round((diagnosedCount / productCount) * 100) : 0;
+            let evidenceItems = 0;
+            const confidences = diagnosedProducts.map(item => {
+                const evidence = getEvidenceStats(item);
+                evidenceItems += Number(evidence.evidenceCount || 0);
+                return Number(evidence.confidence || 0);
+            }).filter(value => value > 0);
+            let evidenceTrust = confidences.length > 0
+                ? Math.round((confidences.reduce((sum, value) => sum + value, 0) / confidences.length) * 100)
+                : 0;
+            if (evidenceTrust === 0 && evidenceItems > 0) {
+                evidenceTrust = Math.min(88, 48 + evidenceItems * 4);
+            }
+            const riskProducts = [...diagnosedProducts].sort((a, b) => {
+                if (isRadarCritical(a) !== isRadarCritical(b)) {
+                    return isRadarCritical(a) ? -1 : 1;
+                }
+                return Number(a.score || 100) - Number(b.score || 100);
+            });
+            let suggestedAction = '保持巡检，优先放大健康商品。';
+            if (criticalProducts.length > 0) {
+                const names = criticalProducts.slice(0, 3).map(item => item.product_name || item.product_id).join('、');
+                suggestedAction = `先处理 ${names} 的红线客诉，再恢复投放。`;
+            } else if (diagnosedCount < productCount) {
+                suggestedAction = '先补齐未诊断商品，再做横向选品判断。';
+            } else if (averageScore !== null && averageScore < 75) {
+                suggestedAction = '收缩预算，集中修复低分商品的供应链问题。';
+            }
+            return {
+                products,
+                diagnosedProducts,
+                criticalProducts,
+                riskProducts,
+                productCount,
+                diagnosedCount,
+                averageScore,
+                evidenceTrust,
+                evidenceItems,
+                suggestedAction
+            };
+        }
 
-            liveProductCount.innerText = String(productCount);
-            liveDiagnosedCount.innerText = String(diagnosedCount);
-            liveCriticalCount.innerText = String(criticalProducts.length);
-            liveAverageScore.innerText = averageScore === null ? '--' : String(averageScore);
+        function buildLocalExecutiveReport(snapshot) {
+            if (snapshot.diagnosedCount === 0) {
+                return '当前还没有完成诊断的商品。建议先为核心 SKU 执行一次 AI 抓取与舆情诊断，再生成完整经营复盘。';
+            }
+            const score = snapshot.averageScore || 0;
+            const riskNames = snapshot.riskProducts.slice(0, 3).map(item => item.product_name || item.product_id).join('、') || '暂无明确风险商品';
+            const healthLine = score >= 85
+                ? '整体健康分偏稳，可继续小步放量。'
+                : (score >= 70 ? '整体健康分处于修复区间，需要先控预算再优化。' : '整体健康分偏低，应暂停高风险商品放量。');
+            const riskLine = snapshot.criticalProducts.length > 0
+                ? `当前有 ${snapshot.criticalProducts.length} 个商品触发红线，优先关注 ${riskNames}。`
+                : '当前未发现红线商品，可把重点放在补齐证据与放量验证。';
+            const trustLine = snapshot.evidenceTrust >= 65
+                ? `证据可信度约 ${snapshot.evidenceTrust}%，足够支撑经营判断。`
+                : `证据可信度约 ${snapshot.evidenceTrust || '--'}%，建议继续抓取评论样本，提高报告可信度。`;
+            return `${healthLine}${riskLine}${trustLine}下一步建议：${snapshot.suggestedAction}`;
+        }
+
+        function updateExecutiveCards(snapshot) {
+            if (executiveEvidenceTrust) {
+                executiveEvidenceTrust.innerText = snapshot.diagnosedCount > 0 ? `${snapshot.evidenceTrust}%` : '--';
+            }
+            if (executiveEvidenceMeta) {
+                executiveEvidenceMeta.innerText = snapshot.evidenceItems > 0
+                    ? `已沉淀 ${snapshot.evidenceItems} 条可审计证据。`
+                    : '等待证据账本同步。';
+            }
+            if (aiExecutiveReport && aiExecutiveReport.dataset.remoteReady !== '1') {
+                aiExecutiveReport.innerText = buildLocalExecutiveReport(snapshot);
+                aiExecutiveReportMeta.innerText = '本地经营规则 · 等待 GPT 汇总';
+            }
+        }
+
+        async function refreshExecutiveReport(options = {}) {
+            const quiet = options.quiet !== false;
+            const snapshot = buildExecutiveSnapshot();
+            updateExecutiveCards(snapshot);
+            if (!isLocalApiOnline || !isAuthenticated) {
+                return;
+            }
+            if (!quiet && aiExecutiveReportMeta) {
+                aiExecutiveReportMeta.innerText = '正在生成 GPT 综合经营报告...';
+            }
+            try {
+                const response = await authorizedFetch(`${API_BASE_URL}/api/executive-report`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ products: activeData })
+                });
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    throw new Error(payload.detail || '综合经营报告生成失败。');
+                }
+                if (aiExecutiveReport) {
+                    aiExecutiveReport.innerText = payload.report || buildLocalExecutiveReport(snapshot);
+                    aiExecutiveReport.dataset.remoteReady = '1';
+                }
+                if (aiExecutiveReportMeta) {
+                    const sourceLabel = payload.source === 'openai' ? `${payload.model_used || 'GPT-5.5'} 已汇总` : '本地规则兜底';
+                    aiExecutiveReportMeta.innerText = `${sourceLabel} · ${payload.generated_at || ''}`;
+                }
+                if (!quiet) {
+                    showToast('AI 综合经营报告已更新。', 'success');
+                }
+            } catch (error) {
+                if (aiExecutiveReport) {
+                    aiExecutiveReport.dataset.remoteReady = '';
+                    aiExecutiveReport.innerText = buildLocalExecutiveReport(snapshot);
+                }
+                if (aiExecutiveReportMeta) {
+                    aiExecutiveReportMeta.innerText = '本地规则兜底 · GPT 通道暂不可用';
+                }
+                if (!quiet) {
+                    showToast(error.message || String(error), 'error');
+                }
+            }
+        }
+
+        function renderLiveOverview() {
+            const snapshot = buildExecutiveSnapshot();
+            const coverage = snapshot.productCount > 0 ? Math.round((snapshot.diagnosedCount / snapshot.productCount) * 100) : 0;
+
+            liveProductCount.innerText = String(snapshot.productCount);
+            liveDiagnosedCount.innerText = String(snapshot.diagnosedCount);
+            liveCriticalCount.innerText = String(snapshot.criticalProducts.length);
+            liveAverageScore.innerText = snapshot.averageScore === null ? '--' : String(snapshot.averageScore);
             liveDiagnosticCoverage.style.width = `${coverage}%`;
 
             liveWorkflowStatus.className = isLocalApiOnline
-                ? 'self-start md:self-center px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-200 border border-emerald-400/20 text-xs font-bold'
-                : 'self-start md:self-center px-3 py-1 rounded-full bg-amber-500/10 text-amber-200 border border-amber-400/20 text-xs font-bold';
+                ? 'px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 text-xs font-bold'
+                : 'px-3 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-100 text-xs font-bold';
             liveWorkflowStatus.innerText = isLocalApiOnline
-                ? (isAuthenticated ? '云端 API 在线 · 已登录' : '云端 API 在线 · 待登录')
-                : '等待 API 同步';
+                ? (isAuthenticated ? '已同步' : '待登录')
+                : '未连接';
 
-            if (productCount === 0) {
-                liveNextAction.innerText = 'Add product -> Run pipeline -> Radar sync.';
-                liveRiskList.innerText = 'NO MOCK DATA · CLOUD ONLY';
+            if (snapshot.productCount === 0) {
+                liveNextAction.innerText = '先添加监控商品并启动诊断。';
+                liveRiskList.innerText = '暂无风险商品。';
+                updateExecutiveCards(snapshot);
                 return;
             }
 
-            if (criticalProducts.length > 0) {
-                const names = criticalProducts.slice(0, 3).map(item => item.product_name || item.product_id).join('、');
-                liveNextAction.innerText = `CRITICAL FIRST · ${names}`;
-                liveRiskList.innerHTML = criticalProducts.slice(0, 3).map(item => `
-                    <div class="mt-2 rounded-lg border border-rose-400/20 bg-rose-500/10 px-3 py-2 text-rose-200 font-semibold">
-                        🚨 ${item.product_name || item.product_id}：${item.radar_alert_reason || '负面声量异常'}
+            liveNextAction.innerText = snapshot.suggestedAction;
+            if (snapshot.criticalProducts.length > 0) {
+                liveRiskList.innerHTML = snapshot.criticalProducts.slice(0, 3).map(item => `
+                    <div class="mt-2 rounded-lg border border-rose-100 bg-rose-50/80 px-3 py-2 text-rose-700 font-semibold">
+                        ${item.product_name || item.product_id}：${item.radar_alert_reason || '负面声量异常'}
                     </div>
                 `).join('');
-                return;
-            }
-
-            if (diagnosedCount < productCount) {
-                liveNextAction.innerText = `PENDING DIAGNOSIS · ${productCount - diagnosedCount}`;
             } else {
-                liveNextAction.innerText = 'ALL CLEAR · READY FOR VS ANALYSIS';
+                liveRiskList.innerHTML = '<span class="inline-flex items-center gap-1 text-emerald-700 font-semibold">当前未触发红线。</span>';
             }
-            liveRiskList.innerHTML = '<span class="inline-flex items-center gap-1 text-emerald-200 font-semibold">🟢 NORMAL · NO CRITICAL NODES</span>';
+            updateExecutiveCards(snapshot);
         }
 
         function syncActiveProductTitle(productKey) {
@@ -2131,7 +2322,7 @@
                 : '';
             marketGapPrimeEvidence.innerHTML = `
                 <div class="flex items-center justify-between gap-3">
-                    <span class="font-black text-indigo-700">Evidence Ledger</span>
+                    <span class="font-black text-indigo-700">证据账本</span>
                     <span class="rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100 px-2 py-0.5 font-black">${escapeHtml(prime.evidence.method || 'ABSA evidence')}</span>
                 </div>
                 <div class="mt-2 text-slate-700"><span class="font-black">Top Aspect:</span> ${escapeHtml(getAspectDisplayName(prime.topAspect))}</div>
@@ -2173,9 +2364,9 @@
                         <div class="flex xl:flex-col items-center xl:items-end gap-3 shrink-0">
                             <div class="text-right">
                                 <div class="text-3xl font-black text-indigo-600">${record.gapScore}</div>
-                                <div class="text-[10px] font-bold text-slate-400">GAP SCORE</div>
+                                <div class="text-[10px] font-bold text-slate-400">机会分</div>
                             </div>
-                            <button data-battlecard-product="${record.key}" class="btn-battlecard quiet-button px-3 py-2 rounded-lg text-xs font-black">查看 Battlecard</button>
+                            <button data-battlecard-product="${record.key}" class="btn-battlecard quiet-button px-3 py-2 rounded-lg text-xs font-black">查看战术卡</button>
                         </div>
                     </div>
                 </div>
@@ -2301,7 +2492,7 @@
                             </div>
                             <div class="shrink-0 text-right">
                                 <div class="text-5xl font-black text-indigo-600">${card.gapScore}</div>
-                                <div class="text-[10px] font-black text-slate-400">GAP SCORE</div>
+                                <div class="text-[10px] font-black text-slate-400">机会分</div>
                             </div>
                         </div>
                     </div>
@@ -2402,7 +2593,7 @@
         function openBattlecard(productKey) {
             const card = getBattlecard(productKey);
             if (!card) {
-                showToast('当前商品尚未完成诊断，暂无法生成 Battlecard。', 'info');
+                showToast('当前商品尚未完成诊断，暂无法生成战术卡。', 'info');
                 return;
             }
             currentBattlecardProductKey = productKey;
@@ -2423,8 +2614,8 @@
                 `Priority: ${card.priority}`,
                 '',
                 `Top Aspect: ${getAspectDisplayName(card.topAspect)}`,
-                `Benchmark Lift: ${formatBenchmarkLift(card.benchmarkLift)}`,
-                `Evidence Confidence: ${formatConfidence(card.confidence)}`,
+                `基线偏离: ${formatBenchmarkLift(card.benchmarkLift)}`,
+                `证据可信度: ${formatConfidence(card.confidence)}`,
                 `Evidence Count: ${card.evidence.evidenceCount || 0}`,
                 `Comment Sample: ${card.evidence.commentCount || 0}`,
                 '',
@@ -2669,6 +2860,31 @@
             `;
             }).join('');
         }
+
+        function setupBackendDetails() {
+            const placements = [
+                ['section-intelligence', 'backend-market-slot'],
+                ['section-evidence', 'backend-evidence-slot'],
+                ['section-architecture', 'backend-architecture-slot']
+            ];
+            placements.forEach(([moduleId, slotId]) => {
+                const module = document.getElementById(moduleId);
+                const slot = document.getElementById(slotId);
+                if (module && slot) {
+                    module.classList.remove('hidden', 'page-section');
+                    module.classList.add('backend-module');
+                    slot.appendChild(module);
+                }
+            });
+            const maintenance = document.getElementById('system-maintenance-panel');
+            const maintenanceSlot = document.getElementById('backend-maintenance-slot');
+            if (maintenance && maintenanceSlot) {
+                maintenance.classList.remove('mt-8');
+                maintenanceSlot.appendChild(maintenance);
+            }
+        }
+
+        setupBackendDetails();
 
         const navBtns = document.querySelectorAll('.nav-btn');
         const sections = document.querySelectorAll('.page-section');
@@ -2951,7 +3167,7 @@
                 const actionButtons = ready
                     ? `
                         <div class="mt-2 flex flex-wrap gap-2">
-                            <button data-battlecard-product="${key}" class="btn-battlecard px-2.5 py-1 rounded-md bg-white/80 text-indigo-700 hover:bg-indigo-50 text-[11px] font-bold border border-indigo-100 transition-colors">📌 Battlecard</button>
+                            <button data-battlecard-product="${key}" class="btn-battlecard px-2.5 py-1 rounded-md bg-white/80 text-indigo-700 hover:bg-indigo-50 text-[11px] font-bold border border-indigo-100 transition-colors">📌 战术卡</button>
                             ${radarCritical
                                 ? `
                                     <button data-sps-product="${key}" class="btn-sps-predict px-2.5 py-1 rounded-md bg-indigo-500/10 text-indigo-200 hover:bg-indigo-500/20 text-[11px] font-bold border border-indigo-400/20 transition-colors">🔮 绩效预测</button>
@@ -3255,13 +3471,13 @@
         document.getElementById('btn-copy-battlecard').addEventListener('click', async () => {
             const plainText = getBattlecardPlainText(currentBattlecardProductKey);
             if (!plainText) {
-                showToast('当前没有可复制的 Battlecard。', 'info');
+                showToast('当前没有可复制的战术卡。', 'info');
                 return;
             }
 
             try {
                 await navigator.clipboard.writeText(plainText);
-                showToast('Battlecard 已复制到剪贴板。', 'success');
+                showToast('战术卡已复制到剪贴板。', 'success');
             } catch (error) {
                 const tempTextarea = document.createElement('textarea');
                 tempTextarea.value = plainText;
@@ -3272,14 +3488,14 @@
                 tempTextarea.select();
                 document.execCommand('copy');
                 tempTextarea.remove();
-                showToast('Battlecard 已复制。', 'success');
+                showToast('战术卡已复制。', 'success');
             }
         });
 
         document.getElementById('btn-print-battlecard').addEventListener('click', () => {
             const card = getBattlecard(currentBattlecardProductKey);
             if (!card) {
-                showToast('当前没有可导出的 Battlecard。', 'info');
+                showToast('当前没有可导出的战术卡。', 'info');
                 return;
             }
 
@@ -3311,7 +3527,7 @@
                 <body>
                     <main class="print-shell">
                         <div style="border-bottom: 2px solid #6366F1; padding-bottom: 16px; margin-bottom: 22px;">
-                            <div style="font-size: 12px; font-weight: 900; color: #4F46E5; letter-spacing: 0.12em;">[BATTLECARD] [MARKET GAP RADAR]</div>
+                            <div style="font-size: 12px; font-weight: 900; color: #4F46E5; letter-spacing: 0.12em;">战术卡 [MARKET GAP RADAR]</div>
                             <h1 style="font-size: 26px; margin: 10px 0 4px; font-weight: 900;">${safeTitle}</h1>
                             <p style="font-size: 13px; color: #64748B; margin: 0;">${safeSubtitle}</p>
                         </div>
@@ -3444,7 +3660,11 @@
                 if (res.ok) {
                     const realData = await res.json();
                     activeData = realData || {};
+                    if (aiExecutiveReport) {
+                        aiExecutiveReport.dataset.remoteReady = '';
+                    }
                     renderSelectorOptions(preferredKey || productSelector.value);
+                    await refreshExecutiveReport({ quiet: true });
                 }
             } catch (error) {
                 console.error('Failed fetching live api products:', error);
@@ -3566,7 +3786,7 @@
         function renderAlertStatus(payload) {
             const enabledText = payload.enabled ? '已启用' : '未启用';
             const signatureText = payload.token_configured ? '已启用通道签名' : '未启用通道签名';
-            alertStatusMeta.innerText = `Webhook ${enabledText} · ${signatureText} · 冷却 ${payload.cooldown_seconds || 0}s · 去重记录 ${payload.dedup_entries || 0} 条`;
+            alertStatusMeta.innerText = `告警 ${enabledText} · ${signatureText} · 冷却 ${payload.cooldown_seconds || 0}s · 去重记录 ${payload.dedup_entries || 0} 条`;
         }
 
         async function refreshAlertStatus() {
@@ -3600,7 +3820,7 @@
                 if (payload.status === 'success') {
                     showToast('📣 测试告警已发送。', 'success');
                 } else {
-                    showToast(payload.alert_result?.reason || 'Webhook 未启用或发送失败。', 'error');
+                    showToast(payload.alert_result?.reason || '告警 未启用或发送失败。', 'error');
                 }
             } catch (error) {
                 showToast(error.message || String(error), 'error');
@@ -3650,7 +3870,7 @@
             btnRunRadarPatrol.disabled = true;
             radarPatrolSpinner.classList.remove('hidden');
             liveWorkflowStatus.className = 'self-start md:self-center px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100 text-xs font-bold';
-            liveWorkflowStatus.innerText = '[PATROL RUNNING]';
+            liveWorkflowStatus.innerText = '巡检中';
             setTerminalOpenState(true);
             pipelineLoadingTitle.innerText = '正在执行 24H 雷达巡检';
             pipelineLoadingDetail.innerText = '系统正在复查所有已注册商品，完成后会自动刷新红线状态。';
@@ -3690,6 +3910,9 @@
         }
 
         btnRunRadarPatrol.addEventListener('click', runRadarPatrol);
+        if (btnRefreshExecutiveReport) {
+            btnRefreshExecutiveReport.addEventListener('click', () => refreshExecutiveReport({ quiet: false }));
+        }
 
         btnSubmitModal.addEventListener('click', async () => {
             const id = document.getElementById('modal-product-id').value.trim();
