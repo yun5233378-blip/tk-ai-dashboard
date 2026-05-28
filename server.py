@@ -3451,16 +3451,24 @@ def requires_operator_auth(request: Request) -> bool:
     return request.url.path not in {"/api/health", "/api/login"}
 
 
+def constant_time_text_equal(left: str, right: str) -> bool:
+    """Compare UTF-8 text in constant time, including non-ASCII secrets."""
+    return hmac.compare_digest(
+        (left or "").encode("utf-8"),
+        (right or "").encode("utf-8"),
+    )
+
+
 def is_operator_authorized(request: Request) -> bool:
-    """用常量时间比较降低令牌侧信道泄露风险。"""
+    """Validate operator bearer token with constant-time comparison."""
     supplied_token = extract_operator_token(request)
-    return bool(supplied_token) and hmac.compare_digest(supplied_token, OPERATOR_TOKEN)
+    return bool(supplied_token) and constant_time_text_equal(supplied_token, OPERATOR_TOKEN)
 
 
 def is_login_password_valid(password: str) -> bool:
-    """优先校验 OPERATOR_PASSWORD，未设置时兼容使用 OPERATOR_TOKEN。"""
+    """Prefer OPERATOR_PASSWORD and fall back to OPERATOR_TOKEN."""
     expected_password = OPERATOR_PASSWORD or OPERATOR_TOKEN
-    return bool(expected_password) and hmac.compare_digest(password, expected_password)
+    return bool(expected_password) and constant_time_text_equal(password, expected_password)
 
 
 @app.middleware("http")
@@ -3576,7 +3584,7 @@ async def health() -> Dict[str, Any]:
 async def login(payload: LoginRequest) -> Dict[str, Any]:
     """账号密码登录，返回前端 localStorage 持久化使用的 Bearer 令牌。"""
     username = payload.username.strip()
-    if not hmac.compare_digest(username, OPERATOR_USERNAME) or not is_login_password_valid(payload.password):
+    if not constant_time_text_equal(username, OPERATOR_USERNAME) or not is_login_password_valid(payload.password):
         raise HTTPException(status_code=401, detail="账号或密码不正确")
 
     append_admin_audit("login", f"运营账号登录：{username}。")
