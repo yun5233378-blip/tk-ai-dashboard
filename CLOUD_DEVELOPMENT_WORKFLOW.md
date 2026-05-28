@@ -99,3 +99,58 @@ scripts/deploy_cloud.sh
 ## Remote
 
 GitHub remote: `git@github.com:yun5233378-blip/tk-ai-dashboard.git`
+
+## Codex Remote Execution Rules
+
+These rules prevent Windows PowerShell, SSH quoting, CRLF, and UTF-8 corruption during cloud development.
+
+1. Use a persistent remote shell for non-trivial work.
+
+```bash
+ssh tk-ai-cloud
+cd /opt/tk-ai
+export LANG=C.UTF-8 LC_ALL=C.UTF-8
+```
+
+2. Do not send multiline edit scripts through one-off local commands like `ssh tk-ai-cloud "..."` from PowerShell.
+
+3. For complex edits, create and run the script or patch on the server side:
+
+```bash
+cat > /tmp/change.py <<'PY'
+# remote-only script content
+PY
+python3 /tmp/change.py
+```
+
+or:
+
+```bash
+git apply <<'PATCH'
+# unified diff
+PATCH
+```
+
+4. Keep one-off SSH commands ASCII-only and short. Use them for reads and simple checks only.
+
+5. Before any deploy, run:
+
+```bash
+git status -sb
+git diff --check
+scripts/validate_cloud.sh
+```
+
+6. Deploy only through:
+
+```bash
+scripts/deploy_cloud.sh
+```
+
+7. If a failed experiment leaves partial edits, clean only Codex-owned uncommitted files after checking status:
+
+```bash
+git status -sb
+git diff -- <file>
+git restore <file>
+```
