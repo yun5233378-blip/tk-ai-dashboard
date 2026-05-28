@@ -24,6 +24,7 @@ import copy
 import hashlib
 import hmac
 import json
+import math
 import os
 import secrets
 import subprocess
@@ -87,6 +88,7 @@ TEMP_DIAGNOSED_PRODUCT_PATH = BASE_DIR / "_diagnosed_product_tmp.json"
 COMPETITOR_VS_REPORTS_PATH = BASE_DIR / "competitor_vs_reports.json"
 ADMIN_AUDIT_LOGS_PATH = BASE_DIR / "admin_audit_logs.json"
 ALERT_DEDUP_PATH = BASE_DIR / "alert_dedup.json"
+RADAR_HISTORY_PATH = BASE_DIR / "radar_history.json"
 
 REDIS_URL = os.getenv("REDIS_URL", "").strip()
 DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
@@ -96,6 +98,7 @@ PRODUCTS_STORE_KEY = os.getenv("PRODUCTS_STORE_KEY", "tk_ai:diagnosed_products")
 VS_REPORTS_STORE_KEY = os.getenv("VS_REPORTS_STORE_KEY", "tk_ai:competitor_vs_reports")
 ADMIN_AUDIT_STORE_KEY = os.getenv("ADMIN_AUDIT_STORE_KEY", "tk_ai:admin_audit_logs")
 ALERT_DEDUP_STORE_KEY = os.getenv("ALERT_DEDUP_STORE_KEY", "tk_ai:alert_dedup")
+RADAR_HISTORY_STORE_KEY = os.getenv("RADAR_HISTORY_STORE_KEY", "tk_ai:radar_history")
 CORS_EXTRA_ORIGINS = [
     item.strip()
     for item in os.getenv("CORS_EXTRA_ORIGINS", "").split(",")
@@ -127,6 +130,13 @@ RADAR_PATROL_INTERVAL_SECONDS = int(os.getenv("RADAR_PATROL_INTERVAL_SECONDS", "
 RADAR_PATROL_STARTUP_DELAY_SECONDS = int(os.getenv("RADAR_PATROL_STARTUP_DELAY_SECONDS", "60"))
 RADAR_NEGATIVE_SPIKE_THRESHOLD = 15
 RADAR_SCORE_CRITICAL_THRESHOLD = 60
+RADAR_HISTORY_MAX_POINTS = int(os.getenv("RADAR_HISTORY_MAX_POINTS", "96"))
+RADAR_EWMA_ALPHA = float(os.getenv("RADAR_EWMA_ALPHA", "0.35"))
+RADAR_Z_THRESHOLD = float(os.getenv("RADAR_Z_THRESHOLD", "2.0"))
+RADAR_MIN_HISTORY_POINTS = int(os.getenv("RADAR_MIN_HISTORY_POINTS", "3"))
+RADAR_MIN_SAMPLE_SIZE = int(os.getenv("RADAR_MIN_SAMPLE_SIZE", "20"))
+RADAR_EWMA_DRIFT_MIN_DELTA = int(os.getenv("RADAR_EWMA_DRIFT_MIN_DELTA", "8"))
+RADAR_MODEL_VERSION = "ewma_baseline_v1"
 
 DEFAULT_PRODUCT_KEY = "apparel"
 DEFAULT_PRODUCT_ID = "apparel"
@@ -297,9 +307,14 @@ ALGORITHM_REFERENCE_LIBRARY: Dict[str, Dict[str, str]] = {
         "role": "流式异常检测和预警评分的公开基准。",
     },
     "river": {
-        "name": "river online anomaly detection",
+        "name": "River online machine learning",
         "url": "https://github.com/online-ml/river",
-        "role": "在线学习场景下的流式异常检测参考实现。",
+        "role": "Python 流式/在线学习项目，提供数据流场景下的异常检测参考。",
+    },
+    "ewma_spc": {
+        "name": "NIST EWMA control chart",
+        "url": "https://www.itl.nist.gov/div898/handbook/pmc/section3/pmc314.htm",
+        "role": "统计过程控制中用指数加权移动平均捕捉小幅持续漂移的经典方法。",
     },
     "amazon_reviews_2023": {
         "name": "Amazon Reviews 2023",
@@ -599,6 +614,31 @@ def load_vs_reports() -> List[Dict[str, Any]]:
 def save_vs_reports(reports: List[Dict[str, Any]]) -> None:
     """保存最近 50 条竞品 PK 历史报告。"""
     save_storage_json(VS_REPORTS_STORE_KEY, COMPETITOR_VS_REPORTS_PATH, reports[-50:])
+
+
+def load_radar_history() -> Dict[str, List[Dict[str, Any]]]:
+    """读取 24H 雷达历史快照，云端优先，结构异常时自动清洗。"""
+    history = load_storage_json(RADAR_HISTORY_STORE_KEY, RADAR_HISTORY_PATH, {})
+    if not isinstance(history, dict):
+        return {}
+
+    cleaned: Dict[str, List[Dict[str, Any]]] = {}
+    for product_key, points in history.items():
+        if not isinstance(points, list):
+            continue
+        valid_points = [point for point in points if isinstance(point, dict)]
+        cleaned[str(product_key)] = valid_points[-RADAR_HISTORY_MAX_POINTS:]
+    return cleaned
+
+
+def save_radar_history(history: Dict[str, List[Dict[str, Any]]]) -> None:
+    """保存雷达历史，单商品只保留最近 RADAR_HISTORY_MAX_POINTS 个快照。"""
+    trimmed = {
+        str(product_key): [point for point in points if isinstance(point, dict)][-RADAR_HISTORY_MAX_POINTS:]
+        for product_key, points in history.items()
+        if isinstance(points, list)
+    }
+    save_storage_json(RADAR_HISTORY_STORE_KEY, RADAR_HISTORY_PATH, trimmed)
 
 
 def build_pending_product(product_id: str, product_name: str, url: str = "") -> Dict[str, Any]:
@@ -1038,7 +1078,7 @@ def build_algorithm_support_pack(product: Dict[str, Any], market_gap: Dict[str, 
             {
                 "method_id": "stream_anomaly",
                 "label": "流式异常预警",
-                "why_it_matters": "把近期负面抬升作为预警信号，适合后续扩展 EWMA/CUSUM。",
+                "why_it_matters": "用历史基线、EWMA 和样本量降级识别持续负面漂移。",
                 "source": reference_source("nab"),
             },
         ],
@@ -1059,20 +1099,28 @@ def build_algorithm_support_pack(product: Dict[str, Any], market_gap: Dict[str, 
 
 def build_radar_lineage(evaluated: Dict[str, Any], latest_score: int, sample_size: int = 0) -> Dict[str, Any]:
     delta = safe_int(evaluated.get("radar_negative_delta"), 0)
-    latest_negative = safe_int(evaluated.get("radar_latest_negative_ratio"), 0)
-    confidence = 0.42 if sample_size <= 0 else min(0.88, 0.40 + min(sample_size, 60) / 125)
-    degradation = "缺少逐条时间戳，当前按巡检前后快照差分降级判断。" if sample_size <= 0 else "使用巡检窗口样本进行负面波动判断。"
+    latest_negative = safe_float(evaluated.get("radar_latest_negative_ratio"), 0.0)
+    baseline = safe_float(evaluated.get("radar_baseline_negative_ratio"), latest_negative)
+    ewma = safe_float(evaluated.get("radar_ewma_negative_ratio"), baseline)
+    z_like = safe_float(evaluated.get("radar_z_like_delta"), 0.0)
+    history_points = safe_int(evaluated.get("radar_history_points"), 0)
+    confidence = min(0.9, 0.28 + min(sample_size, 80) / 160 + min(history_points, 12) / 40)
+    degradation = str(evaluated.get("radar_degradation") or "历史窗口和样本量满足当前轻量预警要求。")
     return build_metric_lineage_entry(
         "radar_risk",
-        "雷达风险",
+        "雷达预警",
         evaluated.get("radar_status", "normal"),
-        "负面率快照差分 >= 阈值 或 健康分 < 阈值；后续升级 EWMA/CUSUM。",
-        f"最新负面率 {latest_negative}%，快照变化 {delta} 个百分点，健康分 {latest_score}。",
+        "兼容阈值 + EWMA 基线漂移；z≈(最新负面率-历史基线)/二项比例标准误。",
+        (
+            f"最新负面率 {latest_negative:.1f}%，历史基线 {baseline:.1f}%，EWMA {ewma:.1f}%，"
+            f"快照变化 {delta} 个百分点，z≈{z_like:.2f}，健康分 {latest_score}。"
+        ),
         sample_size,
         confidence,
         [
             reference_source("nab"),
             reference_source("river"),
+            reference_source("ewma_spc"),
         ],
         degradation,
     )
@@ -1591,6 +1639,124 @@ def build_alert_status() -> Dict[str, Any]:
     }
 
 
+def extract_radar_sample_size(product: Dict[str, Any], explicit_sample_size: int = 0) -> int:
+    """估算本次雷达判断可用样本量，优先使用爬虫真实评论数。"""
+    if explicit_sample_size > 0:
+        return explicit_sample_size
+
+    evidence = product.get("evidence_ledger") if isinstance(product.get("evidence_ledger"), dict) else {}
+    keywords = product.get("keywords") if isinstance(product.get("keywords"), list) else []
+    aspect_terms = product.get("aspect_terms") if isinstance(product.get("aspect_terms"), list) else []
+    return max(
+        safe_int(product.get("radar_sample_size"), 0),
+        safe_int(evidence.get("comment_count"), 0),
+        safe_int(evidence.get("evidence_count"), 0),
+        sum(max(0, safe_int(value, 0)) for value in keywords),
+        sum(max(0, safe_int(item.get("frequency"), 0)) for item in aspect_terms if isinstance(item, dict)),
+    )
+
+
+def build_radar_history_snapshot(
+    product_key: str,
+    product: Dict[str, Any],
+    sample_size: int,
+    source: str,
+) -> Dict[str, Any]:
+    """把一次诊断结果压缩成可长期保存的雷达时间序列点。"""
+    sentiment = product.get("sentiment") if isinstance(product.get("sentiment"), list) else []
+    return {
+        "timestamp": current_timestamp(),
+        "product_key": product_key,
+        "product_id": product.get("product_id", product_key),
+        "negative_ratio": extract_negative_ratio(product),
+        "score": safe_int(product.get("score"), calculate_score(sentiment)),
+        "sample_size": max(0, sample_size),
+        "source": source or "pipeline",
+    }
+
+
+def calculate_ewma(values: List[float], alpha: float = RADAR_EWMA_ALPHA) -> float:
+    """计算指数加权移动平均，用于在线漂移基线。"""
+    cleaned = [safe_float(value) for value in values]
+    if not cleaned:
+        return 0.0
+    alpha = max(0.01, min(1.0, alpha))
+    ewma = cleaned[0]
+    for value in cleaned[1:]:
+        ewma = alpha * value + (1 - alpha) * ewma
+    return ewma
+
+
+def build_radar_drift_model(
+    history_points: List[Dict[str, Any]],
+    latest_negative: int,
+    latest_score: int,
+    sample_size: int,
+) -> Dict[str, Any]:
+    """基于历史负面率构造 EWMA 与二项近似漂移判断。"""
+    prior_values = [
+        safe_float(point.get("negative_ratio"), 0.0)
+        for point in history_points
+        if isinstance(point, dict)
+    ]
+    prior_values = [value for value in prior_values if 0 <= value <= 100]
+    history_count = len(prior_values)
+    baseline = sum(prior_values) / history_count if history_count else float(latest_negative)
+    ewma = calculate_ewma(prior_values, RADAR_EWMA_ALPHA) if prior_values else baseline
+
+    baseline_rate = max(0.01, min(0.99, baseline / 100))
+    latest_rate = max(0.0, min(1.0, latest_negative / 100))
+    effective_sample = max(1, sample_size)
+    standard_error = math.sqrt(max(baseline_rate * (1 - baseline_rate), 0.0001) / effective_sample)
+    z_like_delta = (latest_rate - baseline_rate) / standard_error if standard_error > 0 else 0.0
+    drift_delta = latest_negative - ewma
+    enough_history = history_count >= RADAR_MIN_HISTORY_POINTS
+    enough_sample = sample_size >= RADAR_MIN_SAMPLE_SIZE
+    ewma_breakdown = (
+        enough_history
+        and enough_sample
+        and z_like_delta >= RADAR_Z_THRESHOLD
+        and drift_delta >= RADAR_EWMA_DRIFT_MIN_DELTA
+    )
+
+    degradation_parts = []
+    if not enough_history:
+        degradation_parts.append(f"历史点仅 {history_count} 个，EWMA 漂移仅作观察。")
+    if not enough_sample:
+        degradation_parts.append(f"样本 {sample_size} 条低于 {RADAR_MIN_SAMPLE_SIZE} 条，已降低预警置信。")
+    if not degradation_parts:
+        degradation_parts.append("历史窗口与样本量满足当前轻量漂移判断要求。")
+
+    return {
+        "model": RADAR_MODEL_VERSION,
+        "history_points": history_count,
+        "baseline_negative_ratio": round(baseline, 1),
+        "ewma_negative_ratio": round(ewma, 1),
+        "z_like_delta": round(z_like_delta, 3),
+        "drift_delta": round(drift_delta, 1),
+        "ewma_breakdown": ewma_breakdown,
+        "enough_history": enough_history,
+        "enough_sample": enough_sample,
+        "degradation": " ".join(degradation_parts),
+    }
+
+
+def append_radar_history(
+    product_key: str,
+    product: Dict[str, Any],
+    sample_size: int,
+    source: str,
+) -> Dict[str, Any]:
+    """追加当前快照并返回最新历史点。"""
+    history = load_radar_history()
+    points = history.get(product_key, [])
+    snapshot = build_radar_history_snapshot(product_key, product, sample_size, source)
+    points.append(snapshot)
+    history[product_key] = points[-RADAR_HISTORY_MAX_POINTS:]
+    save_radar_history(history)
+    return snapshot
+
+
 def send_test_alert() -> Dict[str, Any]:
     """发送一条不会污染商品数据的模拟告警。"""
     demo_product = {
@@ -1615,35 +1781,59 @@ def apply_radar_evaluation(
     product: Dict[str, Any],
     previous_product: Dict[str, Any] | None = None,
     emit_alert: bool = False,
+    sample_size: int = 0,
+    history_source: str = "pipeline",
 ) -> Dict[str, Any]:
     """
-    根据 NRR 陡增规则为商品写入雷达状态。
+    写入 24H 雷达状态。
 
-    红线规则：
+    兼容旧红线规则，并叠加基于历史窗口的 EWMA 漂移检测：
     - 最新负面评价占比比上一轮增加 15 个百分点以上；
-    - 或 AI 健康分跌破 60 分。
+    - 或 AI 健康分跌破 60 分；
+    - 或历史样本足够时，负面率相对 EWMA 基线出现显著漂移。
     """
     evaluated = dict(product)
     latest_negative = extract_negative_ratio(evaluated)
     latest_score = safe_int(evaluated.get("score"), calculate_score(evaluated.get("sentiment", [])))
+    resolved_sample_size = extract_radar_sample_size(evaluated, sample_size)
     previous_negative = latest_negative
 
     if previous_product:
         previous_negative = extract_negative_ratio(previous_product)
 
+    history = load_radar_history()
+    history_points = history.get(product_key, [])
+    drift_model = build_radar_drift_model(
+        history_points,
+        latest_negative,
+        latest_score,
+        resolved_sample_size,
+    )
+
     negative_delta = latest_negative - previous_negative
     score_breakdown = latest_score < RADAR_SCORE_CRITICAL_THRESHOLD
     spike_breakdown = negative_delta >= RADAR_NEGATIVE_SPIKE_THRESHOLD
-    is_critical = spike_breakdown or score_breakdown
+    ewma_breakdown = bool(drift_model.get("ewma_breakdown"))
+    is_critical = spike_breakdown or score_breakdown or ewma_breakdown
 
     evaluated["radar_status"] = "critical" if is_critical else "normal"
+    evaluated["radar_model"] = drift_model["model"]
     evaluated["radar_previous_negative_ratio"] = previous_negative
     evaluated["radar_latest_negative_ratio"] = latest_negative
     evaluated["radar_negative_delta"] = negative_delta
+    evaluated["radar_history_points"] = drift_model["history_points"]
+    evaluated["radar_baseline_negative_ratio"] = drift_model["baseline_negative_ratio"]
+    evaluated["radar_ewma_negative_ratio"] = drift_model["ewma_negative_ratio"]
+    evaluated["radar_z_like_delta"] = drift_model["z_like_delta"]
+    evaluated["radar_drift_delta"] = drift_model["drift_delta"]
+    evaluated["radar_sample_size"] = resolved_sample_size
+    evaluated["radar_degradation"] = drift_model["degradation"]
     evaluated["radar_last_checked_at"] = current_timestamp()
     evaluated["radar_alert_reason"] = ""
     evaluated["metric_lineage"] = dict(evaluated.get("metric_lineage") or {})
-    evaluated["metric_lineage"]["radar_risk"] = build_radar_lineage(evaluated, latest_score)
+    evaluated["metric_lineage"]["radar_risk"] = build_radar_lineage(evaluated, latest_score, resolved_sample_size)
+
+    append_radar_history(product_key, evaluated, resolved_sample_size, history_source)
 
     if is_critical:
         reasons = []
@@ -1651,6 +1841,10 @@ def apply_radar_evaluation(
             reasons.append(f"负面占比上升 {negative_delta} 个百分点")
         if score_breakdown:
             reasons.append(f"健康分跌破 {RADAR_SCORE_CRITICAL_THRESHOLD} 分")
+        if ewma_breakdown:
+            reasons.append(
+                f"相对历史基线漂移 {drift_model['drift_delta']} 个百分点，z≈{drift_model['z_like_delta']}"
+            )
         evaluated["radar_alert_reason"] = "；".join(reasons)
         if emit_alert:
             product_name = str(evaluated.get("product_name") or product_key)
@@ -1667,6 +1861,37 @@ def apply_radar_evaluation(
                 append_log(f"📣 [报警通知]: Webhook 未发送，原因：{alert_result.get('reason', '未配置或失败')}。")
 
     return evaluated
+
+
+def product_has_sentiment_snapshot(product: Dict[str, Any]) -> bool:
+    sentiment = product.get("sentiment")
+    return isinstance(sentiment, list) and len(sentiment) >= 3
+
+
+def ensure_radar_fields_for_products(
+    products: Dict[str, Dict[str, Any]],
+) -> tuple[Dict[str, Dict[str, Any]], bool]:
+    """为旧存量商品补齐新雷达字段；只在缺字段时执行一次，不重复污染历史。"""
+    migrated: Dict[str, Dict[str, Any]] = {}
+    changed = False
+    for product_key, product in products.items():
+        if not isinstance(product, dict):
+            continue
+        lineage = product.get("metric_lineage") if isinstance(product.get("metric_lineage"), dict) else {}
+        missing_radar_model = not product.get("radar_model") or "radar_risk" not in lineage
+        if missing_radar_model and not product.get("pending") and product_has_sentiment_snapshot(product):
+            migrated[product_key] = apply_radar_evaluation(
+                product_key,
+                product,
+                product,
+                emit_alert=False,
+                sample_size=extract_radar_sample_size(product),
+                history_source="migration",
+            )
+            changed = True
+        else:
+            migrated[product_key] = product
+    return migrated, changed
 
 
 def build_radar_channel(product_key: str, product: Dict[str, Any], url: str) -> ChannelConfig:
@@ -1703,6 +1928,8 @@ async def run_single_radar_check(product_key: str, previous_product: Dict[str, A
         source_url=url,
         radar_previous_product=previous_product,
         emit_radar_alert=True,
+        radar_sample_size=len(comments),
+        radar_history_source="radar_patrol",
     )
 
     return {
@@ -1711,6 +1938,9 @@ async def run_single_radar_check(product_key: str, previous_product: Dict[str, A
         "status": diagnosed_product.get("radar_status", "normal"),
         "negative_ratio": diagnosed_product.get("radar_latest_negative_ratio", 0),
         "negative_delta": diagnosed_product.get("radar_negative_delta", 0),
+        "baseline_negative_ratio": diagnosed_product.get("radar_baseline_negative_ratio", 0),
+        "ewma_negative_ratio": diagnosed_product.get("radar_ewma_negative_ratio", 0),
+        "z_like_delta": diagnosed_product.get("radar_z_like_delta", 0),
         "raw_comment_count": len(comments),
     }
 
@@ -3199,6 +3429,8 @@ def merge_report_into_products(
     source_url: str = "",
     radar_previous_product: Dict[str, Any] | None = None,
     emit_radar_alert: bool = False,
+    radar_sample_size: int = 0,
+    radar_history_source: str = "pipeline",
 ) -> Dict[str, Any]:
     """把单产品诊断报告合并回前端产品字典，并保留 AI 识别出的真实商品名。"""
     products = load_products()
@@ -3220,6 +3452,8 @@ def merge_report_into_products(
         enriched,
         radar_previous_product or previous_product,
         emit_alert=emit_radar_alert,
+        sample_size=radar_sample_size,
+        history_source=radar_history_source,
     )
     products[channel.product_key] = enriched
     save_products(products)
@@ -3240,7 +3474,7 @@ def run_pipeline_sync(payload: PipelineRequest) -> Dict[str, Any]:
 
     comments = run_crawler(channel, url, limit)
     report = run_ai_diagnose(channel)
-    diagnosed_product = merge_report_into_products(channel, report, url)
+    diagnosed_product = merge_report_into_products(channel, report, url, radar_sample_size=len(comments), radar_history_source="pipeline")
     product_name = str(diagnosed_product.get("product_name", "")).strip() or channel.product_name
     message = (
         f"Pipeline 执行成功：{channel.source_type} -> {channel.product_key} / {product_name}，"
@@ -3356,7 +3590,7 @@ async def run_pipeline_async(payload: PipelineRequest) -> Dict[str, Any]:
 
     comments = await run_crawler_async(channel, url, limit)
     report = await run_ai_diagnose_async(channel)
-    diagnosed_product = merge_report_into_products(channel, report, url)
+    diagnosed_product = merge_report_into_products(channel, report, url, radar_sample_size=len(comments), radar_history_source="pipeline")
     product_name = str(diagnosed_product.get("product_name", "")).strip() or channel.product_name
     message = (
         f"Pipeline 执行成功：{channel.source_type} -> {channel.product_key} / {product_name}，"
@@ -3599,7 +3833,11 @@ async def login(payload: LoginRequest) -> Dict[str, Any]:
 @app.get("/api/products")
 async def get_products() -> Dict[str, Dict[str, Any]]:
     """读取前端产品诊断数据。"""
-    return load_products()
+    products = load_products()
+    products, migrated = ensure_radar_fields_for_products(products)
+    if migrated:
+        save_products(products)
+    return products
 
 
 @app.get("/api/pipeline-logs")
