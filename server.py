@@ -326,6 +326,21 @@ ALGORITHM_REFERENCE_LIBRARY: Dict[str, Dict[str, str]] = {
         "url": "https://cseweb.ucsd.edu/~jmcauley/datasets.html",
         "role": "电商评论数据集和推荐/评论挖掘研究入口。",
     },
+    "evidently": {
+        "name": "Evidently AI monitoring reports",
+        "url": "https://github.com/evidentlyai/evidently",
+        "role": "用监控报告、数据漂移和质量指标组织可复盘的模型/业务信号。",
+    },
+    "ragas": {
+        "name": "RAGAS evaluation framework",
+        "url": "https://github.com/explodinggradients/ragas",
+        "role": "生成式报告需要基于上下文证据并降低幻觉风险的评估思路。",
+    },
+    "recbole": {
+        "name": "RecBole recommender systems",
+        "url": "https://github.com/RUCAIBox/RecBole",
+        "role": "推荐系统实验框架，可作为后续选品排序和候选池评估的开源参照。",
+    },
 }
 
 
@@ -406,6 +421,13 @@ class AdminRestoreRequest(BaseModel):
 
     products: Dict[str, Dict[str, Any]] = Field(default_factory=dict, description="要恢复的商品诊断大盘")
     vs_reports: List[Dict[str, Any]] = Field(default_factory=list, description="要恢复的竞品 PK 历史报告")
+
+
+class ExecutiveReportRequest(BaseModel):
+    """前端 POST /api/executive-report 的请求体。"""
+
+    products: Dict[str, Dict[str, Any]] = Field(default_factory=dict, description="前端当前可见商品快照")
+    force_model: bool = Field(False, description="是否强制尝试模型生成")
 
 
 class ExecutiveReportRequest(BaseModel):
@@ -2313,6 +2335,105 @@ def is_product_diagnosed(product: Dict[str, Any]) -> bool:
     return not (score >= 100 and safe_int(sentiment[1], 0) >= 100)
 
 
+def product_display_name(product_key: str, product: Dict[str, Any]) -> str:
+    return str(product.get("product_name") or product.get("product_id") or product_key)
+
+
+def get_product_top_pain(product: Dict[str, Any]) -> str:
+    aspect_terms = product.get("aspect_terms") if isinstance(product.get("aspect_terms"), list) else []
+    if aspect_terms and isinstance(aspect_terms[0], dict):
+        return str(aspect_terms[0].get("raw_label") or aspect_terms[0].get("aspect") or "核心痛点待确认")
+    labels = product.get("keywordLabels") if isinstance(product.get("keywordLabels"), list) else []
+    return str(labels[0]) if labels else "核心痛点待确认"
+
+
+def build_executive_scorecard(
+    total_products: int,
+    diagnosed_count: int,
+    average_score: int,
+    critical_count: int,
+    evidence_trust: int,
+    evidence_items: int,
+) -> List[Dict[str, Any]]:
+    """首页报告只读取四个核心指标，复杂计算留在后台依据包。"""
+    coverage = round((diagnosed_count / total_products) * 100) if total_products else 0
+    return [
+        {
+            "metric_id": "health_score",
+            "label": "整体健康分",
+            "value": average_score if diagnosed_count else None,
+            "unit": "/100",
+            "status": "good" if average_score >= 85 else ("watch" if average_score >= 70 else "risk"),
+            "explain": "用已诊断 SKU 的情感健康分均值衡量盘面质量。",
+        },
+        {
+            "metric_id": "risk_products",
+            "label": "风险商品",
+            "value": critical_count,
+            "unit": "个",
+            "status": "risk" if critical_count else "good",
+            "explain": "触发雷达红线或低分阈值的商品数量。",
+        },
+        {
+            "metric_id": "evidence_trust",
+            "label": "证据可信度",
+            "value": evidence_trust if diagnosed_count else None,
+            "unit": "%",
+            "status": "good" if evidence_trust >= 65 else ("watch" if evidence_trust >= 40 else "thin"),
+            "explain": "按 Wilson 下界、样本覆盖和来源覆盖折算。",
+        },
+        {
+            "metric_id": "diagnostic_coverage",
+            "label": "诊断覆盖率",
+            "value": coverage,
+            "unit": "%",
+            "status": "good" if coverage >= 80 else ("watch" if coverage >= 40 else "thin"),
+            "explain": "已完成真实评论诊断的商品占比。",
+        },
+    ]
+
+
+def build_executive_method_lineage(snapshot: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+    """汇总首页四个指标背后的方法依据，供后台折叠展示。"""
+    metric_lineage = snapshot.get("metric_lineage") if isinstance(snapshot.get("metric_lineage"), dict) else {}
+    scorecard = snapshot.get("scorecard") if isinstance(snapshot.get("scorecard"), list) else []
+    lineage: Dict[str, Dict[str, Any]] = {}
+
+    health_lineage = metric_lineage.get("health_score") if isinstance(metric_lineage.get("health_score"), dict) else {}
+    lineage["health_score"] = {
+        "label": "整体健康分",
+        "formula": "已诊断 SKU 情感健康分均值；单品分由负面率、核心痛点和证据置信共同解释。",
+        "basis": f"当前已诊断 {snapshot.get('diagnosed_count', 0)} 个商品，平均分 {snapshot.get('average_score', 0)}。",
+        "sources": health_lineage.get("sources") or [reference_source("review_mining"), reference_source("absa")],
+        "degradation": health_lineage.get("degradation") or "未诊断商品不会进入均值，避免占位数据污染结论。",
+    }
+    radar_lineage = metric_lineage.get("radar_risk") if isinstance(metric_lineage.get("radar_risk"), dict) else {}
+    lineage["risk_products"] = {
+        "label": "风险商品",
+        "formula": "雷达红线商品数 + 低健康分商品优先级排序。",
+        "basis": f"红线 {snapshot.get('critical_count', 0)} 个；Top 风险池 {len(snapshot.get('top_risks', []))} 个。",
+        "sources": radar_lineage.get("sources") or [reference_source("nab"), reference_source("ewma_spc")],
+        "degradation": radar_lineage.get("degradation") or "历史点不足时保留阈值规则，漂移模型只作观察。",
+    }
+    evidence_lineage = metric_lineage.get("evidence_trust") if isinstance(metric_lineage.get("evidence_trust"), dict) else {}
+    lineage["evidence_trust"] = {
+        "label": "证据可信度",
+        "formula": "Wilson 下界、样本覆盖、来源覆盖加权。",
+        "basis": f"证据条目 {snapshot.get('evidence_items', 0)}，综合可信度 {snapshot.get('evidence_trust', 0)}%。",
+        "sources": evidence_lineage.get("sources") or [reference_source("wilson"), reference_source("ragas")],
+        "degradation": evidence_lineage.get("degradation") or "样本薄时主动降低结论强度，防止 GPT 报告过度自信。",
+    }
+    coverage_item = next((item for item in scorecard if item.get("metric_id") == "diagnostic_coverage"), {})
+    lineage["diagnostic_coverage"] = {
+        "label": "诊断覆盖率",
+        "formula": "已诊断商品数 / 全部监控商品数。",
+        "basis": f"{snapshot.get('diagnosed_count', 0)} / {snapshot.get('total_products', 0)} 个商品已完成诊断。",
+        "sources": [reference_source("evidently")],
+        "degradation": coverage_item.get("explain") or "覆盖不足时，报告优先提示补样本而非强行给经营结论。",
+    }
+    return lineage
+
+
 def build_executive_report_snapshot(products: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
     """压缩全盘商品指标，只保留首页经营报告需要的核心信号。"""
     diagnosed_items = [
@@ -2328,6 +2449,7 @@ def build_executive_report_snapshot(products: Dict[str, Dict[str, Any]]) -> Dict
     evidence_confidences: List[float] = []
     evidence_items = 0
     top_risks: List[Dict[str, Any]] = []
+    highlights: List[Dict[str, str]] = []
     for key, item in diagnosed_items:
         snapshot = build_vs_snapshot(key, item)
         evidence = item.get("evidence_ledger") if isinstance(item.get("evidence_ledger"), dict) else {}
@@ -2340,23 +2462,36 @@ def build_executive_report_snapshot(products: Dict[str, Dict[str, Any]]) -> Dict
             evidence_confidences.append(trust_score / 100)
         elif confidence > 0:
             evidence_confidences.append(confidence)
-        evidence_items += safe_int(evidence.get("evidence_count"), 0)
+        evidence_count = safe_int(evidence.get("evidence_count"), 0)
+        evidence_items += evidence_count
         market_gap = item.get("market_gap") if isinstance(item.get("market_gap"), dict) else {}
         support_pack = item.get("algorithm_support") if isinstance(item.get("algorithm_support"), dict) else {}
+        risk_reason = str(item.get("radar_alert_reason") or item.get("direction") or "等待进一步归因")
         top_risks.append({
             "product_id": snapshot["product_id"],
             "product_name": snapshot["product_name"],
             "score": snapshot["score"],
             "negative_ratio": snapshot["negative_ratio"],
             "top_complaints": snapshot["top_complaints"][:3],
+            "top_pain": get_product_top_pain(item),
             "direction": snapshot["direction"],
             "action": snapshot["action"],
             "radar_status": item.get("radar_status", "normal"),
+            "risk_reason": risk_reason,
             "market_gap_score": market_gap.get("gap_score", 0),
+            "evidence_trust_score": evidence.get("evidence_trust_score", 0),
+            "evidence_count": evidence_count,
             "evidence_verdict": support_pack.get("verdict", ""),
+        })
+        highlights.append({
+            "product_name": snapshot["product_name"],
+            "signal": f"健康分 {snapshot['score']}，负面率 {snapshot['negative_ratio']}%",
+            "evidence": f"核心痛点：{get_product_top_pain(item)}；证据 {evidence_count} 条",
+            "action": snapshot["action"],
         })
 
     top_risks.sort(key=lambda item: (item["radar_status"] != "critical", item["score"], -item["negative_ratio"]))
+    highlights = highlights[:5]
     evidence_trust = round((sum(evidence_confidences) / len(evidence_confidences)) * 100) if evidence_confidences else 0
     if evidence_trust == 0 and evidence_items > 0:
         evidence_trust = min(88, 48 + evidence_items * 4)
@@ -2384,7 +2519,9 @@ def build_executive_report_snapshot(products: Dict[str, Dict[str, Any]]) -> Dict
             if isinstance(method, dict) and method.get("method_id"):
                 support_methods[str(method["method_id"])] = method
 
-    return {
+    scorecard = build_executive_scorecard(total_products, diagnosed_count, average_score, len(critical_items), evidence_trust, evidence_items)
+    snapshot: Dict[str, Any] = {
+        "schema": "tk_executive_report_snapshot_v2",
         "total_products": total_products,
         "diagnosed_count": diagnosed_count,
         "average_score": average_score,
@@ -2393,14 +2530,26 @@ def build_executive_report_snapshot(products: Dict[str, Dict[str, Any]]) -> Dict
         "evidence_items": evidence_items,
         "suggested_action": suggested_action,
         "top_risks": top_risks[:5],
+        "highlights": highlights,
+        "scorecard": scorecard,
         "metric_lineage": lineage_entries,
         "algorithm_support": {
-            "schema": "tk_algorithm_support_summary_v1",
+            "schema": "tk_algorithm_support_summary_v2",
             "methods": list(support_methods.values()),
             "verdicts": support_verdicts[:5],
-            "references": list(ALGORITHM_REFERENCE_LIBRARY.values()),
+            "references": [
+                reference_source("review_mining"),
+                reference_source("absa"),
+                reference_source("wilson"),
+                reference_source("nab"),
+                reference_source("evidently"),
+                reference_source("ragas"),
+                reference_source("recbole"),
+            ],
         },
     }
+    snapshot["method_lineage"] = build_executive_method_lineage(snapshot)
+    return snapshot
 
 
 def build_rule_based_executive_sections(snapshot: Dict[str, Any]) -> Dict[str, str]:
@@ -2416,23 +2565,24 @@ def build_rule_based_executive_sections(snapshot: Dict[str, Any]) -> Dict[str, s
     critical = snapshot["critical_count"]
     trust = snapshot["evidence_trust"]
     risk_names = "、".join(item["product_name"] for item in snapshot["top_risks"][:3]) or "暂无明确风险商品"
+    top_pain = snapshot["top_risks"][0].get("top_pain") if snapshot.get("top_risks") else "核心痛点待确认"
 
     if score >= 85:
-        summary = f"当前已诊断商品平均健康分为 {score}，整体处于可控放量区间。"
+        summary = f"当前已诊断商品平均健康分为 {score}，整体处于可控放量区间；建议把预算集中给证据可信度更高的健康 SKU。"
     elif score >= 70:
-        summary = f"当前已诊断商品平均健康分为 {score}，经营盘面处于修复区间，需要先稳住预算节奏。"
+        summary = f"当前已诊断商品平均健康分为 {score}，经营盘面处于修复区间，适合先稳住预算节奏再做小批量验证。"
     else:
         summary = f"当前已诊断商品平均健康分为 {score}，盘面风险偏高，应暂停高风险商品的继续放量。"
 
     if critical:
-        risk = f"当前有 {critical} 个商品触发红线，优先关注 {risk_names}；主要问题集中在负面评论聚集和供应链体验波动。"
+        risk = f"当前有 {critical} 个商品触发红线，优先关注 {risk_names}；主要风险集中在“{top_pain}”及相关供应链体验波动。"
     else:
         risk = f"当前未发现红线商品，重点风险来自样本覆盖不足与证据沉淀深度，需继续验证 {risk_names} 的真实用户反馈。"
     if trust >= 65:
         risk += f" 证据可信度约 {trust}%，已能支撑本轮经营判断。"
     else:
         trust_label = trust if trust > 0 else "不足"
-        risk += f" 证据可信度约 {trust_label}，建议继续抓取评论样本，提高结论稳定性。"
+        risk += f" 证据可信度约 {trust_label}，报告已按低样本口径降权，建议继续抓取评论样本。"
 
     action = snapshot["suggested_action"]
     return {
@@ -2488,20 +2638,27 @@ def build_rule_based_executive_report(snapshot: Dict[str, Any]) -> str:
 
 def build_executive_report_prompt(snapshot: Dict[str, Any]) -> str:
     """构造 GPT-5.5 综合经营报告 Prompt。"""
-    compact_payload = json.dumps(snapshot, ensure_ascii=False, indent=2)
+    compact_payload = json.dumps({
+        "scorecard": snapshot.get("scorecard", []),
+        "top_risks": snapshot.get("top_risks", []),
+        "highlights": snapshot.get("highlights", []),
+        "suggested_action": snapshot.get("suggested_action", ""),
+        "method_lineage": snapshot.get("method_lineage", {}),
+    }, ensure_ascii=False, indent=2)
     return f"""
-你是 TK 跨境电商 AI 经营分析官。请基于以下简化经营快照，输出首页可展示的三段式中文经营报告。
+你是 TK 跨境电商 AI 经营分析官。请只基于下方证据快照，输出首页可展示的三段式中文经营报告。
 
-经营快照：
+证据快照：
 {compact_payload}
 
 输出要求：
 1. 只输出严格 JSON，不要 Markdown，不要代码块，不要额外解释。
 2. JSON 必须包含三个字符串字段：summary、risk、action。
-3. summary 写经营摘要，解释整体健康分和当前盘面状态，控制在 45-80 字。
-4. risk 写风险原因，解释风险商品和证据可信度，控制在 60-110 字。
-5. action 写下一步动作，只给清晰可执行的运营建议，控制在 35-70 字。
+3. summary 写经营摘要，解释整体健康分和当前盘面状态，控制在 45-90 字。
+4. risk 写风险原因，必须引用具体商品、痛点或证据可信度，控制在 60-120 字。
+5. action 写下一步动作，只给清晰可执行的运营建议，控制在 35-80 字。
 6. 不要堆砌 Lift、Confidence、ABSA 等后台术语；如果必须提及，请转译成中文经营含义。
+7. 禁止编造证据快照之外的 GMV、销量、市场份额或平台规则。
 """.strip()
 
 
@@ -2559,11 +2716,18 @@ def generate_executive_report(products: Dict[str, Dict[str, Any]]) -> Dict[str, 
         source = "local_fallback"
         append_log(f"AI 综合经营报告已启用本地兜底：{exc}")
 
+    support = snapshot.get("algorithm_support", {}) if isinstance(snapshot.get("algorithm_support"), dict) else {}
+    citations = support.get("references", []) if isinstance(support.get("references"), list) else []
     return {
         "status": "success",
+        "schema": "tk_executive_report_v2",
         "report": flatten_executive_sections(sections),
         "sections": sections,
         "summary": snapshot,
+        "scorecard": snapshot.get("scorecard", []),
+        "highlights": snapshot.get("highlights", []),
+        "method_lineage": snapshot.get("method_lineage", {}),
+        "citations": citations,
         "source": source,
         "model_used": model_used,
         "generated_at": current_timestamp(),

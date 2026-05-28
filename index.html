@@ -1089,6 +1089,14 @@
 
                 <details class="backend-accordion glass-card rounded-lg overflow-hidden border border-slate-200/60">
                     <summary class="cursor-pointer select-none px-6 py-4 flex items-center justify-between gap-4 hover:bg-indigo-50/40 transition-colors">
+                        <span class="font-black text-slate-900">经营报告依据</span>
+                        <span class="text-xs font-bold text-indigo-600">展开</span>
+                    </summary>
+                    <div id="backend-executive-slot" class="border-t border-slate-100 p-6"></div>
+                </details>
+
+                <details class="backend-accordion glass-card rounded-lg overflow-hidden border border-slate-200/60">
+                    <summary class="cursor-pointer select-none px-6 py-4 flex items-center justify-between gap-4 hover:bg-indigo-50/40 transition-colors">
                         <span class="font-black text-slate-900">市场趋势图</span>
                         <span class="text-xs font-bold text-indigo-600">展开</span>
                     </summary>
@@ -1337,6 +1345,7 @@
         let toastTimer = null;
         let operatorAuthEnabled = false;
         let isAuthenticated = false;
+        let latestExecutiveReportPayload = null;
 
         const OPERATOR_TOKEN_STORAGE_KEY = 'tk_ai_operator_token';
         const OPERATOR_USERNAME_STORAGE_KEY = 'tk_ai_operator_username';
@@ -1470,6 +1479,7 @@
         const evidenceBenchmarkBox = document.getElementById('evidence-benchmark-box');
         const btnCopyEvidenceAudit = document.getElementById('btn-copy-evidence-audit');
         const backendRadarSlot = document.getElementById('backend-radar-slot');
+        const backendExecutiveSlot = document.getElementById('backend-executive-slot');
         const spsPredictorModal = document.getElementById('sps-predictor-modal');
         const spsProductTitle = document.getElementById('sps-product-title');
         const spsRemoveSlider = document.getElementById('sps-remove-slider');
@@ -1767,6 +1777,29 @@
             return flattenExecutiveSections(buildLocalExecutiveSections(snapshot));
         }
 
+        function buildLocalExecutivePayload(snapshot) {
+            return {
+                source: 'local_preview',
+                model_used: 'local_rules',
+                generated_at: new Date().toLocaleString('zh-CN', { hour12: false }),
+                sections: buildLocalExecutiveSections(snapshot),
+                scorecard: [
+                    { metric_id: 'health_score', label: '整体健康分', value: snapshot.averageScore, unit: '/100', explain: '已诊断商品健康分均值。' },
+                    { metric_id: 'risk_products', label: '风险商品', value: snapshot.criticalProducts.length, unit: '个', explain: '触发红线或低分风险的商品数量。' },
+                    { metric_id: 'evidence_trust', label: '证据可信度', value: snapshot.evidenceTrust, unit: '%', explain: '评论证据覆盖和置信度汇总。' },
+                    { metric_id: 'diagnostic_coverage', label: '诊断覆盖率', value: snapshot.productCount ? Math.round((snapshot.diagnosedCount / snapshot.productCount) * 100) : 0, unit: '%', explain: '已诊断商品占全部监控商品比例。' }
+                ],
+                highlights: snapshot.riskProducts.slice(0, 5).map(item => ({
+                    product_name: item.product_name || item.product_id || '未命名商品',
+                    signal: `健康分 ${item.score || '--'}，风险状态 ${isRadarCritical(item) ? '红线' : '观察'}`,
+                    evidence: item.radar_alert_reason || item.direction || '等待更多证据',
+                    action: item.action || snapshot.suggestedAction
+                })),
+                method_lineage: {},
+                citations: []
+            };
+        }
+
         function flattenExecutiveSections(sections) {
             return [sections.summary, sections.risk, sections.action]
                 .filter(value => value && String(value).trim())
@@ -1805,6 +1838,89 @@
             if (aiExecutiveReport) aiExecutiveReport.innerText = flattenExecutiveSections(safeSections);
         }
 
+        function renderExecutiveEvidencePanel(payload) {
+            if (!backendExecutiveSlot) return;
+            const data = payload || latestExecutiveReportPayload;
+            if (!data) {
+                backendExecutiveSlot.innerHTML = `
+                    <div class="rounded-lg border border-dashed border-slate-200 bg-slate-50/70 p-6 text-sm text-slate-400">
+                        等待 AI 综合经营报告生成后展示依据。
+                    </div>
+                `;
+                return;
+            }
+
+            const scorecard = Array.isArray(data.scorecard) ? data.scorecard : [];
+            const highlights = Array.isArray(data.highlights) ? data.highlights : [];
+            const lineage = data.method_lineage && typeof data.method_lineage === 'object' ? data.method_lineage : {};
+            const citations = Array.isArray(data.citations) ? data.citations : [];
+            const metricCards = scorecard.map(metric => `
+                <div class="rounded-lg border border-slate-100 bg-white/75 p-4">
+                    <div class="text-xs font-black text-slate-400">${escapeHtml(metric.label || metric.metric_id || '指标')}</div>
+                    <div class="mt-2 text-2xl font-black text-slate-900">${metric.value === null || typeof metric.value === 'undefined' ? '--' : escapeHtml(String(metric.value))}<span class="text-xs text-slate-400 ml-1">${escapeHtml(metric.unit || '')}</span></div>
+                    <div class="mt-2 text-[11px] leading-relaxed text-slate-500">${escapeHtml(metric.explain || '')}</div>
+                </div>
+            `).join('');
+            const highlightRows = highlights.length > 0
+                ? highlights.map(item => `
+                    <div class="rounded-lg border border-slate-100 bg-white/70 p-3">
+                        <div class="font-black text-sm text-slate-900">${escapeHtml(item.product_name || '未命名商品')}</div>
+                        <div class="mt-1 text-xs text-slate-500">${escapeHtml(item.signal || '')}</div>
+                        <div class="mt-2 text-xs leading-relaxed text-slate-600">${escapeHtml(item.evidence || '')}</div>
+                        <div class="mt-2 text-[11px] font-bold text-indigo-600">${escapeHtml(item.action || '')}</div>
+                    </div>
+                `).join('')
+                : '<div class="rounded-lg border border-dashed border-slate-200 bg-slate-50/70 p-4 text-sm text-slate-400">暂无商品级高亮信号。</div>';
+            const lineageRows = Object.keys(lineage).map(key => {
+                const entry = lineage[key] || {};
+                const sources = Array.isArray(entry.sources) ? entry.sources : [];
+                const sourceLinks = sources.map(source => source.url
+                    ? `<a class="text-indigo-600 hover:text-indigo-500" href="${escapeHtml(source.url)}" target="_blank" rel="noreferrer">${escapeHtml(source.name || '来源')}</a>`
+                    : `<span>${escapeHtml(source.name || '来源')}</span>`
+                ).join(' · ');
+                return `
+                    <details class="rounded-lg border border-slate-200/70 bg-white/70 p-3">
+                        <summary class="cursor-pointer select-none text-xs font-black text-slate-700 flex items-center justify-between gap-3">
+                            <span>${escapeHtml(entry.label || key)}</span>
+                            <span class="text-slate-400">展开</span>
+                        </summary>
+                        <div class="mt-3 space-y-2 text-[11px] leading-relaxed text-slate-500">
+                            <div><span class="font-black text-slate-700">公式：</span>${escapeHtml(entry.formula || '')}</div>
+                            <div><span class="font-black text-slate-700">依据：</span>${escapeHtml(entry.basis || '')}</div>
+                            <div><span class="font-black text-slate-700">降权：</span>${escapeHtml(entry.degradation || '')}</div>
+                            ${sourceLinks ? `<div><span class="font-black text-slate-700">来源：</span>${sourceLinks}</div>` : ''}
+                        </div>
+                    </details>
+                `;
+            }).join('');
+            const citationLinks = citations.map(source => source.url
+                ? `<a class="rounded-full border border-slate-200 bg-white/75 px-3 py-1 text-[11px] font-black text-indigo-600 hover:text-indigo-500" href="${escapeHtml(source.url)}" target="_blank" rel="noreferrer">${escapeHtml(source.name || '来源')}</a>`
+                : `<span class="rounded-full border border-slate-200 bg-white/75 px-3 py-1 text-[11px] font-black text-slate-500">${escapeHtml(source.name || '来源')}</span>`
+            ).join('');
+
+            backendExecutiveSlot.innerHTML = `
+                <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3 mb-5">
+                    <div>
+                        <div class="text-lg font-black text-slate-900">AI 综合经营报告依据</div>
+                        <div class="mt-1 text-xs text-slate-400">${escapeHtml(data.source || 'local')} · ${escapeHtml(data.model_used || 'local_rules')} · ${escapeHtml(data.generated_at || '')}</div>
+                    </div>
+                    <span class="rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1 text-xs font-black text-indigo-700">证据驱动</span>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">${metricCards}</div>
+                <div class="mt-5 grid grid-cols-1 xl:grid-cols-[1fr_420px] gap-5">
+                    <div class="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
+                        <div class="text-sm font-black text-slate-900 mb-3">商品级信号</div>
+                        <div class="space-y-3">${highlightRows}</div>
+                    </div>
+                    <div class="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
+                        <div class="text-sm font-black text-slate-900 mb-3">指标算法依据</div>
+                        <div class="space-y-3">${lineageRows || '<div class="text-sm text-slate-400">暂无后台指标依据。</div>'}</div>
+                    </div>
+                </div>
+                ${citationLinks ? `<div class="mt-5 flex flex-wrap gap-2">${citationLinks}</div>` : ''}
+            `;
+        }
+
         function updateExecutiveCards(snapshot) {
             if (executiveEvidenceTrust) {
                 executiveEvidenceTrust.innerText = snapshot.diagnosedCount > 0 ? `${snapshot.evidenceTrust}%` : '--';
@@ -1815,7 +1931,10 @@
                     : '等待证据账本同步。';
             }
             if (aiExecutiveReport && aiExecutiveReport.dataset.remoteReady !== '1') {
-                renderExecutiveSections(buildLocalExecutiveSections(snapshot));
+                const localPayload = buildLocalExecutivePayload(snapshot);
+                latestExecutiveReportPayload = localPayload;
+                renderExecutiveSections(localPayload.sections);
+                renderExecutiveEvidencePanel(localPayload);
                 aiExecutiveReportMeta.innerText = '本地经营规则 · 等待 GPT 汇总';
             }
         }
@@ -1841,7 +1960,10 @@
                     throw new Error(payload.detail || '综合经营报告生成失败。');
                 }
                 const sections = normalizeExecutiveSections(payload.sections || payload.report, snapshot);
+                payload.sections = sections;
+                latestExecutiveReportPayload = payload;
                 renderExecutiveSections(sections);
+                renderExecutiveEvidencePanel(payload);
                 if (aiExecutiveReport) {
                     aiExecutiveReport.dataset.remoteReady = '1';
                 }
@@ -1856,7 +1978,10 @@
                 if (aiExecutiveReport) {
                     aiExecutiveReport.dataset.remoteReady = '';
                 }
-                renderExecutiveSections(buildLocalExecutiveSections(snapshot));
+                const localPayload = buildLocalExecutivePayload(snapshot);
+                latestExecutiveReportPayload = localPayload;
+                renderExecutiveSections(localPayload.sections);
+                renderExecutiveEvidencePanel(localPayload);
                 if (aiExecutiveReportMeta) {
                     aiExecutiveReportMeta.innerText = '本地规则兜底 · GPT 通道暂不可用';
                 }
@@ -3969,6 +4094,8 @@
                 badge.className = 'ml-3 px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-500/10 text-amber-200 border border-amber-400/20 flex items-center gap-1.5';
                 badge.innerHTML = `<span class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span> API 未连接`;
                 activeData = {};
+                latestExecutiveReportPayload = null;
+                renderExecutiveEvidencePanel(null);
                 console.log('API offline. Demo datasets are disabled.', err);
             } finally {
                 renderSelectorOptions(productSelector.value);
