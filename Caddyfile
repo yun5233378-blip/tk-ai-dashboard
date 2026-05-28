@@ -1,4 +1,4 @@
-tk-api.void52.site {
+tk-api.void52.site, dashboard.void52.site {
     encode gzip
 
     handle /api/* {
@@ -8,6 +8,7 @@ tk-api.void52.site {
     handle {
         root * /srv
         try_files {path} /index.html
+        header Cache-Control "no-store, max-age=0"
         file_server
     }
 }
