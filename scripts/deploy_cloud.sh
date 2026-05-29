@@ -39,6 +39,10 @@ scripts/validate_cloud.sh
 
 mkdir -p "$PAGES_DEPLOY_DIR"
 cp index.html "$PAGES_DEPLOY_DIR/index.html"
+if [[ -f tools/platform_login_helper.py ]]; then
+    mkdir -p "$PAGES_DEPLOY_DIR/tools"
+    cp tools/platform_login_helper.py "$PAGES_DEPLOY_DIR/tools/platform_login_helper.py"
+fi
 
 echo "== Git status =="
 git status -sb

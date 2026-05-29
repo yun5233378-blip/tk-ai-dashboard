@@ -1197,6 +1197,7 @@
                                     <input id="platform-session-note" class="neo-input w-full px-3 py-2 rounded-lg text-sm" placeholder="备注，如：运营号 A / 今日更新">
                                     <input id="platform-session-probe-url" class="neo-input w-full px-3 py-2 rounded-lg text-sm" placeholder="测试链接，可填抖音视频或小红书笔记">
                                     <div class="flex flex-wrap gap-2">
+                                        <button id="btn-copy-platform-helper-command" class="primary-action px-4 py-2 rounded-lg text-xs font-bold">复制登录助手命令</button>
                                         <button id="btn-save-platform-session" class="primary-action px-4 py-2 rounded-lg text-xs font-bold">保存</button>
                                         <button id="btn-probe-platform-session" class="quiet-button px-4 py-2 rounded-lg text-xs font-bold">测试</button>
                                         <button id="btn-clear-platform-session" class="quiet-button px-4 py-2 rounded-lg text-xs font-bold text-rose-600">清除</button>
@@ -1210,7 +1211,7 @@
                                     <span class="text-[11px] font-bold text-slate-400">服务器保存，不回显明文</span>
                                 </div>
                                 <textarea id="platform-session-cookies" rows="9" class="neo-input w-full px-3 py-3 rounded-lg text-xs leading-5 font-mono resize-y" placeholder="粘贴浏览器请求头中的 Cookie: a=b; c=d，或 Cookie-Editor / DevTools 导出的 JSON cookies 数组。"></textarea>
-                                <p id="platform-session-meta" class="mt-3 text-xs text-slate-500 leading-relaxed">登录态只用于服务器端评论采集，不会进入备份导出，也不会返回给前端。若平台触发验证码或 Cookie 过期，请在真实浏览器重新登录后更新。</p>
+                                <p id="platform-session-meta" class="mt-3 text-xs text-slate-500 leading-relaxed">优先点“复制登录助手命令”，在本机 PowerShell 运行后会自动弹浏览器登录并上传 Cookie。下面文本框仍保留给手动粘贴 Cookie Header / JSON。</p>
                             </div>
                         </div>
                     </div>
@@ -1711,6 +1712,7 @@
         const platformSessionNote = document.getElementById('platform-session-note');
         const platformSessionProbeUrl = document.getElementById('platform-session-probe-url');
         const platformSessionMeta = document.getElementById('platform-session-meta');
+        const btnCopyPlatformHelperCommand = document.getElementById('btn-copy-platform-helper-command');
         const btnSavePlatformSession = document.getElementById('btn-save-platform-session');
         const btnProbePlatformSession = document.getElementById('btn-probe-platform-session');
         const btnClearPlatformSession = document.getElementById('btn-clear-platform-session');
@@ -4739,6 +4741,30 @@
             }
         }
 
+        async function copyPlatformHelperCommand() {
+            if (!isAdminSession()) return;
+            const platform = platformSessionSelect.value;
+            btnCopyPlatformHelperCommand.disabled = true;
+            try {
+                const response = await authorizedFetch(`${API_BASE_URL}/api/admin/platform-session-helper-command`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ platform })
+                });
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok) throw new Error(payload.detail || '登录助手命令生成失败。');
+                const command = payload.windows_powershell || '';
+                await navigator.clipboard.writeText(command);
+                platformSessionMeta.innerText = `已复制 ${platform === 'douyin' ? '抖音' : '小红书'} 登录助手命令。打开 Windows PowerShell 粘贴运行，弹出浏览器后完成登录，再回到终端按 Enter。命令有效期约 ${Math.round((payload.expires_in_seconds || 900) / 60)} 分钟。`;
+                showToast('登录助手命令已复制。', 'success');
+            } catch (error) {
+                platformSessionMeta.innerText = error.message || String(error);
+                showToast(error.message || String(error), 'error');
+            } finally {
+                btnCopyPlatformHelperCommand.disabled = false;
+            }
+        }
+
         async function savePlatformSession() {
             if (!isAdminSession()) return;
             const platform = platformSessionSelect.value;
@@ -4889,6 +4915,7 @@
         btnAdminRefreshAudit.addEventListener('click', refreshAdminAuditLogs);
         btnAlertStatus.addEventListener('click', refreshAlertStatus);
         btnAlertTest.addEventListener('click', sendTestAlert);
+        btnCopyPlatformHelperCommand.addEventListener('click', copyPlatformHelperCommand);
         btnSavePlatformSession.addEventListener('click', savePlatformSession);
         btnProbePlatformSession.addEventListener('click', probePlatformSession);
         btnClearPlatformSession.addEventListener('click', clearPlatformSession);

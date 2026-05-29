@@ -507,6 +507,22 @@ class PlatformSessionProbeRequest(BaseModel):
     limit: int = Field(5, ge=1, le=30, description="最多测试抓取评论数")
 
 
+class PlatformSessionHelperCommandRequest(BaseModel):
+    """管理员生成本机登录助手命令。"""
+
+    platform: str = Field(..., min_length=1, description="douyin / xiaohongshu")
+
+
+class PlatformSessionHelperUploadRequest(BaseModel):
+    """本机登录助手上传 Cookie 的请求体。"""
+
+    helper_token: str = Field(..., min_length=10, description="短时效助手令牌")
+    platform: str = Field(..., min_length=1, description="douyin / xiaohongshu")
+    cookies: str = Field(..., min_length=1, description="浏览器导出的 cookies JSON 字符串")
+    user_agent: str = Field("", max_length=500, description="浏览器 User-Agent")
+    note: str = Field("", max_length=160, description="可选备注")
+
+
 class VsPipelineRequest(BaseModel):
     """前端 POST /api/run-vs-pipeline 的请求体。"""
 
@@ -897,6 +913,40 @@ def save_platform_sessions(sessions: Dict[str, Dict[str, Any]]) -> None:
     save_storage_json(PLATFORM_SESSIONS_STORE_KEY, PLATFORM_SESSIONS_PATH, cleaned)
 
 
+def save_platform_session_record(
+    platform: str,
+    cookies: str,
+    user_agent: str,
+    note: str,
+    actor_name: str,
+) -> Dict[str, Any]:
+    """Persist one platform crawler login state and preserve last probe metadata."""
+    platform_key = normalize_platform_session_key(platform)
+    cookie_value = str(cookies or "").strip()
+    if estimate_cookie_count(cookie_value) <= 0:
+        raise HTTPException(status_code=400, detail="Cookie 内容无法识别，请粘贴浏览器 Cookie Header 或 JSON 导出。")
+
+    sessions = load_platform_sessions()
+    previous = sessions.get(platform_key) or {}
+    session = {
+        "platform": platform_key,
+        "cookies": cookie_value,
+        "user_agent": str(user_agent or "").strip(),
+        "note": str(note or "").strip(),
+        "updated_at": current_timestamp(),
+        "updated_by": actor_name or "admin",
+        "cookie_count": estimate_cookie_count(cookie_value),
+        "fingerprint": platform_cookie_fingerprint(cookie_value),
+        "last_test_at": str(previous.get("last_test_at") or ""),
+        "last_test_status": str(previous.get("last_test_status") or ""),
+        "last_test_message": str(previous.get("last_test_message") or ""),
+        "last_test_comment_count": int(previous.get("last_test_comment_count") or 0),
+    }
+    sessions[platform_key] = session
+    save_platform_sessions(sessions)
+    return session
+
+
 def public_platform_session_payload(platform: str, session: Dict[str, Any] | None) -> Dict[str, Any]:
     """Build a safe frontend payload without returning raw Cookie values."""
     meta = SUPPORTED_PLATFORM_SESSIONS[platform]
@@ -946,6 +996,89 @@ def build_crawler_session_env(source_type: str) -> Dict[str, str]:
         "user_agent": str(session.get("user_agent") or "").strip(),
     }
     return {"TK_PLATFORM_SESSION_JSON": json.dumps(payload, ensure_ascii=False)}
+
+
+def create_platform_helper_token(platform: str, actor: Dict[str, Any], ttl_seconds: int = 900) -> str:
+    """Create a short-lived token that can only upload one platform session."""
+    platform_key = normalize_platform_session_key(platform)
+    now = current_epoch()
+    payload = {
+        "purpose": "platform_session_helper",
+        "platform": platform_key,
+        "sub": str(actor.get("user_id") or "operator"),
+        "username": str(actor.get("username") or "admin"),
+        "role": str(actor.get("role") or "admin"),
+        "iat": now,
+        "exp": now + max(60, ttl_seconds),
+        "nonce": secrets.token_urlsafe(12),
+    }
+    payload_part = b64url_encode(json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
+    signature = hmac.new(OPERATOR_TOKEN.encode("utf-8"), payload_part.encode("ascii"), hashlib.sha256).digest()
+    return f"ph.{payload_part}.{b64url_encode(signature)}"
+
+
+def verify_platform_helper_token(token: str, platform: str) -> Dict[str, Any]:
+    """Verify a platform-session helper upload token."""
+    try:
+        prefix, payload_part, signature_part = str(token or "").split(".", 2)
+        if prefix != "ph":
+            raise ValueError("bad prefix")
+        expected_signature = hmac.new(OPERATOR_TOKEN.encode("utf-8"), payload_part.encode("ascii"), hashlib.sha256).digest()
+        actual_signature = b64url_decode(signature_part)
+        if not hmac.compare_digest(expected_signature, actual_signature):
+            raise ValueError("bad signature")
+        payload = json.loads(b64url_decode(payload_part).decode("utf-8"))
+        if payload.get("purpose") != "platform_session_helper":
+            raise ValueError("bad purpose")
+        platform_key = normalize_platform_session_key(platform)
+        if payload.get("platform") != platform_key:
+            raise ValueError("platform mismatch")
+        if int(payload.get("exp", 0) or 0) < current_epoch():
+            raise ValueError("expired")
+        if payload.get("role") != "admin":
+            raise ValueError("admin required")
+        return payload
+    except Exception as exc:
+        raise HTTPException(status_code=401, detail="登录助手令牌无效或已过期，请在后台重新生成。") from exc
+
+
+def quote_powershell(value: str) -> str:
+    """Single-quote a value for PowerShell."""
+    return "'" + value.replace("'", "''") + "'"
+
+
+def quote_posix(value: str) -> str:
+    """Single-quote a value for POSIX shells."""
+    return "'" + value.replace("'", "'\"'\"'") + "'"
+
+
+def build_platform_helper_commands(platform: str, helper_token: str, api_base_url: str) -> Dict[str, str]:
+    """Build local commands that download and run the browser login helper."""
+    platform_key = normalize_platform_session_key(platform)
+    script_url = f"{api_base_url.rstrip('/')}/tools/platform_login_helper.py"
+    api_url = api_base_url.rstrip("/")
+    windows = (
+        "$ErrorActionPreference='Stop'; "
+        "$p=Join-Path $env:TEMP 'tk_platform_login_helper.py'; "
+        f"Invoke-WebRequest -UseBasicParsing {quote_powershell(script_url)} -OutFile $p; "
+        "$python='python'; if (Get-Command py -ErrorAction SilentlyContinue) { $python='py' }; "
+        "& $python -m pip install --user requests playwright; "
+        "& $python -m playwright install chromium; "
+        f"& $python $p --platform {quote_powershell(platform_key)} --api {quote_powershell(api_url)} --helper-token {quote_powershell(helper_token)}"
+    )
+    mac_linux = (
+        "set -e; "
+        "p=\"${TMPDIR:-/tmp}/tk_platform_login_helper.py\"; "
+        f"curl -fsSL {quote_posix(script_url)} -o \"$p\"; "
+        "python3 -m pip install --user requests playwright; "
+        "python3 -m playwright install chromium; "
+        f"python3 \"$p\" --platform {quote_posix(platform_key)} --api {quote_posix(api_url)} --helper-token {quote_posix(helper_token)}"
+    )
+    return {
+        "script_url": script_url,
+        "windows_powershell": windows,
+        "mac_linux": mac_linux,
+    }
 
 
 def load_vs_reports() -> List[Dict[str, Any]]:
@@ -4602,7 +4735,14 @@ def requires_operator_auth(request: Request) -> bool:
         return False
     if not request.url.path.startswith("/api/"):
         return False
-    public_paths = {"/api/health", "/api/login", "/api/register", "/api/auth/login", "/api/auth/register"}
+    public_paths = {
+        "/api/health",
+        "/api/login",
+        "/api/register",
+        "/api/auth/login",
+        "/api/auth/register",
+        "/api/platform-session-helper/upload",
+    }
     return request.url.path not in public_paths
 
 
@@ -5494,39 +5634,70 @@ async def admin_platform_sessions() -> Dict[str, Any]:
     return build_platform_sessions_payload()
 
 
+@app.post("/api/admin/platform-session-helper-command")
+async def admin_platform_session_helper_command(payload: PlatformSessionHelperCommandRequest) -> Dict[str, Any]:
+    """生成本机一键登录助手命令，避免运营手动查找 Cookie。"""
+    platform_key = normalize_platform_session_key(payload.platform)
+    actor = get_current_request_user()
+    helper_token = create_platform_helper_token(platform_key, actor)
+    commands = build_platform_helper_commands(platform_key, helper_token, "https://tk-api.void52.site")
+    append_admin_audit(
+        "create_platform_helper_command",
+        f"生成{SUPPORTED_PLATFORM_SESSIONS[platform_key]['label']}本机登录助手命令。",
+        {"platform": platform_key},
+    )
+    return {
+        "status": "success",
+        "platform": platform_key,
+        "expires_in_seconds": 900,
+        **commands,
+    }
+
+
+@app.post("/api/platform-session-helper/upload")
+async def platform_session_helper_upload(payload: PlatformSessionHelperUploadRequest) -> Dict[str, Any]:
+    """本机登录助手上传浏览器 cookies；只接受短时效助手令牌。"""
+    platform_key = normalize_platform_session_key(payload.platform)
+    helper_payload = verify_platform_helper_token(payload.helper_token, platform_key)
+    actor_name = str(helper_payload.get("username") or "login_helper")
+    session = save_platform_session_record(
+        platform_key,
+        payload.cookies,
+        payload.user_agent,
+        payload.note or "本机登录助手自动上传",
+        actor_name,
+    )
+    append_admin_audit(
+        "platform_helper_upload",
+        f"本机登录助手上传{SUPPORTED_PLATFORM_SESSIONS[platform_key]['label']}采集登录态。",
+        {"platform": platform_key, "cookie_count": session["cookie_count"], "actor": actor_name},
+    )
+    return {
+        "status": "success",
+        "session": public_platform_session_payload(platform_key, session),
+    }
+
+
 @app.put("/api/admin/platform-sessions/{platform}")
 async def admin_save_platform_session(platform: str, payload: PlatformSessionRequest) -> Dict[str, Any]:
     """保存抖音/小红书采集登录态，供后端爬虫子进程注入。"""
     platform_key = normalize_platform_session_key(platform)
-    cookies = payload.cookies.strip()
-    if estimate_cookie_count(cookies) <= 0:
-        raise HTTPException(status_code=400, detail="Cookie 内容无法识别，请粘贴浏览器 Cookie Header 或 JSON 导出。")
-
     actor = get_current_request_user()
-    sessions = load_platform_sessions()
-    sessions[platform_key] = {
-        "platform": platform_key,
-        "cookies": cookies,
-        "user_agent": payload.user_agent.strip(),
-        "note": payload.note.strip(),
-        "updated_at": current_timestamp(),
-        "updated_by": actor.get("username", "admin"),
-        "cookie_count": estimate_cookie_count(cookies),
-        "fingerprint": platform_cookie_fingerprint(cookies),
-        "last_test_at": str((sessions.get(platform_key) or {}).get("last_test_at") or ""),
-        "last_test_status": str((sessions.get(platform_key) or {}).get("last_test_status") or ""),
-        "last_test_message": str((sessions.get(platform_key) or {}).get("last_test_message") or ""),
-        "last_test_comment_count": int((sessions.get(platform_key) or {}).get("last_test_comment_count") or 0),
-    }
-    save_platform_sessions(sessions)
+    session = save_platform_session_record(
+        platform_key,
+        payload.cookies,
+        payload.user_agent,
+        payload.note,
+        str(actor.get("username", "admin")),
+    )
     append_admin_audit(
         "save_platform_session",
         f"保存{SUPPORTED_PLATFORM_SESSIONS[platform_key]['label']}采集登录态。",
-        {"platform": platform_key, "cookie_count": sessions[platform_key]["cookie_count"]},
+        {"platform": platform_key, "cookie_count": session["cookie_count"]},
     )
     return {
         "status": "success",
-        "session": public_platform_session_payload(platform_key, sessions[platform_key]),
+        "session": public_platform_session_payload(platform_key, session),
     }
 
 

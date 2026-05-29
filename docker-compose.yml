@@ -42,6 +42,7 @@ services:
             - caddy_data:/data
             - caddy_config:/config
             - ./index.html:/srv/index.html:ro
+            - ./tools:/srv/tools:ro
         depends_on:
             - api
 
