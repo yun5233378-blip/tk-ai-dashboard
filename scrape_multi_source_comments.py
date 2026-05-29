@@ -161,11 +161,112 @@ def build_public_page_comments(source: str, platform: str, limit: int) -> List[D
     return dedupe_comments(comments, limit)
 
 
+def is_probable_comment_text(text: str) -> bool:
+    value = normalize_comment_text(text)
+    if len(value) < MIN_COMMENT_LENGTH or len(value) > 220:
+        return False
+    lowered = value.lower()
+    blocked_terms = [
+        "login",
+        "sign in",
+        "download",
+        "copyright",
+        "privacy",
+        "cookie",
+        "javascript",
+        "app store",
+        "google play",
+        "douyin",
+        "xiaohongshu",
+        "打开app",
+        "登录",
+        "注册",
+        "下载",
+        "隐私",
+        "用户协议",
+    ]
+    if any(term in lowered for term in blocked_terms):
+        return False
+    if re.search(r"https?://|www\.", lowered):
+        return False
+    return True
+
+
+def collect_visible_text_candidates(page: Any, limit: int) -> List[str]:
+    selectors = [
+        '[data-e2e*="comment"]',
+        '[class*="comment"]',
+        '[class*="Comment"]',
+        '[class*="note-content"]',
+        '[class*="content"]',
+        '[class*="reply"]',
+        '[class*="Reply"]',
+        'div[role="listitem"]',
+        'span',
+        'p',
+    ]
+    candidates: List[str] = []
+    for selector in selectors:
+        try:
+            elements = page.query_selector_all(selector)
+        except Exception:
+            continue
+        for element in elements[:240]:
+            if len(candidates) >= limit * 4:
+                break
+            try:
+                raw_text = element.inner_text(timeout=1000)
+            except Exception:
+                continue
+            for line in str(raw_text or "").splitlines():
+                value = normalize_comment_text(line)
+                if is_probable_comment_text(value):
+                    candidates.append(value)
+        if len(candidates) >= limit:
+            break
+    return candidates
+
+
+def build_browser_visible_comments(source: str, platform: str, limit: int) -> List[Dict[str, Any]]:
+    try:
+        from playwright.sync_api import sync_playwright
+    except Exception as exc:
+        print(f"{platform} browser comment probe unavailable: {exc}")
+        return []
+
+    comments: List[Dict[str, Any]] = []
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        context = browser.new_context(
+            viewport={"width": 1365, "height": 900},
+            locale="zh-CN",
+            user_agent=USER_AGENT,
+        )
+        page = context.new_page()
+        page.set_default_timeout(12000)
+        try:
+            page.goto(source, wait_until="domcontentloaded", timeout=30000)
+            for _ in range(5):
+                page.mouse.wheel(0, 900)
+                time.sleep(1.2)
+            candidates = collect_visible_text_candidates(page, limit)
+            comments = [
+                make_comment(value, platform, idx + 1, source)
+                for idx, value in enumerate(candidates)
+            ]
+        finally:
+            browser.close()
+    comments = dedupe_comments(comments, limit)
+    for comment in comments:
+        comment["collection_method"] = "browser_visible_comment_probe"
+    return comments
+
+
 def platform_guidance(platform: str) -> str:
     if platform == "douyin":
-        return "抖音公开页通常限制评论读取；请导出或复制评论文本后用 comments:// 或文本文件导入。"
+        return "抖音链接已尝试浏览器直抓，但公开页未暴露可读评论；需要接入浏览器登录态/Cookie 后重试，或临时使用应急评论文本导入。"
     if platform == "xiaohongshu":
-        return "小红书公开页通常限制评论读取；请导出或复制笔记评论文本后用 comments:// 或文本文件导入。"
+        return "小红书链接已尝试浏览器直抓，但公开页未暴露可读评论；需要接入浏览器登录态/Cookie 后重试，或临时使用应急评论文本导入。"
     return "该平台暂未接入专用公开评论 API，请使用 comments:// 或文本文件导入评论。"
 
 
@@ -175,9 +276,18 @@ def collect_comments(source: str, limit: int) -> tuple[str, List[Dict[str, Any]]
         comments = read_manual_comments(source, platform, limit)
         return platform, comments
 
+    if platform in {"douyin", "xiaohongshu"}:
+        try:
+            comments = build_browser_visible_comments(source, platform, limit)
+            if comments:
+                print(f"{platform} browser probe extracted {len(comments)} visible comments.")
+                return platform, comments
+        except Exception as exc:
+            print(f"{platform} browser comment probe unavailable: {exc}")
+
     try:
         comments = build_public_page_comments(source, platform, limit)
-        if comments:
+        if comments and (platform not in {"douyin", "xiaohongshu"} or len(comments) >= 2):
             print(f"{platform} public page extracted {len(comments)} text signals.")
             return platform, comments
     except Exception as exc:

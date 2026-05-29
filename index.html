@@ -879,17 +879,18 @@
                     <span class="kicker-pill">TikTok</span>
                     <span class="kicker-pill">抖音</span>
                     <span class="kicker-pill">小红书</span>
-                    <span class="kicker-pill">评论导入</span>
+                    <span class="kicker-pill">链接直抓</span>
                 </div>
                 <div class="flex flex-col md:flex-row gap-3">
-                    <input id="pipeline-url" type="text" placeholder="请输入 YouTube / TikTok / 抖音 / 小红书链接..." class="neo-input flex-grow px-4 py-2.5 rounded-lg text-sm focus:outline-none transition-all">
+                    <input id="pipeline-url" type="text" placeholder="粘贴商品视频 / 笔记链接，系统会直接抓取评论并诊断..." class="neo-input flex-grow px-4 py-2.5 rounded-lg text-sm focus:outline-none transition-all">
                     <button id="btn-run-pipeline" class="primary-action px-6 py-2.5 rounded-lg text-sm font-medium flex items-center justify-center gap-2">
                         <span id="spinner" class="hidden w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                        开始 AI 抓取与分析
+                        抓取评论并诊断
                     </button>
                 </div>
-                <details class="mt-4 rounded-lg border border-slate-200/70 bg-white/60 p-4">
-                    <summary class="cursor-pointer select-none text-sm font-black text-slate-700">导入抖音 / 小红书评论文本</summary>
+                <details class="mt-4 rounded-lg border border-slate-200/70 bg-white/45 p-4">
+                    <summary class="cursor-pointer select-none text-xs font-black text-slate-500">应急入口：平台拦截时再粘贴评论文本</summary>
+                    <p class="mt-2 text-xs text-slate-500 leading-relaxed">主流程请直接使用上方链接抓取。只有抖音/小红书公开页限制评论读取、需要人工导出评论时，才使用这里。</p>
                     <div class="mt-3 grid grid-cols-1 lg:grid-cols-[160px_1fr_auto] gap-3">
                         <select id="manual-source-platform" class="neo-input px-3 py-2.5 rounded-lg text-sm focus:outline-none">
                             <option value="xiaohongshu">小红书</option>
@@ -1024,7 +1025,7 @@
                                 <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">产品名称</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">AI 选品健康分</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">核心优化方向</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">系统建议动作</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">系统建议 / 管理</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-200" id="product-table-body">
@@ -1238,7 +1239,7 @@
     <div id="add-product-modal" class="modal-backdrop fixed inset-0 z-[80] hidden flex items-center justify-center p-4">
         <div class="modal-panel rounded-lg max-w-md w-full p-6 md:p-8 mx-4">
             <div class="flex justify-between items-center mb-5">
-                <h3 class="text-lg font-bold text-slate-900 flex items-center gap-1.5">
+                <h3 id="product-modal-title" class="text-lg font-bold text-slate-900 flex items-center gap-1.5">
                     <span>➕</span> 添加新监控商品
                 </h3>
                 <button id="btn-close-modal" class="modal-close text-xl font-bold">&times;</button>
@@ -1253,7 +1254,7 @@
                     <input id="modal-product-name" type="text" placeholder="例如: 潮流复古运动鞋" class="neo-input w-full px-3.5 py-2 rounded-lg text-sm focus:outline-none transition-all">
                 </div>
                 <div>
-                    <label class="block text-xs font-bold text-slate-500 mb-1">YouTube / TikTok 视频评测链接</label>
+                    <label class="block text-xs font-bold text-slate-500 mb-1">YouTube / TikTok / 抖音 / 小红书商品链接</label>
                     <input id="modal-product-url" type="text" placeholder="请输入评测链接..." class="neo-input w-full px-3.5 py-2 rounded-lg text-sm focus:outline-none transition-all">
                 </div>
             </div>
@@ -3806,6 +3807,12 @@
                         </div>
                     `
                     : '';
+                const managementButtons = `
+                    <div class="mt-2 flex flex-wrap gap-2">
+                        <button data-edit-product="${escapeHtml(key)}" class="px-2.5 py-1 rounded-md bg-white/80 text-slate-700 hover:bg-slate-50 text-[11px] font-bold border border-slate-200 transition-colors">编辑</button>
+                        <button data-delete-product="${escapeHtml(key)}" class="px-2.5 py-1 rounded-md bg-rose-50 text-rose-700 hover:bg-rose-100 text-[11px] font-bold border border-rose-100 transition-colors">删除</button>
+                    </div>
+                `;
 
                 const tr = document.createElement('tr');
                 tr.className = radarCritical
@@ -3834,6 +3841,7 @@
                     <td class="px-6 py-4 whitespace-nowrap">
                         <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full border ${badgeStyle}">${item.action || '待诊断'}</span>
                         ${actionButtons}
+                        ${managementButtons}
                     </td>
                 `;
                 tableBody.appendChild(tr);
@@ -4101,10 +4109,20 @@
             }
         });
 
-        document.getElementById('product-table-body').addEventListener('click', (event) => {
+        document.getElementById('product-table-body').addEventListener('click', async (event) => {
+            const editButton = event.target.closest('[data-edit-product]');
+            const deleteButton = event.target.closest('[data-delete-product]');
             const spsButton = event.target.closest('[data-sps-product]');
             const appealButton = event.target.closest('[data-appeal-product]');
             const battlecardButton = event.target.closest('[data-battlecard-product]');
+            if (editButton) {
+                openEditProductModal(editButton.getAttribute('data-edit-product'));
+                return;
+            }
+            if (deleteButton) {
+                await deleteProduct(deleteButton.getAttribute('data-delete-product'));
+                return;
+            }
             if (battlecardButton) {
                 openBattlecard(battlecardButton.getAttribute('data-battlecard-product'));
                 return;
@@ -4627,20 +4645,54 @@
         const btnCloseModal = document.getElementById('btn-close-modal');
         const btnCancelModal = document.getElementById('btn-cancel-modal');
         const btnSubmitModal = document.getElementById('btn-submit-modal');
+        const productModalTitle = document.getElementById('product-modal-title');
+        const modalProductId = document.getElementById('modal-product-id');
+        const modalProductName = document.getElementById('modal-product-name');
+        const modalProductUrl = document.getElementById('modal-product-url');
+        let editingProductKey = '';
 
-        btnShowModal.addEventListener('click', () => {
+        function openAddProductModal() {
             if (!isLocalApiOnline) {
                 showToast('API 未连接，请稍后刷新页面重试。', 'error');
                 return;
             }
+            editingProductKey = '';
+            productModalTitle.innerHTML = '<span>➕</span> 添加新监控商品';
+            btnSubmitModal.innerText = '确认添加';
+            modalProductId.disabled = false;
+            modalProductId.classList.remove('opacity-60', 'cursor-not-allowed');
+            modalProductId.value = '';
+            modalProductName.value = '';
+            modalProductUrl.value = '';
             addModal.classList.remove('hidden');
-        });
+        }
+
+        function openEditProductModal(productKey) {
+            const item = activeData[productKey];
+            if (!item) return;
+            editingProductKey = productKey;
+            productModalTitle.innerHTML = '<span>✏️</span> 编辑监控商品';
+            btnSubmitModal.innerText = '保存修改';
+            modalProductId.value = productKey;
+            modalProductId.disabled = true;
+            modalProductId.classList.add('opacity-60', 'cursor-not-allowed');
+            modalProductName.value = item.product_name || productKey;
+            modalProductUrl.value = item.source_url || item.url || '';
+            addModal.classList.remove('hidden');
+        }
+
+        btnShowModal.addEventListener('click', openAddProductModal);
 
         const hideAddModal = () => {
             addModal.classList.add('hidden');
-            document.getElementById('modal-product-id').value = '';
-            document.getElementById('modal-product-name').value = '';
-            document.getElementById('modal-product-url').value = '';
+            editingProductKey = '';
+            modalProductId.disabled = false;
+            modalProductId.classList.remove('opacity-60', 'cursor-not-allowed');
+            modalProductId.value = '';
+            modalProductName.value = '';
+            modalProductUrl.value = '';
+            productModalTitle.innerHTML = '<span>➕</span> 添加新监控商品';
+            btnSubmitModal.innerText = '确认添加';
         };
 
         btnCloseModal.addEventListener('click', hideAddModal);
@@ -4713,37 +4765,80 @@
         }
 
         btnSubmitModal.addEventListener('click', async () => {
-            const id = document.getElementById('modal-product-id').value.trim();
-            const name = document.getElementById('modal-product-name').value.trim();
-            const url = document.getElementById('modal-product-url').value.trim();
+            const id = modalProductId.value.trim();
+            const name = modalProductName.value.trim();
+            const url = modalProductUrl.value.trim();
+            const isEditing = Boolean(editingProductKey);
 
-            if (!id || !name || !url) {
-                showToast('请完整填写新产品 ID、显示名称以及评测链接！', 'error');
+            if (!id || !name || (!isEditing && !url)) {
+                showToast('请完整填写商品 ID、显示名称以及商品链接！', 'error');
                 return;
             }
 
             try {
-                const response = await authorizedFetch(`${API_BASE_URL}/api/add-product`, {
-                    method: 'POST',
+                const endpoint = isEditing
+                    ? `${API_BASE_URL}/api/products/${encodeURIComponent(editingProductKey)}`
+                    : `${API_BASE_URL}/api/add-product`;
+                const response = await authorizedFetch(endpoint, {
+                    method: isEditing ? 'PUT' : 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ product_id: id, product_name: name, url: url })
+                    body: JSON.stringify(isEditing
+                        ? { product_name: name, url: url }
+                        : { product_id: id, product_name: name, url: url })
                 });
                 const payload = await response.json().catch(() => ({}));
 
                 if (response.ok) {
-                    showToast(`➕ 商品 [${name}] 已成功写入云端监控大盘！`, 'success');
+                    const targetKey = payload.product_key || editingProductKey || id;
+                    showToast(isEditing ? `商品 [${name}] 已更新。` : `➕ 商品 [${name}] 已成功写入云端监控大盘！`, 'success');
                     hideAddModal();
-                    await fetchAndLoadRealData(id);
-                    productSelector.value = id;
-                    renderDiagnosticCharts(id);
+                    await fetchAndLoadRealData(targetKey);
+                    renderSelectorOptions(targetKey);
+                    productSelector.value = targetKey;
+                    renderDiagnosticCharts(targetKey);
                     renderProductTable();
                 } else {
-                    showToast(payload.detail || '持久化注册失败，请检查参数或 ID 重复状态', 'error');
+                    showToast(payload.detail || (editingProductKey ? '商品更新失败。' : '持久化注册失败，请检查参数或 ID 重复状态'), 'error');
                 }
             } catch (error) {
                 showToast('连接云端 API 失败，请检查后端服务运行状态。', 'error');
             }
         });
+
+        async function deleteProduct(productKey) {
+            const item = activeData[productKey] || {};
+            const productName = item.product_name || productKey;
+            const confirmed = window.confirm(`确认删除「${productName}」吗？\n\n删除后会从历史诊断和选品列表中移除，并清理该商品的雷达历史。`);
+            if (!confirmed) return;
+
+            try {
+                const response = await authorizedFetch(`${API_BASE_URL}/api/products/${encodeURIComponent(productKey)}`, {
+                    method: 'DELETE'
+                });
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    throw new Error(payload.detail || '删除失败。');
+                }
+
+                let nextKey = productSelector.value === productKey ? '' : productSelector.value;
+                showToast(`已删除「${productName}」。`, 'success');
+                await fetchAndLoadRealData(nextKey);
+                if (!nextKey || !activeData[nextKey]) {
+                    nextKey = Object.keys(activeData)[0] || '';
+                }
+                renderSelectorOptions(nextKey);
+                if (nextKey) {
+                    productSelector.value = nextKey;
+                }
+                renderDiagnosticCharts(nextKey);
+                renderProductTable();
+                if (isAdminSession()) {
+                    await refreshAdminAuditLogs();
+                }
+            } catch (error) {
+                showToast(error.message || String(error), 'error');
+            }
+        }
 
         function setTerminalOpenState(isOpen) {
             if (isOpen) {
@@ -4768,7 +4863,7 @@
                 renderDiagnosticCharts(updatedKey);
                 renderProductTable();
             } else {
-                showToast(payload.detail || '未采集到有效评论，或 AI 分析服务暂时不可用。', 'error');
+                showToast(payload.detail || '未采集到有效评论。若是抖音/小红书链接，可能需要后续接入浏览器登录态采集。', 'error');
             }
         }
 
@@ -4780,7 +4875,7 @@
 
             const url = pipelineUrl.value.trim();
             if (!url) {
-                showToast('请输入合法链接，或使用下方评论导入入口。', 'error');
+                showToast('请粘贴商品视频或笔记链接后再启动抓取。', 'error');
                 return;
             }
 
@@ -4791,7 +4886,7 @@
             spinner.classList.remove('hidden');
             setTerminalOpenState(true);
             pipelineLoadingTitle.innerText = '正在抓取并分析评论';
-            pipelineLoadingDetail.innerText = '系统正在读取多源讨论并生成 AI 舆情报告，请稍候。';
+            pipelineLoadingDetail.innerText = '系统正在尝试直接读取链接内评论；如平台限制公开评论，会返回明确失败原因。';
             progressPercent.innerText = '15%';
             logOffset = 0;
             pollInterval = setInterval(fetchLogs, 800);
@@ -5049,4 +5144,3 @@
     </script>
 </body>
 </html>
-

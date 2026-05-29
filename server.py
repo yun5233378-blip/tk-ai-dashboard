@@ -451,6 +451,13 @@ class AddProductRequest(BaseModel):
     url: str = Field("", description="该商品默认诊断链接，可为空")
 
 
+class UpdateProductRequest(BaseModel):
+    """前端 PUT /api/products/{product_id} 的请求体。"""
+
+    product_name: str = Field(..., min_length=1, description="商品显示名称")
+    url: str = Field("", description="该商品默认诊断链接，可为空")
+
+
 class LoginRequest(BaseModel):
     """前端账号密码登录请求体。"""
 
@@ -5287,6 +5294,70 @@ async def add_product(payload: AddProductRequest) -> Dict[str, Any]:
         "message": f"已添加新监控商品：{product_name}",
         "product_key": product_id,
         "product": products[product_id],
+    }
+
+
+@app.put("/api/products/{product_id}")
+async def update_product(product_id: str, payload: UpdateProductRequest) -> Dict[str, Any]:
+    """编辑历史诊断商品的显示名称与默认抓取链接，保留既有诊断结果。"""
+    product_key = product_id.strip()
+    product_name = payload.product_name.strip()
+    url = payload.url.strip()
+
+    if not product_key:
+        raise HTTPException(status_code=400, detail="商品 ID 不能为空。")
+    if not product_name:
+        raise HTTPException(status_code=400, detail="商品名称不能为空。")
+
+    products = load_products()
+    if product_key not in products:
+        raise HTTPException(status_code=404, detail="商品不存在或已被删除。")
+
+    product = dict(products[product_key])
+    product["product_id"] = str(product.get("product_id") or product_key)
+    product["product_name"] = product_name
+    product["source_url"] = url
+    product["url"] = url
+    products[product_key] = product
+    save_products(products)
+    append_log(f"已编辑监控商品：{product_key} / {product_name}。")
+    append_admin_audit("update_product", f"编辑监控商品：{product_key} / {product_name}。")
+
+    return {
+        "status": "success",
+        "message": f"已更新监控商品：{product_name}",
+        "product_key": product_key,
+        "product": product,
+    }
+
+
+@app.delete("/api/products/{product_id}")
+async def delete_product(product_id: str) -> Dict[str, Any]:
+    """删除历史诊断商品，并同步清理该商品的雷达历史。"""
+    product_key = product_id.strip()
+    if not product_key:
+        raise HTTPException(status_code=400, detail="商品 ID 不能为空。")
+
+    products = load_products()
+    if product_key not in products:
+        raise HTTPException(status_code=404, detail="商品不存在或已被删除。")
+
+    removed = products.pop(product_key)
+    save_products(products)
+
+    radar_history = load_radar_history()
+    if product_key in radar_history:
+        radar_history.pop(product_key, None)
+        save_radar_history(radar_history)
+
+    product_name = str(removed.get("product_name") or product_key)
+    append_log(f"已删除历史诊断商品：{product_key} / {product_name}。")
+    append_admin_audit("delete_product", f"删除历史诊断商品：{product_key} / {product_name}。")
+
+    return {
+        "status": "success",
+        "message": f"已删除历史诊断商品：{product_name}",
+        "product_key": product_key,
     }
 
 
