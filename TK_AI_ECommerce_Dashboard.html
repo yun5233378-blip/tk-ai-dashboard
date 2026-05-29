@@ -592,11 +592,17 @@
             60% { transform: translateX(-5px); }
             80% { transform: translateX(5px); }
         }
+        .auth-dot-grid {
+            background-image: radial-gradient(circle at 2px 2px, #E2E8F0 1px, transparent 0);
+            background-size: 32px 32px;
+        }
+        .auth-mesh {
+            background: radial-gradient(circle at 50% 50%, rgba(79, 70, 229, 0.045) 0%, rgba(248, 250, 252, 0) 52%);
+        }
         .login-card {
-            background: rgba(255, 255, 255, 0.82);
-            backdrop-filter: blur(28px) saturate(1.35);
-            border: 1px solid rgba(226, 232, 240, 0.82);
-            box-shadow: 0 32px 90px rgba(15, 23, 42, 0.18), 0 0 0 1px rgba(255, 255, 255, 0.72), 0 28px 80px rgba(99, 102, 241, 0.14);
+            background: #ffffff;
+            border: 1px solid #c5c6cd;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 10px 15px -3px rgba(0,0,0,0.02);
             animation: scaleIn 0.34s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
             opacity: 0;
             transform: scale(0.95) translateY(8px);
@@ -604,50 +610,139 @@
         .login-card.shake {
             animation: loginShake 0.35s ease;
         }
+        .stitch-card {
+            background: #ffffff;
+            border: 1px solid #c5c6cd;
+            border-radius: 0.75rem;
+            box-shadow: 0 1px 3px rgba(9, 20, 38, 0.05);
+            transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s var(--tk-ease);
+        }
+        .stitch-card:hover {
+            border-color: #75777d;
+            box-shadow: 0 16px 40px -26px rgba(9, 20, 38, 0.28);
+        }
+        .stitch-panel {
+            background: #eff4ff;
+            border: 1px solid #c5c6cd;
+            border-radius: 1rem;
+        }
+        .stitch-label {
+            color: #45474c;
+            font-size: 12px;
+            line-height: 16px;
+            font-weight: 700;
+        }
+        .stitch-body {
+            color: #45474c;
+            font-size: 13px;
+            line-height: 18px;
+        }
+        .stitch-title {
+            color: #091426;
+            font-size: 20px;
+            line-height: 28px;
+            font-weight: 800;
+            letter-spacing: -0.01em;
+        }
+        .stitch-display {
+            color: #091426;
+            font-size: 36px;
+            line-height: 44px;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+        }
+        .radial-score {
+            background: radial-gradient(closest-side, white 76%, transparent 77% 100%),
+                        conic-gradient(#4b41e1 calc(var(--value, 84) * 1%), #e2e8f0 0);
+        }
+        .radar-grid {
+            background-color: #ffffff;
+            background-image: radial-gradient(circle at 1px 1px, rgba(117, 119, 125, 0.28) 1px, transparent 0);
+            background-size: 18px 18px;
+        }
     </style>
 </head>
 <body class="app-shell min-h-screen bg-slate-50 text-slate-900 antialiased">
 
-    <div id="login-screen" class="fixed inset-0 z-[120] hidden items-center justify-center bg-slate-950/25 backdrop-blur-xl p-4">
-        <div class="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(99,102,241,0.18),transparent_34%),radial-gradient(circle_at_72%_82%,rgba(139,92,246,0.14),transparent_36%),#F8FAFC]"></div>
-        <form id="login-form" class="login-card relative rounded-2xl w-full max-w-sm p-7 md:p-8">
-            <div class="mb-6 text-center">
-                <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white shadow-[0_18px_48px_rgba(99,102,241,0.18)] text-3xl">✨</div>
-                <div class="flex justify-center gap-2 mb-3">
-                    <span class="kicker-pill">[SECURED]</span>
-                    <span class="kicker-pill">[PLATINUM]</span>
+    <div id="login-screen" class="auth-dot-grid fixed inset-0 z-[120] hidden items-center justify-center bg-[#f8f9ff] p-4">
+        <div class="auth-mesh absolute inset-0 pointer-events-none"></div>
+        <main class="relative z-10 w-full max-w-[420px]">
+            <div class="mb-8 text-center">
+                <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-[#091426] text-white">
+                    <span class="material-symbols-outlined text-[28px]" style="font-variation-settings: 'FILL' 1;">security</span>
                 </div>
-                <h2 id="auth-title" class="text-xl font-black text-slate-900">TK-AI 安全登入</h2>
-                <p id="auth-subtitle" class="mt-2 text-xs font-semibold text-slate-400">系统内置账号校验</p>
+                <h1 class="text-[20px] font-black leading-7 tracking-tight text-[#091426]">TK-AI 智选舆情看板</h1>
+                <p id="auth-subtitle" class="mt-1 text-[13px] font-medium leading-[18px] text-[#45474c]">高规格企业级情报决策中枢</p>
             </div>
-            <div class="mb-5 grid grid-cols-2 gap-1 rounded-xl border border-slate-200/70 bg-slate-100/80 p-1">
-                <button id="auth-mode-login" type="button" class="rounded-lg bg-white px-3 py-2 text-xs font-black text-indigo-700 shadow-sm">登录</button>
-                <button id="auth-mode-register" type="button" class="rounded-lg px-3 py-2 text-xs font-black text-slate-500">注册</button>
-            </div>
-            <div class="space-y-4">
-                <div>
-                    <label id="login-username-label" class="block text-xs font-bold text-slate-500 mb-1">账号 / 邮箱</label>
-                    <input id="login-username" type="text" autocomplete="username" value="admin" class="neo-input w-full px-3.5 py-2.5 rounded-lg text-sm focus:outline-none transition-all">
+            <form id="login-form" class="login-card relative rounded-xl p-8">
+                <div class="mb-8 flex border-b border-[#c5c6cd]">
+                    <button id="auth-mode-login" type="button" class="flex-1 border-b-2 border-[#4b41e1] pb-4 text-xs font-bold text-[#4b41e1]">账号登录</button>
+                    <button id="auth-mode-register" type="button" class="flex-1 pb-4 text-xs font-bold text-[#45474c] transition hover:text-[#091426]">新用户注册</button>
                 </div>
-                <div id="register-email-wrap" class="hidden">
-                    <label class="block text-xs font-bold text-slate-500 mb-1">邮箱</label>
-                    <input id="register-email" type="email" autocomplete="email" placeholder="you@example.com" class="neo-input w-full px-3.5 py-2.5 rounded-lg text-sm focus:outline-none transition-all">
+                <h2 id="auth-title" class="sr-only">TK-AI 安全登入</h2>
+                <div class="space-y-6">
+                    <div>
+                        <label id="login-username-label" class="mb-1 block text-xs font-bold text-[#45474c]">电子邮箱 / 用户名</label>
+                        <div class="relative">
+                            <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[20px] text-[#75777d]">alternate_email</span>
+                            <input id="login-username" type="text" autocomplete="username" value="admin" placeholder="name@company.com" class="neo-input w-full rounded-lg border border-[#c5c6cd] bg-[#f8f9ff] py-3 pl-10 pr-4 text-sm outline-none transition focus:border-[#4b41e1] focus:ring-2 focus:ring-[#4b41e1]/15">
+                        </div>
+                    </div>
+                    <div id="register-email-wrap" class="hidden">
+                        <label class="mb-1 block text-xs font-bold text-[#45474c]">企业邮箱</label>
+                        <div class="relative">
+                            <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[20px] text-[#75777d]">mail</span>
+                            <input id="register-email" type="email" autocomplete="email" placeholder="hr@enterprise.com" class="neo-input w-full rounded-lg border border-[#c5c6cd] bg-[#f8f9ff] py-3 pl-10 pr-4 text-sm outline-none transition focus:border-[#4b41e1] focus:ring-2 focus:ring-[#4b41e1]/15">
+                        </div>
+                    </div>
+                    <div>
+                        <div class="mb-1 flex items-center justify-between">
+                            <label class="block text-xs font-bold text-[#45474c]">安全密码</label>
+                            <span class="text-xs font-bold text-[#4b41e1]">忘记密码?</span>
+                        </div>
+                        <div class="relative">
+                            <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[20px] text-[#75777d]">lock</span>
+                            <input id="login-password" type="password" autocomplete="current-password" placeholder="••••••••" class="neo-input w-full rounded-lg border border-[#c5c6cd] bg-[#f8f9ff] py-3 pl-10 pr-4 text-sm outline-none transition focus:border-[#4b41e1] focus:ring-2 focus:ring-[#4b41e1]/15">
+                        </div>
+                    </div>
+                    <div id="register-invite-wrap" class="hidden">
+                        <label class="mb-1 block text-xs font-bold text-[#45474c]">企业邀请码 <span class="text-[#ba1a1a]">*</span></label>
+                        <div class="relative">
+                            <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[20px] text-[#75777d]">card_membership</span>
+                            <input id="register-invite-code" type="text" autocomplete="off" placeholder="TK-XXXX-XXXX" class="neo-input w-full rounded-lg border border-[#c5c6cd] bg-[#f8f9ff] py-3 pl-10 pr-4 font-mono text-sm uppercase outline-none transition focus:border-[#4b41e1] focus:ring-2 focus:ring-[#4b41e1]/15">
+                        </div>
+                        <p class="mt-1 text-[11px] leading-tight text-[#45474c]/70">此系统仅限受邀企业成员注册使用。</p>
+                    </div>
+                    <label class="flex items-center gap-2 text-[13px] leading-[18px] text-[#45474c]">
+                        <input class="h-4 w-4 rounded border-[#c5c6cd] text-[#4b41e1] focus:ring-[#4b41e1]/20" type="checkbox">
+                        保持登录状态 (30天)
+                    </label>
+                    <div id="login-error" class="hidden rounded-lg border border-rose-100 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700"></div>
                 </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-500 mb-1">密码</label>
-                    <input id="login-password" type="password" autocomplete="current-password" class="neo-input w-full px-3.5 py-2.5 rounded-lg text-sm focus:outline-none transition-all">
+                <button id="btn-login-submit" type="submit" class="mt-6 flex w-full items-center justify-center gap-2 rounded-lg bg-[#4b41e1] py-3 text-xs font-bold text-white transition hover:opacity-90 active:scale-[0.98]">
+                    <span id="login-spinner" class="hidden h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin"></span>
+                    <span id="auth-submit-label">立即登录</span>
+                    <span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+                </button>
+                <div class="mt-8 border-t border-[#c5c6cd] pt-6 text-center">
+                    <p class="mb-4 text-[13px] leading-[18px] text-[#45474c]">其他登录方式</p>
+                    <div class="flex justify-center gap-4">
+                        <button type="button" class="flex h-10 w-10 items-center justify-center rounded-lg border border-[#c5c6cd] text-[#091426] transition hover:bg-[#eff4ff]">
+                            <span class="material-symbols-outlined text-[19px]">chat</span>
+                        </button>
+                        <button type="button" class="flex h-10 w-10 items-center justify-center rounded-lg border border-[#c5c6cd] text-[#091426] transition hover:bg-[#eff4ff]">
+                            <span class="material-symbols-outlined text-[19px]">account_circle</span>
+                        </button>
+                    </div>
                 </div>
-                <div id="register-invite-wrap" class="hidden">
-                    <label class="block text-xs font-bold text-slate-500 mb-1">邀请码</label>
-                    <input id="register-invite-code" type="text" autocomplete="off" placeholder="请输入内测邀请码" class="neo-input w-full px-3.5 py-2.5 rounded-lg text-sm focus:outline-none transition-all">
+            </form>
+            <footer class="mt-8 space-y-1 text-center">
+                <p class="text-[12px] text-[#45474c]">© 2024 TK-AI Intelligence Systems. All Rights Reserved.</p>
+                <div class="flex justify-center gap-3 text-[12px] font-bold text-[#45474c]">
+                    <span>服务条款</span><span>|</span><span>隐私政策</span><span>|</span><span>系统状态</span>
                 </div>
-                <div id="login-error" class="hidden rounded-lg border border-rose-100 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700"></div>
-            </div>
-            <button id="btn-login-submit" type="submit" class="primary-action mt-6 w-full px-5 py-2.5 rounded-lg text-sm font-bold flex items-center justify-center gap-2">
-                <span id="login-spinner" class="hidden w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                <span id="auth-submit-label">安全登入</span>
-            </button>
-        </form>
+            </footer>
+        </main>
     </div>
 
     <div id="toast" class="fixed bottom-5 right-5 transform translate-y-20 opacity-0 transition-all duration-300 px-5 py-3.5 rounded-lg border border-white/70 shadow-[0_18px_55px_rgba(15,23,42,0.16)] z-[100] flex items-center gap-2.5 font-medium backdrop-blur-xl">
@@ -656,36 +751,39 @@
     </div>
 
     <aside class="command-sidebar fixed left-0 top-0 z-50 hidden h-screen w-[260px] flex-col overflow-y-auto px-3 py-5 lg:flex">
-        <div class="px-4 pb-7">
-            <div class="mb-5 flex h-11 w-11 items-center justify-center rounded-xl bg-white/10 text-2xl text-white shadow-[0_20px_42px_rgba(0,0,0,0.22)]">✨</div>
-            <h1 class="text-xl font-black text-white">Command Center</h1>
-            <p class="mt-1 text-xs font-bold uppercase tracking-wide text-[#8590a6]">TikTok AI Operator</p>
+        <div class="mb-8 mt-1 px-4">
+            <h1 class="text-[20px] font-black leading-7 text-white">Command Center</h1>
+            <p class="text-xs font-bold text-[#8590a6]">AI Operator v2.4</p>
         </div>
         <nav class="flex-1 space-y-1">
             <button data-target="section-market" class="nav-btn nav-active">
                 <span class="material-symbols-outlined text-[20px]">dashboard</span>
-                <span>运营总览</span>
+                <span>Dashboard</span>
             </button>
             <button data-target="section-sentiment" class="nav-btn">
                 <span class="material-symbols-outlined text-[20px]">psychology</span>
-                <span>AI 诊断</span>
+                <span>AI Diagnosis</span>
             </button>
             <button data-target="section-products" class="nav-btn">
-                <span class="material-symbols-outlined text-[20px]">inventory_2</span>
-                <span>选品建议</span>
+                <span class="material-symbols-outlined text-[20px]">rebase_edit</span>
+                <span>Selection Recommendations</span>
             </button>
             <button data-target="section-details" class="nav-btn">
                 <span class="material-symbols-outlined text-[20px]">query_stats</span>
-                <span>后台明细</span>
+                <span>Detailed Metrics</span>
             </button>
         </nav>
-        <div class="mt-7 space-y-3 border-t border-white/10 pt-5">
-            <div class="rounded-xl bg-white/5 p-4">
-                <div class="text-xs font-black uppercase tracking-wide text-[#8590a6]">当前策略</div>
-                <div class="mt-2 text-sm font-bold leading-relaxed text-white">专注 TikTok 评论抓取与选品决策闭环</div>
-            </div>
-            <button id="sidebar-run-pipeline-shortcut" type="button" class="w-full rounded-xl bg-[#4b41e1] px-4 py-3 text-sm font-black text-white shadow-[0_18px_34px_rgba(75,65,225,0.28)] transition hover:bg-[#645efb]">
-                新建诊断
+        <div class="mt-auto space-y-1 border-t border-white/10 pt-5">
+            <button id="sidebar-run-pipeline-shortcut" type="button" class="mb-4 w-full rounded-lg bg-[#4b41e1] px-4 py-3 text-xs font-bold text-white transition hover:opacity-90">
+                New Analysis
+            </button>
+            <button type="button" class="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-xs font-bold text-[#8590a6] transition hover:bg-[#1e293b] hover:text-white">
+                <span class="material-symbols-outlined text-[20px]">settings</span>
+                <span>Settings</span>
+            </button>
+            <button type="button" class="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-xs font-bold text-[#8590a6] transition hover:bg-[#1e293b] hover:text-white">
+                <span class="material-symbols-outlined text-[20px]">help</span>
+                <span>Support</span>
             </button>
         </div>
     </aside>
@@ -700,14 +798,14 @@
                             <h2 class="text-xl font-black tracking-tight text-[#091426] sm:text-2xl">TikTok Intelligence</h2>
                             <span id="api-status-badge" class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-bold">
                                 <span class="h-2 w-2 rounded-full bg-amber-400 animate-pulse"></span>
-                                等待 API 连接
+                                API Status: Live
                             </span>
                         </div>
                     </div>
                     <div class="flex flex-wrap items-center gap-3">
                         <div class="command-search hidden items-center gap-2 rounded-lg px-3 py-2 md:flex">
                             <span class="material-symbols-outlined text-[19px] text-slate-400">search</span>
-                            <span class="text-xs font-semibold text-slate-400">搜索商品、报告、Brief</span>
+                            <span class="text-xs font-semibold text-slate-400">Global Search</span>
                         </div>
                         <button id="btn-logout" class="command-logout hidden rounded-lg px-3 py-2 text-xs font-black transition">登出 🔓</button>
                         <div class="command-avatar flex h-9 w-9 items-center justify-center rounded-full text-xs font-black">TK</div>
@@ -747,102 +845,206 @@
             </div>
         </div>
 
-        <div id="section-market" class="page-section fade-in">
-            <div class="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div id="section-market" class="page-section fade-in space-y-6">
+            <div class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                 <div>
-                    <div class="flex flex-wrap gap-2 mb-3">
-                        <span class="kicker-pill">[LIVE]</span>
-                        <span class="kicker-pill">[SYNCED]</span>
-                        <span class="kicker-pill">[SECURED]</span>
-                    </div>
-                    <h1 class="text-3xl font-bold text-slate-900 mb-2">运营总览</h1>
+                    <h1 class="stitch-display">你好, TikTok 运营者</h1>
+                    <p class="stitch-body mt-1">这里是您的 TikTok Intelligence 实时运营中控台。今日数据已就绪。</p>
                 </div>
-                <div class="flex flex-wrap gap-3">
-                    <button id="btn-run-radar-patrol" class="quiet-button px-5 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-1.5">
-                        <span id="radar-patrol-spinner" class="hidden w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></span>
-                        <span>TikTok 自动巡检</span>
+                <div class="flex flex-wrap gap-4">
+                    <button class="flex items-center gap-2 rounded-lg border border-[#c5c6cd] px-4 py-2 text-xs font-bold text-[#0b1c30] transition hover:bg-[#eff4ff]">
+                        <span class="material-symbols-outlined text-[18px]">calendar_month</span>
+                        最后 7 天
                     </button>
-                    <button id="btn-show-add-modal" class="primary-action px-5 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-1.5">
-                        <span>➕</span> 添加监控商品
+                    <button id="btn-show-add-modal" class="rounded-lg bg-[#4b41e1] px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:opacity-90">
+                        新增分析商品
                     </button>
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5 mb-8">
-                <div class="glass-card metric-card rounded-lg p-6 border border-slate-200/60">
-                    <div class="flex items-center justify-between gap-3">
-                        <span class="metric-label">整体健康分</span>
-                        <span class="kicker-pill">健康</span>
+            <div class="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
+                <div class="stitch-card flex min-h-[128px] flex-col justify-between p-6">
+                    <div class="flex items-start justify-between">
+                        <span class="stitch-label">Avg Health Score</span>
+                        <span class="material-symbols-outlined text-[#4b41e1]">favorite</span>
                     </div>
-                    <div id="live-average-score" class="metric-value mt-5">--</div>
-                    <div class="mt-4 h-1.5 rounded-full bg-slate-100 overflow-hidden">
-                        <div id="live-diagnostic-coverage" class="h-full w-0 bg-indigo-500 transition-all duration-500"></div>
+                    <div class="mt-4 flex items-center gap-4">
+                        <div class="radial-score flex h-16 w-16 items-center justify-center rounded-full" style="--value: 84;">
+                            <span id="live-average-score" class="text-xl font-black text-[#091426]">--</span>
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-1 text-xs font-bold text-[#00a472]">
+                                <span class="material-symbols-outlined text-sm">arrow_upward</span>
+                                4.2%
+                            </div>
+                            <div class="stitch-body">较上周对比</div>
+                            <div class="mt-1 h-1 w-24 overflow-hidden rounded-full bg-[#e2e8f0]">
+                                <div id="live-diagnostic-coverage" class="h-full w-0 bg-[#4b41e1] transition-all duration-500"></div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="mt-3 text-xs text-slate-500">
-                        已诊断 <span id="live-diagnosed-count" class="font-black text-slate-700">0</span> / <span id="live-product-count" class="font-black text-slate-700">0</span> 个商品
+                    <div class="mt-3 text-xs font-semibold text-[#45474c]">
+                        已诊断 <span id="live-diagnosed-count" class="font-black text-[#091426]">0</span> / <span id="live-product-count" class="font-black text-[#091426]">0</span>
                     </div>
                 </div>
 
-                <div class="glass-card metric-card rounded-lg p-6 border border-slate-200/60">
-                    <div class="flex items-center justify-between gap-3">
-                        <span class="metric-label">风险商品</span>
-                        <span class="kicker-pill">红线</span>
+                <div class="stitch-card flex min-h-[128px] flex-col justify-between p-6">
+                    <div class="flex items-start justify-between">
+                        <span class="stitch-label">Risk Item Count</span>
+                        <span class="material-symbols-outlined text-[#ba1a1a]">warning</span>
                     </div>
-                    <div id="live-critical-count" class="metric-value mt-5 text-rose-600">0</div>
-                    <div id="live-risk-list" class="mt-4 text-xs text-slate-500 leading-relaxed">暂无风险商品。</div>
+                    <div class="mt-4">
+                        <div id="live-critical-count" class="stitch-display">0</div>
+                        <div class="mt-2 flex items-center gap-2">
+                            <span class="rounded bg-[#ffdad6] px-2 py-0.5 text-[10px] font-black text-[#93000a]">高风险</span>
+                            <span class="stitch-body">需立即处理</span>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="glass-card metric-card rounded-lg p-6 border border-slate-200/60">
-                    <div class="flex items-center justify-between gap-3">
-                        <span class="metric-label">证据可信度</span>
-                        <span class="kicker-pill">审计</span>
+                <div class="stitch-card flex min-h-[128px] flex-col justify-between p-6">
+                    <div class="flex items-start justify-between">
+                        <span class="stitch-label">Evidence Credibility</span>
+                        <span class="material-symbols-outlined text-[#00a472]">verified_user</span>
                     </div>
-                    <div id="executive-evidence-trust" class="metric-value mt-5 text-emerald-600">--</div>
-                    <div id="executive-evidence-meta" class="mt-4 text-xs text-slate-500 leading-relaxed">等待证据账本同步。</div>
+                    <div class="mt-4">
+                        <div id="executive-evidence-trust" class="stitch-display">--</div>
+                        <div class="mt-2 h-1 overflow-hidden rounded-full bg-[#c5c6cd]">
+                            <div class="h-full w-[98%] bg-[#00a472]"></div>
+                        </div>
+                        <div id="executive-evidence-meta" class="mt-1 font-mono text-[11px] text-[#45474c]">Confidence: ±0.4%</div>
+                    </div>
                 </div>
 
-                <div class="glass-card metric-card rounded-lg p-6 border border-slate-200/60">
-                    <div class="flex items-center justify-between gap-3">
-                        <span class="metric-label">建议动作</span>
-                        <span id="live-workflow-status" class="px-3 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-bold">等待同步</span>
+                <div class="flex min-h-[128px] flex-col justify-between rounded-xl bg-[#091426] p-6 text-white shadow-sm">
+                    <div class="flex items-start justify-between">
+                        <span class="text-xs font-bold opacity-70">Inspection Engine</span>
+                        <span class="material-symbols-outlined text-[#4edea3]">robot_2</span>
                     </div>
-                    <div id="live-next-action" class="mt-5 text-base font-black leading-relaxed text-slate-900">等待云端商品数据同步。</div>
+                    <div class="mt-4 flex flex-col items-center">
+                        <div class="relative">
+                            <div class="absolute inset-0 rounded-full bg-[#4edea3] opacity-30 animate-ping"></div>
+                            <span id="live-workflow-status" class="relative z-10 text-xl font-black text-[#4edea3]">ACTIVE</span>
+                        </div>
+                        <div class="mt-2 text-[13px] text-[#8590a6]">TikTok Auto-Inspection</div>
+                        <div id="live-next-action" class="mt-2 line-clamp-2 text-center text-[11px] leading-4 text-[#bcc7de]">等待云端商品数据同步。</div>
+                    </div>
+                    <button id="btn-run-radar-patrol" class="mt-3 flex items-center justify-center gap-2 rounded-lg bg-white/10 px-3 py-2 text-xs font-bold text-white transition hover:bg-white/20">
+                        <span id="radar-patrol-spinner" class="hidden h-4 w-4 rounded-full border-2 border-[#4edea3] border-t-transparent animate-spin"></span>
+                        Last heartbeat: 2s ago
+                    </button>
                 </div>
             </div>
 
-            <div class="glass-card rounded-lg p-6 md:p-8 border border-slate-200/60">
-                <div class="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
-                    <div>
-                        <div class="flex flex-wrap gap-2 mb-3">
-                            <span class="kicker-pill">GPT汇总</span>
-                            <span class="kicker-pill">经营复盘</span>
+            <div class="grid grid-cols-12 gap-6">
+                <div class="stitch-panel col-span-12 overflow-hidden lg:col-span-8">
+                    <div class="flex">
+                        <div class="flex-1 space-y-4 p-8">
+                            <div class="flex items-center gap-2">
+                                <div class="rounded-lg bg-[#4b41e1]/10 p-2">
+                                    <span class="material-symbols-outlined text-[#4b41e1]">auto_awesome</span>
+                                </div>
+                                <h2 class="stitch-title">AI 综合经营报告</h2>
+                            </div>
+                            <p id="ai-executive-report" class="hidden">登录后将基于健康分、风险商品、证据可信度和建议动作生成综合经营报告。</p>
+                            <p id="ai-executive-summary" class="text-sm leading-7 text-[#0b1c30]">等待同步。</p>
+                            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                <div class="rounded-xl border border-[#c5c6cd] bg-white p-4">
+                                    <div class="mb-2 flex items-center gap-2 text-xs font-bold text-[#ba1a1a]">
+                                        <span class="material-symbols-outlined text-sm">feedback</span>
+                                        主要负面评价原因
+                                    </div>
+                                    <p id="ai-executive-risk" class="stitch-body">等待同步。</p>
+                                </div>
+                                <div class="rounded-xl border border-[#c5c6cd] bg-white p-4">
+                                    <div class="mb-2 flex items-center gap-2 text-xs font-bold text-[#00a472]">
+                                        <span class="material-symbols-outlined text-sm">track_changes</span>
+                                        优化目标 (SPS)
+                                    </div>
+                                    <p id="ai-executive-action" class="stitch-body">等待同步。</p>
+                                </div>
+                            </div>
+                            <div class="flex flex-wrap items-center gap-4 border-t border-[#c5c6cd]/50 pt-4">
+                                <button data-executive-brief="selection" class="rounded-lg bg-[#091426] px-6 py-2.5 text-xs font-bold text-white transition hover:opacity-90">
+                                    Next Steps
+                                    <span class="material-symbols-outlined ml-1 text-[18px] align-[-4px]">chevron_right</span>
+                                </button>
+                                <button id="btn-refresh-executive-report" class="rounded-lg border border-[#c5c6cd] px-6 py-2.5 text-xs font-bold text-[#0b1c30] transition hover:bg-white">
+                                    <span class="material-symbols-outlined mr-1 text-[18px] align-[-4px]">refresh</span>
+                                    Regenerate Report
+                                </button>
+                                <button data-executive-brief="supply_chain" class="rounded-lg border border-[#c5c6cd] px-4 py-2.5 text-xs font-bold text-[#0b1c30] transition hover:bg-white">供应链 Brief</button>
+                                <button data-executive-brief="appeal" class="rounded-lg border border-[#c5c6cd] px-4 py-2.5 text-xs font-bold text-[#0b1c30] transition hover:bg-white">申诉 Brief</button>
+                            </div>
+                            <div id="ai-executive-report-meta" class="text-xs font-bold text-[#45474c]">等待同步</div>
                         </div>
-                        <h2 class="text-2xl font-black text-slate-900">AI 综合经营报告</h2>
-                    </div>
-                    <div class="flex flex-wrap gap-2">
-                        <button id="btn-refresh-executive-report" class="quiet-button px-4 py-2 rounded-lg text-sm font-bold">重新生成</button>
-                        <button data-executive-brief="supply_chain" class="quiet-button px-4 py-2 rounded-lg text-sm font-bold">供应链 Brief</button>
-                        <button data-executive-brief="appeal" class="quiet-button px-4 py-2 rounded-lg text-sm font-bold">申诉 Brief</button>
-                        <button data-executive-brief="selection" class="quiet-button px-4 py-2 rounded-lg text-sm font-bold">选品 Brief</button>
+                        <div class="relative hidden w-1/3 overflow-hidden bg-[#091426] lg:block">
+                            <img class="absolute inset-0 h-full w-full object-cover opacity-60 mix-blend-screen" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCe7kmNKTEU1xhFka3ixWXyl0u_BZepK08YgYu63o7OJJJam60uLIhua4OB0bw8CGL4XikO9ttvUiMOs5jPdTWq9_seGcqzRikt3ajU_gfbhiYuuxgazByOWap5WW_PDTSWSmG66_WmLYuHLhhfQ0lffRLyUyI4klqHrRsTqSHiew1Jo77xvL4W2UE8OKddr0X6LlKRRGVOVQ3TuFjFlX25A9W6Zbh8nL9tFIs6mqs97Du9H9sWEltFeETVwyN55AZzF37JhNb1LQ" alt="">
+                            <div class="absolute inset-0 bg-gradient-to-l from-transparent via-transparent to-[#eff4ff]"></div>
+                        </div>
                     </div>
                 </div>
-                <div class="executive-report-box mt-6 rounded-lg p-5">
-                    <p id="ai-executive-report" class="hidden">登录后将基于健康分、风险商品、证据可信度和建议动作生成综合经营报告。</p>
-                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                        <div class="bg-white/70 border border-slate-200/70 rounded-lg p-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
-                            <div class="text-xs font-black text-indigo-600 mb-2">经营摘要</div>
-                            <p id="ai-executive-summary" class="text-sm leading-7 text-slate-700">等待同步。</p>
+
+                <div class="col-span-12 flex flex-col gap-6 rounded-2xl border-2 border-[#ba1a1a]/20 bg-white p-8 shadow-[0_10px_40px_-15px_rgba(186,26,26,0.1)] lg:col-span-4">
+                    <div class="flex items-center gap-3">
+                        <div class="flex h-10 w-10 items-center justify-center rounded-full bg-[#ffdad6] text-[#93000a]">
+                            <span class="material-symbols-outlined">gavel</span>
                         </div>
-                        <div class="bg-white/70 border border-slate-200/70 rounded-lg p-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
-                            <div class="text-xs font-black text-rose-600 mb-2">风险原因</div>
-                            <p id="ai-executive-risk" class="text-sm leading-7 text-slate-700">等待同步。</p>
-                        </div>
-                        <div class="bg-white/70 border border-slate-200/70 rounded-lg p-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
-                            <div class="text-xs font-black text-emerald-600 mb-2">下一步动作</div>
-                            <p id="ai-executive-action" class="text-sm leading-7 text-slate-700">等待同步。</p>
+                        <div>
+                            <h3 class="stitch-title text-[#ba1a1a]">风险预警提示</h3>
+                            <p class="stitch-body">当前检测到风险商品</p>
                         </div>
                     </div>
-                    <div id="ai-executive-report-meta" class="mt-4 text-xs font-bold text-slate-400">等待同步</div>
+                    <div id="live-risk-list" class="space-y-4 text-sm leading-6 text-[#45474c]">暂无风险商品。</div>
+                    <button class="mt-auto rounded-lg bg-[#ba1a1a] py-3 text-xs font-bold text-white shadow-lg shadow-[#ba1a1a]/10 transition hover:opacity-90">
+                        立即处理风险
+                    </button>
+                </div>
+            </div>
+
+            <div class="stitch-card overflow-hidden">
+                <div class="flex items-center justify-between border-b border-[#c5c6cd] bg-[#eff4ff] px-6 py-4">
+                    <span class="stitch-label text-[#0b1c30]">实时监控反馈</span>
+                    <div class="flex gap-2">
+                        <span class="material-symbols-outlined text-sm text-[#45474c]">filter_list</span>
+                        <span class="material-symbols-outlined text-sm text-[#45474c]">more_vert</span>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left">
+                        <thead>
+                            <tr class="border-b border-[#c5c6cd]/40 text-xs font-bold text-[#45474c]">
+                                <th class="px-8 py-4">检测项</th>
+                                <th class="px-8 py-4">检测频率</th>
+                                <th class="px-8 py-4">状态</th>
+                                <th class="px-8 py-4">准确度</th>
+                                <th class="px-8 py-4">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-sm text-[#0b1c30]">
+                            <tr class="border-b border-[#c5c6cd]/30 transition hover:bg-[#eff4ff]">
+                                <td class="px-8 py-4 font-bold">负面评价语义分析</td>
+                                <td class="px-8 py-4 font-mono text-[#45474c]">Real-time</td>
+                                <td class="px-8 py-4"><span class="rounded-full bg-[#6ffbbe] px-2 py-1 text-[10px] font-bold text-[#005236]">运行中</span></td>
+                                <td class="px-8 py-4 font-mono">99.1%</td>
+                                <td class="px-8 py-4"><button class="font-bold text-[#4b41e1]">查看详情</button></td>
+                            </tr>
+                            <tr class="border-b border-[#c5c6cd]/30 transition hover:bg-[#eff4ff]">
+                                <td class="px-8 py-4 font-bold">竞品动态抓取</td>
+                                <td class="px-8 py-4 font-mono text-[#45474c]">Every 5m</td>
+                                <td class="px-8 py-4"><span class="rounded-full bg-[#6ffbbe] px-2 py-1 text-[10px] font-bold text-[#005236]">运行中</span></td>
+                                <td class="px-8 py-4 font-mono">96.4%</td>
+                                <td class="px-8 py-4"><button class="font-bold text-[#4b41e1]">配置</button></td>
+                            </tr>
+                            <tr class="transition hover:bg-[#eff4ff]">
+                                <td class="px-8 py-4 font-bold">流量模型异常</td>
+                                <td class="px-8 py-4 font-mono text-[#45474c]">Daily</td>
+                                <td class="px-8 py-4"><span class="rounded-full bg-[#e2dfff] px-2 py-1 text-[10px] font-bold text-[#3323cc]">待命</span></td>
+                                <td class="px-8 py-4 font-mono">--</td>
+                                <td class="px-8 py-4"><button class="font-bold text-[#4b41e1]">立即执行</button></td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
@@ -1008,175 +1210,270 @@
         </div>
 
         <div id="section-sentiment" class="page-section hidden fade-in">
-            <div class="mb-8">
-                <div class="flex flex-wrap gap-2 mb-3">
-                    <span class="kicker-pill">抓取中</span>
-                    <span class="kicker-pill">[GPT-5.5]</span>
-                    <span class="kicker-pill">自动识别</span>
-                </div>
-                <h1 class="text-3xl font-bold text-slate-900 mb-2">AI 舆情诊断</h1>
-            </div>
-
-            <div class="glass-card p-6 md:p-8 rounded-lg mb-8">
-                <h3 class="text-lg font-bold text-indigo-900 mb-2 flex items-center gap-2">
-                    <span>🚀</span> 启动实时 AI 抓取与诊断管道
-                </h3>
-                <div class="flex flex-wrap gap-2 mb-4">
-                    <span class="kicker-pill">TikTok</span>
-                    <span class="kicker-pill">链接直抓</span>
-                    <span class="kicker-pill">自动复跑</span>
-                </div>
-                <div class="flex flex-col md:flex-row gap-3">
-                    <input id="pipeline-url" type="text" placeholder="粘贴 TikTok 商品视频链接，例如 https://www.tiktok.com/@shop/video/..." class="neo-input flex-grow px-4 py-2.5 rounded-lg text-sm focus:outline-none transition-all">
-                    <button id="btn-run-pipeline" class="primary-action px-6 py-2.5 rounded-lg text-sm font-medium flex items-center justify-center gap-2">
-                        <span id="spinner" class="hidden w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                        抓取评论并诊断
-                    </button>
-                    <button id="btn-copy-local-capture-command" class="hidden quiet-button px-4 py-2.5 rounded-lg text-sm font-bold">
-                        本机直采
-                    </button>
-                </div>
-                <details class="mt-4 rounded-lg border border-slate-200/70 bg-white/45 p-4">
-                    <summary class="cursor-pointer select-none text-xs font-black text-slate-500">应急入口：TikTok 评论文本导入</summary>
-                    <p class="mt-2 text-xs text-slate-500 leading-relaxed">主流程只使用 TikTok 链接直抓。只有 TikTok 页面短时不可访问或接口限流时，才把运营侧已整理的评论文本粘贴到这里复盘。</p>
-                    <div class="mt-3 grid grid-cols-1 lg:grid-cols-[160px_1fr_auto] gap-3">
-                        <select id="manual-source-platform" class="neo-input px-3 py-2.5 rounded-lg text-sm focus:outline-none">
-                            <option value="manual">TikTok 文本</option>
-                        </select>
-                        <input id="manual-source-url" type="text" placeholder="可选：原始 TikTok 视频链接" class="neo-input px-3 py-2.5 rounded-lg text-sm focus:outline-none">
-                        <button id="btn-import-comments" class="quiet-button px-4 py-2.5 rounded-lg text-sm font-bold">导入分析</button>
+            <div class="mx-auto max-w-[1200px] space-y-8">
+                <section class="flex flex-col items-center justify-center py-8 text-center">
+                    <h1 class="stitch-display">AI 智能视频诊断</h1>
+                    <p class="stitch-body mt-2 max-w-xl">输入 TikTok 产品视频链接，即刻分析用户舆情、产品口碑及潜在风险。</p>
+                    <div class="group relative mt-6 w-full max-w-3xl">
+                        <div class="absolute -inset-1 rounded-xl bg-gradient-to-r from-[#4b41e1]/20 to-[#091426]/20 opacity-25 blur transition duration-1000 group-hover:opacity-40"></div>
+                        <div class="relative flex flex-col gap-4 rounded-xl border border-[#c5c6cd] bg-white p-4 shadow-sm md:flex-row">
+                            <div class="flex flex-1 items-center rounded-lg border border-[#c5c6cd] bg-white px-4 transition focus-within:border-[#4b41e1] focus-within:ring-2 focus-within:ring-[#4b41e1]/20">
+                                <span class="material-symbols-outlined text-[#75777d]">link</span>
+                                <input id="pipeline-url" type="text" placeholder="请输入 TikTok 视频链接..." class="neo-input ml-2 w-full border-none bg-transparent py-3 text-sm focus:ring-0">
+                            </div>
+                            <button id="btn-run-pipeline" class="flex items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-[#4b41e1] px-8 py-3 text-xs font-bold text-white shadow-md transition hover:bg-[#645efb] active:scale-95">
+                                <span id="spinner" class="hidden h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin"></span>
+                                <span class="material-symbols-outlined text-[18px]">analytics</span>
+                                开始诊断
+                            </button>
+                            <button id="btn-copy-local-capture-command" class="hidden rounded-lg border border-[#c5c6cd] px-4 py-3 text-xs font-bold text-[#0b1c30]">本机直采</button>
+                        </div>
                     </div>
-                    <textarea id="manual-comments-input" rows="5" placeholder="每行一条评论，仅用于 TikTok 临时复盘。" class="neo-input mt-3 w-full px-3 py-3 rounded-lg text-sm leading-6 focus:outline-none resize-y"></textarea>
-                </details>
+                    <details class="group mt-4 w-full max-w-3xl">
+                        <summary class="flex cursor-pointer list-none items-center justify-center gap-1 text-xs font-bold text-[#45474c]/60 transition hover:text-[#45474c]">
+                            <span class="material-symbols-outlined text-sm">backup</span>
+                            无法解析链接？尝试手动上传 CSV/JSON 备份数据
+                        </summary>
+                        <div class="mt-4 rounded-xl border-2 border-dashed border-[#c5c6cd] bg-[#eff4ff] p-6 text-left">
+                            <div class="grid grid-cols-1 gap-3 lg:grid-cols-[160px_1fr_auto]">
+                                <select id="manual-source-platform" class="neo-input rounded-lg px-3 py-2.5 text-sm focus:outline-none">
+                                    <option value="manual">TikTok 文本</option>
+                                </select>
+                                <input id="manual-source-url" type="text" placeholder="可选：原始 TikTok 视频链接" class="neo-input rounded-lg px-3 py-2.5 text-sm focus:outline-none">
+                                <button id="btn-import-comments" class="rounded-lg border border-[#c5c6cd] bg-white px-4 py-2.5 text-sm font-bold text-[#0b1c30]">导入分析</button>
+                            </div>
+                            <textarea id="manual-comments-input" rows="5" placeholder="每行一条评论，仅用于 TikTok 临时复盘。" class="neo-input mt-3 w-full resize-y rounded-lg px-3 py-3 text-sm leading-6 focus:outline-none"></textarea>
+                        </div>
+                    </details>
+                </section>
 
-                <div id="pipeline-loading-state" class="hidden mt-5 rounded-lg border border-indigo-100 bg-indigo-50/70 px-4 py-3">
-                    <div class="flex items-center justify-between gap-4">
-                        <div class="flex items-center gap-3 min-w-0">
-                            <span class="w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin flex-none"></span>
-                            <div class="min-w-0">
-                                <div id="pipeline-loading-title" class="text-sm font-black text-indigo-700">正在抓取并分析评论</div>
-                                <div id="pipeline-loading-detail" class="text-xs text-slate-500 mt-0.5">请稍候，系统会自动刷新诊断报告。</div>
+                <div id="pipeline-loading-state" class="hidden animate-fade-in space-y-6 py-4">
+                    <div class="relative overflow-hidden rounded-xl border border-[#c5c6cd] bg-white p-8 shadow-sm">
+                        <div class="absolute left-0 top-0 h-1 w-full bg-[#eff4ff]">
+                            <div class="h-full w-1/4 bg-[#4b41e1] transition-all duration-500"></div>
+                        </div>
+                        <div class="mb-6 flex items-start justify-between">
+                            <div>
+                                <h3 id="pipeline-loading-title" class="stitch-title">正在分析视频舆情数据...</h3>
+                                <p id="pipeline-loading-detail" class="mt-1 max-w-md truncate font-mono text-[13px] text-[#45474c]">TikTok API URL: ...</p>
+                            </div>
+                            <span id="progress-percent" class="rounded-full border border-[#4b41e1]/20 bg-[#4b41e1]/10 px-3 py-1 text-xs font-bold text-[#4b41e1] animate-pulse">0%</span>
+                        </div>
+                        <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
+                            <div class="rounded-lg border border-[#c5c6cd] bg-[#eff4ff] p-4">
+                                <div class="flex items-center justify-between"><span class="stitch-label">Parsing Link</span><span class="h-2 w-2 rounded-full bg-[#4b41e1]"></span></div>
+                                <div class="mt-2 h-1 overflow-hidden rounded-full bg-[#c5c6cd]"><div class="h-full w-full bg-[#4b41e1]"></div></div>
+                            </div>
+                            <div class="rounded-lg border border-transparent bg-white/50 p-4 opacity-50">
+                                <div class="flex items-center justify-between"><span class="stitch-label">Crawling Comments</span><span class="h-2 w-2 rounded-full bg-[#4b41e1]"></span></div>
+                                <div class="mt-2 h-1 rounded-full bg-[#c5c6cd]"></div>
+                            </div>
+                            <div class="rounded-lg border border-transparent bg-white/50 p-4 opacity-50">
+                                <div class="flex items-center justify-between"><span class="stitch-label">AI Analyzing</span><span class="h-2 w-2 rounded-full bg-[#4b41e1]"></span></div>
+                                <div class="mt-2 h-1 rounded-full bg-[#c5c6cd]"></div>
+                            </div>
+                            <div class="rounded-lg border border-transparent bg-white/50 p-4 opacity-50">
+                                <div class="flex items-center justify-between"><span class="stitch-label">Generating Brief</span><span class="h-2 w-2 rounded-full bg-[#4b41e1]"></span></div>
+                                <div class="mt-2 h-1 rounded-full bg-[#c5c6cd]"></div>
                             </div>
                         </div>
-                        <span id="progress-percent" class="font-mono text-indigo-700 bg-white/70 px-2.5 py-1 rounded-md border border-indigo-100 text-xs font-bold">0%</span>
                     </div>
                 </div>
-            </div>
 
-            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-                <div class="text-slate-800 font-bold text-xl flex items-center gap-2">
-                    <span class="w-3 h-3 rounded-full bg-indigo-400 animate-ping"></span>
-                    当前诊断商品：<span id="active-product-title" class="text-indigo-600">加载中...</span>
+                <div class="grid grid-cols-1 gap-6 opacity-40 grayscale md:grid-cols-3">
+                    <div class="flex h-48 flex-col items-center justify-center rounded-xl border border-[#c5c6cd] bg-white">
+                        <span class="material-symbols-outlined mb-2 text-4xl">bar_chart</span>
+                        <div class="h-2 w-24 rounded-full bg-[#eff4ff]"></div>
+                    </div>
+                    <div class="flex h-48 flex-col items-center justify-center rounded-xl border border-[#c5c6cd] bg-white">
+                        <span class="material-symbols-outlined mb-2 text-4xl">pie_chart</span>
+                        <div class="h-2 w-24 rounded-full bg-[#eff4ff]"></div>
+                    </div>
+                    <div class="flex h-48 flex-col items-center justify-center rounded-xl border border-[#c5c6cd] bg-white">
+                        <span class="material-symbols-outlined mb-2 text-4xl">show_chart</span>
+                        <div class="h-2 w-24 rounded-full bg-[#eff4ff]"></div>
+                    </div>
                 </div>
-                <div class="w-full md:w-72">
-                    <select id="product-selector" class="neo-input w-full rounded-lg py-2 px-3 focus:outline-none text-sm font-semibold">
-                    </select>
-                </div>
-            </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8" id="report-print-area">
-                <div class="glass-card p-6 md:p-8 rounded-lg">
-                    <h3 class="text-lg font-semibold mb-4 text-slate-800">舆情情感分布比例</h3>
-                    <div id="doughnut-placeholder" class="hidden flex items-center justify-center h-64 text-slate-400 font-medium">等待抓取数据中...</div>
-                    <div class="chart-container" style="height: 300px;" id="doughnut-container">
-                        <canvas id="sentimentChart"></canvas>
+                <div class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+                    <div>
+                        <h2 class="stitch-title">诊断结果报告</h2>
+                        <p class="stitch-body">当前诊断商品：<span id="active-product-title" class="font-bold text-[#4b41e1]">加载中...</span></p>
                     </div>
-                </div>
-                <div class="glass-card p-6 md:p-8 rounded-lg flex flex-col h-full">
-                    <h3 class="text-lg font-semibold mb-4 text-slate-800">AI 提取核心负面标签 TOP 5</h3>
-                    <div id="bar-placeholder" class="hidden flex items-center justify-center h-52 text-slate-400 font-medium">等待抓取数据中...</div>
-                    <div class="chart-container flex-grow" style="height: 250px;" id="bar-container">
-                        <canvas id="keywordChart"></canvas>
-                    </div>
-                    <div id="ai-insight-box" class="mt-4 p-4 rounded-lg border text-sm transition-all duration-300">
-                        <span class="font-bold">🤖 AI 诊断结论：</span> 加载中...
-                    </div>
-                    <div class="mt-4 flex justify-end">
-                        <button id="btn-export-report" class="quiet-button px-4 py-2 text-xs font-semibold rounded-lg flex items-center gap-1.5">
-                            <span>📄</span> 导出 AI 诊断意见书
+                    <div class="flex flex-wrap gap-3">
+                        <select id="product-selector" class="neo-input w-full rounded-lg px-3 py-2 text-sm font-semibold focus:outline-none md:w-72"></select>
+                        <button id="btn-export-report" class="flex items-center gap-2 rounded-lg bg-[#091426] px-6 py-2.5 text-xs font-bold text-white transition hover:bg-[#1e293b]">
+                            <span class="material-symbols-outlined text-[18px]">download</span>
+                            Export Opinion Brief
                         </button>
                     </div>
                 </div>
-            </div>
 
-            <div id="sourcing-radar-panel" class="hidden glass-card rounded-lg border border-emerald-100 bg-emerald-50/40 p-6 md:p-8 mb-8">
-                <div class="mb-5">
-                    <h3 class="text-lg font-black text-slate-900">📦 1688 跨境源头工厂匹配与加权优选大盘</h3>
-                    <p id="sourcing-panel-note" class="text-sm text-slate-600 mt-1">系统将当前客诉转译为供应链改良方向，并推荐 1688 源头工厂进行打样验证。</p>
-                </div>
-                <div class="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-6">
-                    <div class="dark-panel rounded-lg p-4 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.7)]">
-                        <div class="h-80">
-                            <canvas id="factoryRadarChart"></canvas>
+                <div class="grid grid-cols-1 gap-6 md:grid-cols-12" id="report-print-area">
+                    <div class="stitch-card flex flex-col items-center justify-center p-8 text-center md:col-span-4">
+                        <span class="stitch-label uppercase tracking-widest">Health Score</span>
+                        <div id="doughnut-placeholder" class="hidden mt-6 flex h-40 items-center justify-center text-sm text-[#75777d]">等待抓取数据中...</div>
+                        <div class="chart-container mt-3 w-full" style="height: 190px;" id="doughnut-container">
+                            <canvas id="sentimentChart"></canvas>
                         </div>
                     </div>
-                    <div id="factory-card-list" class="space-y-3">
-                        <!-- 推荐工厂卡片由 JS 动态渲染 -->
+                    <div class="stitch-card space-y-6 p-8 md:col-span-8">
+                        <div class="flex items-center justify-between">
+                            <h3 class="stitch-label">Sentiment Distribution</h3>
+                            <div class="flex gap-4 text-sm">
+                                <div class="flex items-center gap-2"><span class="h-3 w-3 rounded-full bg-[#4b41e1]"></span>Positive</div>
+                                <div class="flex items-center gap-2"><span class="h-3 w-3 rounded-full bg-[#ba1a1a]"></span>Negative</div>
+                            </div>
+                        </div>
+                        <div id="bar-placeholder" class="hidden flex h-48 items-center justify-center text-sm text-[#75777d]">等待抓取数据中...</div>
+                        <div class="chart-container" style="height: 220px;" id="bar-container">
+                            <canvas id="keywordChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="stitch-card space-y-4 p-8 md:col-span-12">
+                        <div class="flex items-center gap-2">
+                            <span class="material-symbols-outlined text-[#4b41e1]">auto_awesome</span>
+                            <h3 class="stitch-label">AI Conclusion</h3>
+                        </div>
+                        <div id="ai-insight-box" class="rounded-lg border border-[#c5c6cd] bg-[#eff4ff] p-4 text-sm leading-7 text-[#45474c] transition-all duration-300">
+                            <span class="font-bold">AI 诊断结论：</span> 加载中...
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- 竞品横向 PK 折叠面板：复用当前数据库中的商品诊断结果做多维对比 -->
-            <details id="competitor-vs-panel" class="glass-card rounded-lg overflow-hidden border border-indigo-100 group">
-                <summary class="cursor-pointer select-none list-none px-6 py-4 transition-colors flex items-center justify-between hover:bg-indigo-500/5">
-                    <span class="text-lg font-bold text-slate-900">📊 竞品横向对比</span>
-                    <span class="text-xs font-semibold text-indigo-600 group-open:hidden">展开</span>
-                    <span class="text-xs font-semibold text-indigo-600 hidden group-open:inline">收起</span>
-                </summary>
-                <div class="px-6 pb-6 pt-2 border-t border-slate-100 bg-white/45">
-                    <div class="flex flex-col xl:flex-row xl:items-start gap-5">
-                        <div class="w-full xl:w-80 shrink-0">
-                            <div class="text-xs font-bold text-slate-500 uppercase tracking-wide mb-3">选择 2-3 个已诊断商品</div>
-                            <div id="competitor-checkbox-list" class="space-y-2 max-h-64 overflow-y-auto pr-1">
-                                <!-- 由 JS 根据当前数据库动态生成 -->
-                            </div>
-                    <button id="btn-run-vs-pipeline" class="primary-action mt-4 w-full px-4 py-2.5 text-sm font-bold rounded-lg flex items-center justify-center gap-2">
-                                <span id="vs-spinner" class="hidden w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                                启动多维对比诊断
-                            </button>
+                <div id="sourcing-radar-panel" class="hidden stitch-card p-8">
+                    <div class="mb-5">
+                        <h3 class="stitch-title">1688 跨境源头工厂匹配与加权优选大盘</h3>
+                        <p id="sourcing-panel-note" class="stitch-body mt-1">系统将当前客诉转译为供应链改良方向，并推荐源头工厂进行打样验证。</p>
+                    </div>
+                    <div class="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_360px]">
+                        <div class="rounded-xl border border-[#c5c6cd] bg-white p-4">
+                            <div class="h-80"><canvas id="factoryRadarChart"></canvas></div>
                         </div>
-                        <div class="flex-1 min-w-0">
-                            <div id="vs-empty-state" class="h-64 rounded-lg border border-dashed border-slate-200 bg-slate-50/70 flex items-center justify-center text-sm text-slate-400">
-                                勾选 2-3 个商品后，将在这里生成健康度与负面情绪横向对比图。
+                        <div id="factory-card-list" class="space-y-3"></div>
+                    </div>
+                </div>
+
+                <details id="competitor-vs-panel" class="stitch-card overflow-hidden">
+                    <summary class="flex cursor-pointer select-none items-center justify-between gap-4 px-6 py-4 transition hover:bg-[#eff4ff]">
+                        <span class="stitch-title">竞品横向对比</span>
+                        <span class="material-symbols-outlined">expand_more</span>
+                    </summary>
+                    <div class="border-t border-[#c5c6cd] bg-white p-6">
+                        <div class="flex flex-col gap-5 xl:flex-row xl:items-start">
+                            <div class="w-full shrink-0 xl:w-80">
+                                <div class="mb-3 text-xs font-bold uppercase tracking-wide text-[#45474c]">选择 2-3 个已诊断商品</div>
+                                <div id="competitor-checkbox-list" class="max-h-64 space-y-2 overflow-y-auto pr-1"></div>
+                                <button id="btn-run-vs-pipeline" class="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-[#4b41e1] px-4 py-2.5 text-sm font-bold text-white">
+                                    <span id="vs-spinner" class="hidden h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin"></span>
+                                    启动多维对比诊断
+                                </button>
                             </div>
-                            <div id="vs-chart-wrap" class="hidden dark-panel rounded-lg p-4 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.7)]">
-                                <div class="h-72">
-                                    <canvas id="vsChart"></canvas>
+                            <div class="min-w-0 flex-1">
+                                <div id="vs-empty-state" class="flex h-64 items-center justify-center rounded-lg border border-dashed border-[#c5c6cd] bg-[#eff4ff] text-sm text-[#45474c]">
+                                    勾选 2-3 个商品后，将在这里生成健康度与负面情绪横向对比图。
                                 </div>
-                            </div>
-                            <div id="vs-ai-report" class="hidden mt-4 rounded-lg border border-violet-100 bg-violet-50/70 p-5 text-sm text-violet-800 leading-relaxed whitespace-pre-line shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
-                                <!-- AI 竞品击穿报告由 JS 动态渲染 -->
+                                <div id="vs-chart-wrap" class="hidden rounded-lg border border-[#c5c6cd] bg-white p-4">
+                                    <div class="h-72"><canvas id="vsChart"></canvas></div>
+                                </div>
+                                <div id="vs-ai-report" class="mt-4 hidden rounded-lg border border-[#c5c6cd] bg-[#eff4ff] p-5 text-sm leading-relaxed text-[#45474c] whitespace-pre-line"></div>
                             </div>
                         </div>
                     </div>
-                </div>
-            </details>
+                </details>
+            </div>
         </div>
 
-        <div id="section-products" class="page-section hidden fade-in">
-            <div class="mb-8">
-                <div class="flex flex-wrap gap-2 mb-3">
-                    <span class="kicker-pill">雷达</span>
-                    <span class="kicker-pill">[SPS]</span>
-                    <span class="kicker-pill">申诉</span>
+        <div id="section-products" class="page-section hidden fade-in space-y-8">
+            <div class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+                <div>
+                    <h1 class="stitch-display">选品建议</h1>
+                    <p class="stitch-body mt-1">基于 AI 诊断的库存优化与爆款潜力分析</p>
                 </div>
-                <h1 class="text-3xl font-bold text-slate-900 mb-4">选品建议</h1>
+                <div class="flex gap-3">
+                    <button class="flex items-center gap-2 rounded-lg bg-[#091426] px-4 py-2 text-xs font-bold text-white transition hover:opacity-90">
+                        <span class="material-symbols-outlined text-[18px]">filter_list</span>
+                        筛选过滤
+                    </button>
+                    <button class="flex items-center gap-2 rounded-lg bg-[#4b41e1] px-4 py-2 text-xs font-bold text-white shadow-lg shadow-[#4b41e1]/20 transition hover:opacity-90">
+                        <span class="material-symbols-outlined text-[18px]">add</span>
+                        新增分析商品
+                    </button>
+                </div>
             </div>
 
-            <div class="glass-card rounded-lg overflow-hidden">
+            <div class="stitch-card overflow-hidden">
                 <div class="overflow-x-auto">
-                    <table class="dark-table min-w-full divide-y divide-slate-200">
+                    <table class="w-full border-collapse text-left">
                         <thead>
-                            <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">产品名称</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">AI 选品健康分</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">核心优化方向</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">系统建议 / 管理</th>
+                            <tr class="border-b border-[#c5c6cd] bg-[#eff4ff]">
+                                <th class="px-4 py-4 text-xs font-bold uppercase tracking-wider text-[#45474c]">Product Name</th>
+                                <th class="px-4 py-4 text-xs font-bold uppercase tracking-wider text-[#45474c]">Health Score</th>
+                                <th class="px-4 py-4 text-xs font-bold uppercase tracking-wider text-[#45474c]">Main Pain Points</th>
+                                <th class="px-4 py-4 text-xs font-bold uppercase tracking-wider text-[#45474c]">Optimization Direction / Actions</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-slate-200" id="product-table-body">
-                        </tbody>
+                        <tbody class="divide-y divide-[#c5c6cd]/40" id="product-table-body"></tbody>
                     </table>
+                </div>
+                <div class="flex items-center justify-between border-t border-[#c5c6cd] bg-[#eff4ff] px-4 py-4">
+                    <span class="stitch-body">Showing live diagnosis products</span>
+                    <div class="flex gap-1">
+                        <button class="flex h-8 w-8 items-center justify-center rounded border border-[#c5c6cd] bg-white"><span class="material-symbols-outlined text-sm">chevron_left</span></button>
+                        <button class="flex h-8 w-8 items-center justify-center rounded bg-[#4b41e1] text-xs font-bold text-white">1</button>
+                        <button class="flex h-8 w-8 items-center justify-center rounded border border-[#c5c6cd] bg-white text-xs font-bold">2</button>
+                        <button class="flex h-8 w-8 items-center justify-center rounded border border-[#c5c6cd] bg-white text-xs font-bold">3</button>
+                        <button class="flex h-8 w-8 items-center justify-center rounded border border-[#c5c6cd] bg-white"><span class="material-symbols-outlined text-sm">chevron_right</span></button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-12 gap-8">
+                <div class="stitch-card col-span-12 p-6 lg:col-span-8">
+                    <div class="mb-6 flex items-start justify-between">
+                        <h3 class="stitch-title">供货趋势分析</h3>
+                        <select class="rounded-lg border border-[#c5c6cd] bg-[#eff4ff] p-2 text-sm outline-none">
+                            <option>Last 30 Days</option>
+                            <option>Last 90 Days</option>
+                        </select>
+                    </div>
+                    <div class="relative flex h-64 items-end gap-2">
+                        <div class="absolute inset-0 flex flex-col justify-between py-2">
+                            <div class="h-px w-full border-b border-[#c5c6cd]/40"></div>
+                            <div class="h-px w-full border-b border-[#c5c6cd]/40"></div>
+                            <div class="h-px w-full border-b border-[#c5c6cd]/40"></div>
+                            <div class="h-px w-full border-b border-[#c5c6cd]/40"></div>
+                        </div>
+                        <div class="relative h-[60%] flex-1 rounded-t-sm bg-[#4b41e1]/10"></div>
+                        <div class="relative h-[45%] flex-1 rounded-t-sm bg-[#4b41e1]/20"></div>
+                        <div class="relative h-[85%] flex-1 rounded-t-sm bg-[#4b41e1]/30"></div>
+                        <div class="relative h-[70%] flex-1 rounded-t-sm bg-[#4b41e1]/40"></div>
+                        <div class="relative h-[55%] flex-1 rounded-t-sm bg-[#4b41e1]/50"></div>
+                        <div class="relative h-[95%] flex-1 rounded-t-sm bg-[#4b41e1]/60"></div>
+                        <div class="relative h-[40%] flex-1 rounded-t-sm bg-[#4b41e1]/20"></div>
+                        <div class="relative h-[75%] flex-1 rounded-t-sm bg-[#4b41e1]/30"></div>
+                        <div class="relative h-[65%] flex-1 rounded-t-sm bg-[#4b41e1]/40"></div>
+                        <div class="relative h-[30%] flex-1 rounded-t-sm bg-[#4b41e1]/50"></div>
+                    </div>
+                </div>
+                <div class="col-span-12 space-y-4 lg:col-span-4">
+                    <div class="rounded-xl bg-[#091426] p-6 text-white shadow-xl">
+                        <div class="mb-4 flex items-center gap-2">
+                            <span class="material-symbols-outlined text-[#e2dfff]">bolt</span>
+                            <span class="text-xs font-bold uppercase">AI 建议摘要</span>
+                        </div>
+                        <p class="text-sm leading-7 opacity-90">系统会根据商品健康分、负面痛点和可修复度生成选品建议。优先处理高风险商品，再进入供应链打样和 SPS 修复。</p>
+                        <button data-executive-brief="selection" class="mt-6 w-full rounded-lg border border-white/20 bg-white/10 py-2 text-xs font-bold transition hover:bg-white/20">生成全局 Brief</button>
+                    </div>
+                    <div class="stitch-card p-6">
+                        <h4 class="mb-4 text-xs font-bold">Top Risk Categories</h4>
+                        <div class="space-y-3">
+                            <div class="flex items-center justify-between text-sm"><span>Electronics</span><span class="font-bold text-[#ba1a1a]">24% High Risk</span></div>
+                            <div class="h-1.5 rounded-full bg-[#eff4ff]"><div class="h-full w-[24%] rounded-full bg-[#ba1a1a]"></div></div>
+                            <div class="flex items-center justify-between pt-2 text-sm"><span>Lifestyle</span><span class="font-bold text-[#00a472]">8% High Risk</span></div>
+                            <div class="h-1.5 rounded-full bg-[#eff4ff]"><div class="h-full w-[8%] rounded-full bg-[#00a472]"></div></div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -1230,156 +1527,205 @@
         </div>
 
 
-        <div id="section-details" class="page-section hidden fade-in">
-            <div class="mb-8 flex flex-col lg:flex-row lg:items-end justify-between gap-4">
-                <div>
-                    <div class="flex flex-wrap gap-2 mb-3">
-                        <span class="kicker-pill">后台</span>
-                        <span class="kicker-pill">默认折叠</span>
+        <div id="section-details" class="page-section hidden fade-in space-y-6">
+            <div class="grid grid-cols-12 gap-6">
+                <div class="stitch-card col-span-12 p-5 lg:col-span-5">
+                    <div class="mb-4 flex items-center justify-between">
+                        <h3 class="stitch-title flex items-center gap-2">
+                            <span class="material-symbols-outlined text-[#4b41e1]">radar</span>
+                            Market Gap Radar
+                        </h3>
+                        <span class="rounded bg-[#e2dfff] px-2 py-1 text-[10px] font-bold text-[#3323cc]">供需缺口分析</span>
                     </div>
-                    <h1 class="text-3xl font-bold text-slate-900 mb-2">后台明细</h1>
+                    <div class="radar-grid relative flex h-[300px] items-center justify-center overflow-hidden rounded-lg">
+                        <div class="absolute h-48 w-48 rounded-full border-2 border-dashed border-[#4b41e1]/30"></div>
+                        <div class="absolute flex h-32 w-32 rotate-45 items-center justify-center rounded-lg border-2 border-[#4b41e1] bg-[#4b41e1]/10">
+                            <div class="h-16 w-16 rounded-full border border-[#4b41e1] bg-[#4b41e1]/20"></div>
+                        </div>
+                        <div class="absolute bottom-4 left-4 right-4 flex justify-between font-mono text-[10px] text-[#45474c]">
+                            <span>S: 82%</span><span>D: 94%</span><span>GAP: 12%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stitch-card col-span-12 p-5 lg:col-span-7">
+                    <div class="mb-4 flex items-center justify-between">
+                        <h3 class="stitch-title flex items-center gap-2">
+                            <span class="material-symbols-outlined text-[#4b41e1]">swords</span>
+                            Competitive Battlecard
+                        </h3>
+                        <div class="flex gap-2">
+                            <span class="material-symbols-outlined text-sm text-[#45474c]">filter_list</span>
+                            <span class="material-symbols-outlined text-sm text-[#45474c]">more_vert</span>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full border-collapse text-left">
+                            <thead>
+                                <tr class="border-b border-[#c5c6cd] bg-[#eff4ff]">
+                                    <th class="px-4 py-3 text-xs font-bold uppercase text-[#45474c]">维度 Metric</th>
+                                    <th class="px-4 py-3 text-xs font-bold uppercase text-[#45474c]">TikTok Shop</th>
+                                    <th class="px-4 py-3 text-xs font-bold uppercase text-[#45474c]">Competitor A</th>
+                                    <th class="px-4 py-3 text-xs font-bold uppercase text-[#45474c]">Market Avg</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-sm">
+                                <tr class="border-b border-[#eff4ff] hover:bg-[#eff4ff]"><td class="px-4 py-3 font-bold">Conversion Rate</td><td class="px-4 py-3 font-mono text-[#00a472]">3.42% ↑</td><td class="px-4 py-3 font-mono">2.10%</td><td class="px-4 py-3 font-mono">2.50%</td></tr>
+                                <tr class="border-b border-[#eff4ff] hover:bg-[#eff4ff]"><td class="px-4 py-3 font-bold">Retention (D30)</td><td class="px-4 py-3 font-mono text-[#00a472]">18.5%</td><td class="px-4 py-3 font-mono">22.1%</td><td class="px-4 py-3 font-mono">15.2%</td></tr>
+                                <tr class="border-b border-[#eff4ff] hover:bg-[#eff4ff]"><td class="px-4 py-3 font-bold">AOV ($)</td><td class="px-4 py-3 font-mono">$42.10</td><td class="px-4 py-3 font-mono">$68.50</td><td class="px-4 py-3 font-mono">$51.00</td></tr>
+                                <tr class="hover:bg-[#eff4ff]"><td class="px-4 py-3 font-bold">CAC Efficiency</td><td class="px-4 py-3 font-mono text-[#00a472]">High</td><td class="px-4 py-3 font-mono">Medium</td><td class="px-4 py-3 font-mono">Low-Med</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
-            <div class="space-y-4">
-                <details class="backend-accordion glass-card rounded-lg overflow-hidden border border-slate-200/60">
-                    <summary class="cursor-pointer select-none px-6 py-4 flex items-center justify-between gap-4 hover:bg-indigo-50/40 transition-colors">
-                        <span class="font-black text-slate-900">机会雷达与战术卡</span>
-                        <span class="text-xs font-bold text-indigo-600">展开</span>
-                    </summary>
-                    <div id="backend-market-slot" class="border-t border-slate-100 p-6"></div>
-                </details>
-
-                <details class="backend-accordion glass-card rounded-lg overflow-hidden border border-slate-200/60">
-                    <summary class="cursor-pointer select-none px-6 py-4 flex items-center justify-between gap-4 hover:bg-indigo-50/40 transition-colors">
-                        <span class="font-black text-slate-900">证据审计与样例评论</span>
-                        <span class="text-xs font-bold text-indigo-600">展开</span>
-                    </summary>
-                    <div id="backend-evidence-slot" class="border-t border-slate-100 p-6"></div>
-                </details>
-
-                <details class="backend-accordion glass-card rounded-lg overflow-hidden border border-slate-200/60">
-                    <summary class="cursor-pointer select-none px-6 py-4 flex items-center justify-between gap-4 hover:bg-indigo-50/40 transition-colors">
-                        <span class="font-black text-slate-900">雷达预警依据</span>
-                        <span class="text-xs font-bold text-indigo-600">展开</span>
-                    </summary>
-                    <div id="backend-radar-slot" class="border-t border-slate-100 p-6"></div>
-                </details>
-
-                <details class="backend-accordion glass-card rounded-lg overflow-hidden border border-slate-200/60">
-                    <summary class="cursor-pointer select-none px-6 py-4 flex items-center justify-between gap-4 hover:bg-indigo-50/40 transition-colors">
-                        <span class="font-black text-slate-900">经营报告依据</span>
-                        <span class="text-xs font-bold text-indigo-600">展开</span>
-                    </summary>
-                    <div id="backend-executive-slot" class="border-t border-slate-100 p-6"></div>
-                </details>
-
-                <details class="backend-accordion glass-card rounded-lg overflow-hidden border border-slate-200/60">
-                    <summary class="cursor-pointer select-none px-6 py-4 flex items-center justify-between gap-4 hover:bg-indigo-50/40 transition-colors">
-                        <span class="font-black text-slate-900">市场趋势图</span>
-                        <span class="text-xs font-bold text-indigo-600">展开</span>
-                    </summary>
-                    <div class="border-t border-slate-100 p-6">
-                        <h3 class="text-lg font-semibold mb-4 text-slate-800">TK电商 GMV 增长与退货率趋势</h3>
-                        <div class="chart-container">
-                            <canvas id="marketChart"></canvas>
+            <div class="grid grid-cols-12 gap-6">
+                <div class="stitch-card col-span-12 flex h-[500px] flex-col overflow-hidden md:col-span-8">
+                    <div class="flex items-center justify-between border-b border-[#c5c6cd] bg-[#eff4ff]/60 p-5">
+                        <h3 class="stitch-title flex items-center gap-2">
+                            <span class="material-symbols-outlined text-[#4b41e1]">policy</span>
+                            Evidence Audit Center (证据审计)
+                        </h3>
+                        <div class="flex gap-2">
+                            <span class="rounded bg-[#091426] px-2 py-1 font-mono text-[10px] text-white">LIVE STREAM</span>
+                            <span class="rounded bg-[#645efb] px-2 py-1 font-mono text-[10px] text-white">BATCH_492</span>
                         </div>
                     </div>
-                </details>
+                    <div id="backend-evidence-slot" class="flex-1 overflow-y-auto p-5"></div>
+                </div>
 
-                <details id="auth-admin-panel" class="backend-accordion glass-card rounded-lg overflow-hidden border border-slate-200/60">
-                    <summary class="cursor-pointer select-none px-6 py-4 flex items-center justify-between gap-4 hover:bg-indigo-50/40 transition-colors">
-                        <span class="font-black text-slate-900">用户与邀请码管理</span>
-                        <span class="text-xs font-bold text-indigo-600">展开</span>
-                    </summary>
-                    <div class="border-t border-slate-100 p-6 space-y-6">
-                        <div class="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-6">
-                            <div class="rounded-lg border border-slate-100 bg-white/70 p-4">
-                                <div class="flex items-center justify-between gap-3 mb-3">
-                                    <h3 class="text-sm font-black text-slate-900">注册用户</h3>
-                                    <button id="btn-refresh-users" class="quiet-button px-3 py-1.5 rounded-lg text-xs font-bold">刷新</button>
-                                </div>
-                                <div id="admin-users-list" class="space-y-2 text-sm text-slate-600">等待加载用户列表...</div>
-                            </div>
-                            <div class="rounded-lg border border-indigo-100 bg-indigo-50/40 p-4">
-                                <h3 class="text-sm font-black text-slate-900 mb-3">创建邀请码</h3>
-                                <div class="space-y-3">
-                                    <input id="invite-code-input" class="neo-input w-full px-3 py-2 rounded-lg text-sm" placeholder="可选：自定义邀请码">
-                                    <div class="grid grid-cols-2 gap-2">
-                                        <input id="invite-max-uses" type="number" min="1" max="100" value="1" class="neo-input w-full px-3 py-2 rounded-lg text-sm" placeholder="次数">
-                                        <input id="invite-days" type="number" min="1" max="365" value="14" class="neo-input w-full px-3 py-2 rounded-lg text-sm" placeholder="天数">
-                                    </div>
-                                    <input id="invite-note" class="neo-input w-full px-3 py-2 rounded-lg text-sm" placeholder="备注，如：第一批内测">
-                                    <button id="btn-create-invite" class="primary-action w-full px-4 py-2 rounded-lg text-sm font-bold">生成邀请码</button>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="rounded-lg border border-slate-100 bg-white/70 p-4">
-                            <div class="flex items-center justify-between gap-3 mb-3">
-                                <h3 class="text-sm font-black text-slate-900">邀请码</h3>
-                                <button id="btn-refresh-invites" class="quiet-button px-3 py-1.5 rounded-lg text-xs font-bold">刷新</button>
-                            </div>
-                            <div id="admin-invites-list" class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-slate-600">等待加载邀请码...</div>
-                        </div>
+                <div class="stitch-card col-span-12 flex h-[500px] flex-col overflow-hidden md:col-span-4">
+                    <div class="border-b border-[#c5c6cd] bg-[#eff4ff]/60 p-5">
+                        <h3 class="stitch-title flex items-center gap-2">
+                            <span class="material-symbols-outlined text-[#4b41e1]">terminal</span>
+                            System Health
+                        </h3>
                     </div>
-                </details>
-
-                <details id="platform-session-panel" class="hidden backend-accordion glass-card rounded-lg overflow-hidden border border-slate-200/60">
-                    <summary class="cursor-pointer select-none px-6 py-4 flex items-center justify-between gap-4 hover:bg-indigo-50/40 transition-colors">
-                        <span class="font-black text-slate-900">平台采集登录态</span>
-                        <span class="text-xs font-bold text-indigo-600">展开</span>
-                    </summary>
-                    <div class="border-t border-slate-100 p-6 space-y-5">
-                        <div id="platform-session-list" class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-slate-600">等待加载平台状态...</div>
-                        <div class="grid grid-cols-1 xl:grid-cols-[260px_1fr] gap-5">
-                            <div class="rounded-lg border border-indigo-100 bg-indigo-50/45 p-4">
-                                <div class="text-xs font-black text-indigo-700 mb-3">保存登录态</div>
-                                <div class="space-y-3">
-                                    <select id="platform-session-select" class="neo-input w-full px-3 py-2 rounded-lg text-sm">
-                                        <option value="douyin">抖音</option>
-                                        <option value="xiaohongshu">小红书</option>
-                                    </select>
-                                    <input id="platform-session-user-agent" class="neo-input w-full px-3 py-2 rounded-lg text-sm" placeholder="可选：浏览器 User-Agent">
-                                    <input id="platform-session-note" class="neo-input w-full px-3 py-2 rounded-lg text-sm" placeholder="备注，如：运营号 A / 今日更新">
-                                    <input id="platform-session-probe-url" class="neo-input w-full px-3 py-2 rounded-lg text-sm" placeholder="测试链接，可填整段抖音 / 小红书分享口令">
-                                    <div class="flex flex-wrap gap-2">
-                                        <button id="btn-copy-platform-helper-command" class="primary-action px-4 py-2 rounded-lg text-xs font-bold">复制登录助手命令</button>
-                                        <button id="btn-save-platform-session" class="primary-action px-4 py-2 rounded-lg text-xs font-bold">保存</button>
-                                        <button id="btn-crawler-preflight" class="quiet-button px-4 py-2 rounded-lg text-xs font-bold">策略预检</button>
-                                        <button id="btn-probe-platform-session" class="quiet-button px-4 py-2 rounded-lg text-xs font-bold">测试</button>
-                                        <button id="btn-clear-platform-session" class="quiet-button px-4 py-2 rounded-lg text-xs font-bold text-rose-600">清除</button>
-                                        <button id="btn-refresh-platform-sessions" class="quiet-button px-4 py-2 rounded-lg text-xs font-bold">刷新</button>
-                                    </div>
-                                </div>
+                    <div class="flex-1 space-y-6 overflow-y-auto p-5">
+                        <div>
+                            <div class="mb-2 flex items-center justify-between">
+                                <span class="text-xs font-bold uppercase text-[#45474c]">24H Activity Radar</span>
+                                <span class="font-mono text-[10px] text-[#00a472]">UPTIME 99.98%</span>
                             </div>
-                            <div class="rounded-lg border border-slate-100 bg-white/70 p-4">
-                                <div class="flex items-center justify-between gap-3 mb-2">
-                                    <div class="text-xs font-black text-slate-500">Cookie Header / JSON 导出</div>
-                                    <span class="text-[11px] font-bold text-slate-400">服务器保存，不回显明文</span>
-                                </div>
-                                <textarea id="platform-session-cookies" rows="9" class="neo-input w-full px-3 py-3 rounded-lg text-xs leading-5 font-mono resize-y" placeholder="粘贴浏览器请求头中的 Cookie: a=b; c=d，或 Cookie-Editor / DevTools 导出的 JSON cookies 数组。"></textarea>
-                                <p id="platform-session-meta" class="mt-3 text-xs text-slate-500 leading-relaxed">优先点“复制登录助手命令”，在本机 PowerShell 运行后会自动弹浏览器登录并上传 Cookie。下面文本框仍保留给手动粘贴 Cookie Header / JSON。</p>
+                            <div class="flex h-24 items-end gap-[2px] rounded-lg bg-[#eff4ff] p-2">
+                                <div class="h-[60%] w-full rounded-t-sm bg-[#4b41e1]/20"></div><div class="h-[65%] w-full rounded-t-sm bg-[#4b41e1]/20"></div><div class="h-[80%] w-full rounded-t-sm bg-[#4b41e1]/40"></div><div class="h-[55%] w-full rounded-t-sm bg-[#4b41e1]/20"></div><div class="h-[90%] w-full rounded-t-sm bg-[#4b41e1]/60"></div><div class="h-[40%] w-full rounded-t-sm bg-[#4b41e1]/20"></div><div class="h-[100%] w-full rounded-t-sm bg-[#4b41e1]"></div><div class="h-[70%] w-full rounded-t-sm bg-[#4b41e1]/30"></div><div class="h-[60%] w-full rounded-t-sm bg-[#4b41e1]/20"></div><div class="h-[62%] w-full rounded-t-sm bg-[#4b41e1]/20"></div>
                             </div>
                         </div>
+                        <div class="space-y-3">
+                            <span class="text-xs font-bold uppercase text-[#45474c]">API Endpoint Cluster</span>
+                            <div class="flex items-center justify-between rounded-lg border border-[#c5c6cd]/50 bg-white p-3"><span class="font-mono text-[12px]">v2/diagnosis/realtime</span><span class="font-mono text-[11px] text-[#75777d]">42ms</span></div>
+                            <div class="flex items-center justify-between rounded-lg border border-[#c5c6cd]/50 bg-white p-3"><span class="font-mono text-[12px]">v2/recommend/absa</span><span class="font-mono text-[11px] text-[#75777d]">108ms</span></div>
+                            <div class="flex items-center justify-between rounded-lg border border-[#c5c6cd]/50 bg-white p-3"><span class="font-mono text-[12px]">v2/audit/evidence</span><span class="font-mono text-[11px] text-[#75777d]">892ms</span></div>
+                        </div>
+                        <div id="backend-maintenance-slot"></div>
                     </div>
-                </details>
-
-                <details class="backend-accordion glass-card rounded-lg overflow-hidden border border-slate-200/60">
-                    <summary class="cursor-pointer select-none px-6 py-4 flex items-center justify-between gap-4 hover:bg-indigo-50/40 transition-colors">
-                        <span class="font-black text-slate-900">系统维护与告警</span>
-                        <span class="text-xs font-bold text-indigo-600">展开</span>
-                    </summary>
-                    <div id="backend-maintenance-slot" class="border-t border-slate-100 p-6"></div>
-                </details>
-
-                <details class="backend-accordion glass-card rounded-lg overflow-hidden border border-slate-200/60">
-                    <summary class="cursor-pointer select-none px-6 py-4 flex items-center justify-between gap-4 hover:bg-indigo-50/40 transition-colors">
-                        <span class="font-black text-slate-900">技术架构</span>
-                        <span class="text-xs font-bold text-indigo-600">展开</span>
-                    </summary>
-                    <div id="backend-architecture-slot" class="border-t border-slate-100 p-6"></div>
-                </details>
+                </div>
             </div>
+
+            <details class="stitch-card overflow-hidden">
+                <summary class="flex cursor-pointer list-none items-center justify-between bg-[#eff4ff]/50 p-5 transition hover:bg-[#eff4ff]">
+                    <h3 class="stitch-title flex items-center gap-2">
+                        <span class="material-symbols-outlined text-[#4b41e1]">query_stats</span>
+                        Advanced Indicators (高级指标)
+                    </h3>
+                    <span class="material-symbols-outlined">expand_more</span>
+                </summary>
+                <div class="grid grid-cols-2 gap-4 border-t border-[#c5c6cd] p-5 md:grid-cols-3 lg:grid-cols-6">
+                    <div class="rounded-lg border border-[#c5c6cd] bg-white p-4"><span class="block text-xs font-bold text-[#75777d]">Lift</span><span class="stitch-title text-[#00a472]">12.4x</span></div>
+                    <div class="rounded-lg border border-[#c5c6cd] bg-white p-4"><span class="block text-xs font-bold text-[#75777d]">Confidence</span><span class="stitch-title">99.4%</span></div>
+                    <div class="rounded-lg border border-[#c5c6cd] bg-white p-4"><span class="block text-xs font-bold text-[#75777d]">Evidence Count</span><span class="stitch-title">1.2M+</span></div>
+                    <div class="rounded-lg border border-[#c5c6cd] bg-white p-4"><span class="block text-xs font-bold text-[#75777d]">ABSA Score</span><span class="stitch-title">0.82</span></div>
+                    <div class="rounded-lg border border-[#c5c6cd] bg-white p-4"><span class="block text-xs font-bold text-[#75777d]">EWMA</span><span class="stitch-title">0.05s</span></div>
+                    <div class="rounded-lg border border-[#c5c6cd] bg-white p-4"><span class="block text-xs font-bold text-[#75777d]">SPS Half-life</span><span class="stitch-title">4.2H</span></div>
+                </div>
+            </details>
+
+            <details class="stitch-card overflow-hidden">
+                <summary class="flex cursor-pointer list-none items-center justify-between bg-[#eff4ff]/50 p-5 transition hover:bg-[#eff4ff]">
+                    <h3 class="stitch-title">Deep Metrics & Admin</h3>
+                    <span class="material-symbols-outlined">expand_more</span>
+                </summary>
+                <div class="space-y-5 border-t border-[#c5c6cd] p-5">
+                    <div id="backend-market-slot" class="rounded-xl border border-[#c5c6cd] bg-white p-5"></div>
+                    <div id="backend-radar-slot" class="rounded-xl border border-[#c5c6cd] bg-white p-5"></div>
+                    <div id="backend-executive-slot" class="rounded-xl border border-[#c5c6cd] bg-white p-5"></div>
+                    <div class="rounded-xl border border-[#c5c6cd] bg-white p-5">
+                        <h3 class="mb-4 text-sm font-black text-[#091426]">TK电商 GMV 增长与退货率趋势</h3>
+                        <div class="chart-container"><canvas id="marketChart"></canvas></div>
+                    </div>
+
+                    <div id="auth-admin-panel" class="rounded-xl border border-[#c5c6cd] bg-white p-5">
+                        <div class="mb-4 flex border-b border-[#c5c6cd]">
+                            <button class="border-b-2 border-[#4b41e1] px-4 py-3 text-xs font-bold text-[#4b41e1]">User Management</button>
+                            <button class="px-4 py-3 text-xs font-bold text-[#45474c]">Invitation Code</button>
+                            <button class="px-4 py-3 text-xs font-bold text-[#45474c]">Webhook Setting</button>
+                        </div>
+                        <div class="grid grid-cols-1 gap-5 xl:grid-cols-[1fr_360px]">
+                            <div>
+                                <div class="mb-3 flex items-center justify-between">
+                                    <h4 class="stitch-title">活跃用户 (Active Users)</h4>
+                                    <button id="btn-refresh-users" class="rounded-lg border border-[#c5c6cd] px-3 py-1.5 text-xs font-bold">刷新</button>
+                                </div>
+                                <div id="admin-users-list" class="grid grid-cols-1 gap-3 text-sm text-[#45474c] md:grid-cols-2 lg:grid-cols-3">等待加载用户列表...</div>
+                            </div>
+                            <div class="rounded-lg border border-[#c5c6cd] bg-[#eff4ff] p-4">
+                                <h3 class="mb-3 text-sm font-black text-[#091426]">创建邀请码</h3>
+                                <div class="space-y-3">
+                                    <input id="invite-code-input" class="neo-input w-full rounded-lg px-3 py-2 text-sm" placeholder="可选：自定义邀请码">
+                                    <div class="grid grid-cols-2 gap-2">
+                                        <input id="invite-max-uses" type="number" min="1" max="100" value="1" class="neo-input w-full rounded-lg px-3 py-2 text-sm" placeholder="次数">
+                                        <input id="invite-days" type="number" min="1" max="365" value="14" class="neo-input w-full rounded-lg px-3 py-2 text-sm" placeholder="天数">
+                                    </div>
+                                    <input id="invite-note" class="neo-input w-full rounded-lg px-3 py-2 text-sm" placeholder="备注，如：第一批内测">
+                                    <button id="btn-create-invite" class="w-full rounded-lg bg-[#4b41e1] px-4 py-2 text-sm font-bold text-white">生成邀请码</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-5 rounded-lg border border-[#c5c6cd] bg-white p-4">
+                            <div class="mb-3 flex items-center justify-between">
+                                <h3 class="text-sm font-black text-[#091426]">邀请码</h3>
+                                <button id="btn-refresh-invites" class="rounded-lg border border-[#c5c6cd] px-3 py-1.5 text-xs font-bold">刷新</button>
+                            </div>
+                            <div id="admin-invites-list" class="grid grid-cols-1 gap-3 text-sm text-[#45474c] md:grid-cols-2">等待加载邀请码...</div>
+                        </div>
+                    </div>
+
+                    <div id="platform-session-panel" class="hidden rounded-xl border border-[#c5c6cd] bg-white p-5">
+                        <h3 class="stitch-title mb-4">平台采集登录态</h3>
+                        <div id="platform-session-list" class="mb-4 grid grid-cols-1 gap-3 text-sm text-[#45474c] md:grid-cols-2">等待加载平台状态...</div>
+                        <div class="grid grid-cols-1 gap-5 xl:grid-cols-[260px_1fr]">
+                            <div class="rounded-lg border border-[#c5c6cd] bg-[#eff4ff] p-4">
+                                <div class="mb-3 text-xs font-black text-[#4b41e1]">保存登录态</div>
+                                <div class="space-y-3">
+                                    <select id="platform-session-select" class="neo-input w-full rounded-lg px-3 py-2 text-sm"><option value="douyin">抖音</option><option value="xiaohongshu">小红书</option></select>
+                                    <input id="platform-session-user-agent" class="neo-input w-full rounded-lg px-3 py-2 text-sm" placeholder="可选：浏览器 User-Agent">
+                                    <input id="platform-session-note" class="neo-input w-full rounded-lg px-3 py-2 text-sm" placeholder="备注，如：运营号 A / 今日更新">
+                                    <input id="platform-session-probe-url" class="neo-input w-full rounded-lg px-3 py-2 text-sm" placeholder="测试链接，可填整段抖音 / 小红书分享口令">
+                                    <div class="flex flex-wrap gap-2">
+                                        <button id="btn-copy-platform-helper-command" class="rounded-lg bg-[#4b41e1] px-4 py-2 text-xs font-bold text-white">复制登录助手命令</button>
+                                        <button id="btn-save-platform-session" class="rounded-lg bg-[#4b41e1] px-4 py-2 text-xs font-bold text-white">保存</button>
+                                        <button id="btn-crawler-preflight" class="rounded-lg border border-[#c5c6cd] px-4 py-2 text-xs font-bold">策略预检</button>
+                                        <button id="btn-probe-platform-session" class="rounded-lg border border-[#c5c6cd] px-4 py-2 text-xs font-bold">测试</button>
+                                        <button id="btn-clear-platform-session" class="rounded-lg border border-[#ffdad6] px-4 py-2 text-xs font-bold text-[#ba1a1a]">清除</button>
+                                        <button id="btn-refresh-platform-sessions" class="rounded-lg border border-[#c5c6cd] px-4 py-2 text-xs font-bold">刷新</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="rounded-lg border border-[#c5c6cd] bg-white p-4">
+                                <div class="mb-2 flex items-center justify-between">
+                                    <div class="text-xs font-black text-[#45474c]">Cookie Header / JSON 导出</div>
+                                    <span class="text-[11px] font-bold text-[#75777d]">服务器保存，不回显明文</span>
+                                </div>
+                                <textarea id="platform-session-cookies" rows="9" class="neo-input w-full resize-y rounded-lg px-3 py-3 font-mono text-xs leading-5" placeholder="粘贴浏览器请求头中的 Cookie: a=b; c=d，或 Cookie-Editor / DevTools 导出的 JSON cookies 数组。"></textarea>
+                                <p id="platform-session-meta" class="mt-3 text-xs leading-relaxed text-[#45474c]">优先点“复制登录助手命令”，在本机 PowerShell 运行后会自动弹浏览器登录并上传 Cookie。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="backend-architecture-slot" class="rounded-xl border border-[#c5c6cd] bg-white p-5"></div>
+                </div>
+            </details>
         </div>
 
         <div id="section-architecture" class="backend-module hidden fade-in">
@@ -1696,18 +2042,18 @@
             authMode = mode === 'register' ? 'register' : 'login';
             const isRegister = authMode === 'register';
             document.getElementById('auth-title').innerText = isRegister ? '创建内测账号' : 'TK-AI 安全登入';
-            document.getElementById('auth-subtitle').innerText = isRegister ? '邀请码注册后自动进入独立数据空间' : '系统内置账号校验';
-            document.getElementById('auth-submit-label').innerText = isRegister ? '创建账号并进入' : '安全登入';
-            document.getElementById('login-username-label').innerText = isRegister ? '账号' : '账号 / 邮箱';
+            document.getElementById('auth-subtitle').innerText = isRegister ? '邀请码注册后自动进入独立数据空间' : '高规格企业级情报决策中枢';
+            document.getElementById('auth-submit-label').innerText = isRegister ? '创建账号' : '立即登录';
+            document.getElementById('login-username-label').innerText = isRegister ? '账号' : '电子邮箱 / 用户名';
             document.getElementById('register-email-wrap').classList.toggle('hidden', !isRegister);
             document.getElementById('register-invite-wrap').classList.toggle('hidden', !isRegister);
             document.getElementById('login-username').value = isRegister ? '' : (document.getElementById('login-username').value || 'admin');
             document.getElementById('auth-mode-login').className = isRegister
-                ? 'rounded-lg px-3 py-2 text-xs font-black text-slate-500'
-                : 'rounded-lg bg-white px-3 py-2 text-xs font-black text-indigo-700 shadow-sm';
+                ? 'flex-1 pb-4 text-xs font-bold text-[#45474c] transition hover:text-[#091426]'
+                : 'flex-1 border-b-2 border-[#4b41e1] pb-4 text-xs font-bold text-[#4b41e1]';
             document.getElementById('auth-mode-register').className = isRegister
-                ? 'rounded-lg bg-white px-3 py-2 text-xs font-black text-indigo-700 shadow-sm'
-                : 'rounded-lg px-3 py-2 text-xs font-black text-slate-500';
+                ? 'flex-1 border-b-2 border-[#4b41e1] pb-4 text-xs font-bold text-[#4b41e1]'
+                : 'flex-1 pb-4 text-xs font-bold text-[#45474c] transition hover:text-[#091426]';
         }
 
         async function authorizedFetch(url, options = {}) {
@@ -2406,8 +2752,8 @@
             liveDiagnosticCoverage.style.width = `${coverage}%`;
 
             liveWorkflowStatus.className = isLocalApiOnline
-                ? 'px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 text-xs font-bold'
-                : 'px-3 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-100 text-xs font-bold';
+                ? 'relative z-10 text-xl font-black text-[#4edea3]'
+                : 'relative z-10 text-xl font-black text-[#f59e0b]';
             liveWorkflowStatus.innerText = isLocalApiOnline
                 ? (isAuthenticated ? '已同步' : '待登录')
                 : '未连接';
@@ -4033,49 +4379,54 @@
                 const actionButtons = ready
                     ? `
                         <div class="mt-2 flex flex-wrap gap-2">
-                            <button data-battlecard-product="${key}" class="btn-battlecard px-2.5 py-1 rounded-md bg-white/80 text-indigo-700 hover:bg-indigo-50 text-[11px] font-bold border border-indigo-100 transition-colors">📌 战术卡</button>
+                            <button data-battlecard-product="${key}" class="btn-battlecard rounded-md border border-[#c5c6cd] bg-white px-2.5 py-1 text-[11px] font-bold text-[#4b41e1] transition hover:bg-[#eff4ff]">战术卡</button>
                             ${radarCritical
                                 ? `
-                                    <button data-sps-product="${key}" class="btn-sps-predict px-2.5 py-1 rounded-md bg-indigo-500/10 text-indigo-200 hover:bg-indigo-500/20 text-[11px] font-bold border border-indigo-400/20 transition-colors">🔮 绩效预测</button>
-                                    <button data-appeal-product="${key}" class="btn-appeal px-2.5 py-1 rounded-md bg-gradient-to-r from-indigo-600 to-violet-600 text-white text-[11px] font-bold shadow-[0_10px_20px_rgba(79,70,229,0.18)] transition-all hover:-translate-y-0.5">🛡️ 申诉抗辩</button>
+                                    <button data-sps-product="${key}" class="btn-sps-predict rounded-md border border-[#c5c6cd] bg-white px-2.5 py-1 text-[11px] font-bold text-[#091426] transition hover:bg-[#eff4ff]">SPS 预测</button>
+                                    <button data-appeal-product="${key}" class="btn-appeal rounded-md bg-[#4b41e1] px-2.5 py-1 text-[11px] font-bold text-white transition hover:bg-[#645efb]">申诉抗辩</button>
                                 `
-                                : '<span class="text-[11px] font-semibold text-emerald-600 self-center">雷达状态正常</span>'}
+                                : '<span class="self-center text-[11px] font-bold text-[#00a472]">雷达状态正常</span>'}
                         </div>
                     `
                     : '';
                 const managementButtons = `
                     <div class="mt-2 flex flex-wrap gap-2">
-                        <button data-edit-product="${escapeHtml(key)}" class="px-2.5 py-1 rounded-md bg-white/80 text-slate-700 hover:bg-slate-50 text-[11px] font-bold border border-slate-200 transition-colors">编辑</button>
-                        <button data-delete-product="${escapeHtml(key)}" class="px-2.5 py-1 rounded-md bg-rose-50 text-rose-700 hover:bg-rose-100 text-[11px] font-bold border border-rose-100 transition-colors">删除</button>
+                        <button data-edit-product="${escapeHtml(key)}" class="rounded-md border border-[#c5c6cd] bg-white px-2.5 py-1 text-[11px] font-bold text-[#091426] transition hover:bg-[#eff4ff]">编辑</button>
+                        <button data-delete-product="${escapeHtml(key)}" class="rounded-md border border-[#ffdad6] bg-[#ffdad6]/45 px-2.5 py-1 text-[11px] font-bold text-[#ba1a1a] transition hover:bg-[#ffdad6]">删除</button>
                     </div>
                 `;
 
                 const tr = document.createElement('tr');
                 tr.className = radarCritical
-                    ? 'bg-rose-500/10 hover:bg-rose-500/15 transition-colors'
-                    : 'hover:bg-indigo-500/5 transition-colors';
+                    ? 'group relative bg-[#ffdad6]/30 transition-colors hover:bg-[#ffdad6]/45'
+                    : 'group relative transition-colors hover:bg-[#eff4ff]';
                 tr.innerHTML = `
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <div class="flex items-start gap-3">
-                            ${radarLightMarkup}
+                    <td class="px-4 py-4">
+                        <div class="flex items-center gap-3">
+                            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#d3e4fe] text-[#091426]">
+                                <span class="material-symbols-outlined text-[20px]">inventory_2</span>
+                            </div>
                             <div>
-                                <div class="font-bold text-slate-900">${item.product_name || key}</div>
-                                <div class="text-xs text-slate-500">ID: ${item.product_id || key}</div>
-                                ${radarCritical ? `<div class="mt-1 text-[11px] font-semibold text-rose-600">🚨 ${item.radar_alert_reason || '实时雷达监测到异常波动'}</div>` : ''}
+                                <div class="text-xs font-bold text-[#091426]">${item.product_name || key}</div>
+                                <div class="text-[13px] text-[#45474c]">SKU: ${item.product_id || key}</div>
+                                ${radarCritical ? `<div class="mt-1 text-[11px] font-bold text-[#ba1a1a]">${item.radar_alert_reason || '实时雷达监测到异常波动'}</div>` : ''}
                             </div>
                         </div>
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <div class="flex items-center">
-                            <span class="${scoreColor} font-bold mr-2">${scoreDisplay}</span>
-                            <div class="w-full bg-slate-100 rounded-full h-2 max-w-[80px] overflow-hidden">
-                                <div class="${barColor} h-2 rounded-full" style="width: ${ready ? score : 12}%"></div>
+                    <td class="px-4 py-4">
+                        <div class="flex items-center gap-3">
+                            <div class="inline-flex h-12 w-12 items-center justify-center rounded-full border-4 ${score < 70 && ready ? 'border-[#ffdad6] text-[#ba1a1a]' : (score < 90 && ready ? 'border-[#d3e4fe] text-[#091426]' : 'border-emerald-100 text-emerald-700')} text-sm font-black">
+                                ${ready ? score : '--'}
                             </div>
+                            <span class="text-xs font-bold text-[#45474c]">${ready ? '已诊断' : '待诊断'}</span>
                         </div>
                     </td>
-                    <td class="px-6 py-4 text-sm text-slate-700">${item.direction || '等待诊断生成优化方向'}</td>
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full border ${badgeStyle}">${item.action || '待诊断'}</span>
+                    <td class="px-4 py-4 text-sm text-[#0b1c30]">
+                        ${item.keywordLabels && item.keywordLabels.length ? item.keywordLabels.slice(0, 2).map(escapeHtml).join('，') : '等待诊断生成痛点'}
+                    </td>
+                    <td class="px-4 py-4">
+                        <div class="text-sm text-[#45474c]">${item.direction || '等待诊断生成优化方向'}</div>
+                        <span class="mt-2 inline-flex rounded-full border px-3 py-1 text-xs font-bold ${radarCritical ? 'border-[#ffdad6] bg-[#ffdad6]/45 text-[#ba1a1a]' : 'border-[#c5c6cd] bg-[#eff4ff] text-[#4b41e1]'}">${item.action || '待诊断'}</span>
                         ${actionButtons}
                         ${managementButtons}
                     </td>
@@ -5204,7 +5555,7 @@
 
             btnRunRadarPatrol.disabled = true;
             radarPatrolSpinner.classList.remove('hidden');
-            liveWorkflowStatus.className = 'self-start md:self-center px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100 text-xs font-bold';
+            liveWorkflowStatus.className = 'relative z-10 text-xl font-black text-[#4b41e1]';
             liveWorkflowStatus.innerText = '巡检中';
             setTerminalOpenState(true);
             pipelineLoadingTitle.innerText = '正在执行 TikTok 自动巡检';
