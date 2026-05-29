@@ -1199,6 +1199,7 @@
                                     <div class="flex flex-wrap gap-2">
                                         <button id="btn-copy-platform-helper-command" class="primary-action px-4 py-2 rounded-lg text-xs font-bold">复制登录助手命令</button>
                                         <button id="btn-save-platform-session" class="primary-action px-4 py-2 rounded-lg text-xs font-bold">保存</button>
+                                        <button id="btn-crawler-preflight" class="quiet-button px-4 py-2 rounded-lg text-xs font-bold">策略预检</button>
                                         <button id="btn-probe-platform-session" class="quiet-button px-4 py-2 rounded-lg text-xs font-bold">测试</button>
                                         <button id="btn-clear-platform-session" class="quiet-button px-4 py-2 rounded-lg text-xs font-bold text-rose-600">清除</button>
                                         <button id="btn-refresh-platform-sessions" class="quiet-button px-4 py-2 rounded-lg text-xs font-bold">刷新</button>
@@ -1713,6 +1714,7 @@
         const platformSessionProbeUrl = document.getElementById('platform-session-probe-url');
         const platformSessionMeta = document.getElementById('platform-session-meta');
         const btnCopyPlatformHelperCommand = document.getElementById('btn-copy-platform-helper-command');
+        const btnCrawlerPreflight = document.getElementById('btn-crawler-preflight');
         const btnSavePlatformSession = document.getElementById('btn-save-platform-session');
         const btnProbePlatformSession = document.getElementById('btn-probe-platform-session');
         const btnClearPlatformSession = document.getElementById('btn-clear-platform-session');
@@ -4765,6 +4767,35 @@
             }
         }
 
+        async function runCrawlerPreflight() {
+            if (!isAdminSession()) return;
+            const url = platformSessionProbeUrl.value.trim();
+            if (!url) {
+                showToast('请先填写要预检的抖音或小红书链接。', 'error');
+                return;
+            }
+            btnCrawlerPreflight.disabled = true;
+            platformSessionMeta.innerText = '正在分析采集策略与访问阻力边界...';
+            try {
+                const response = await authorizedFetch(`${API_BASE_URL}/api/admin/crawler-preflight`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url })
+                });
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok) throw new Error(payload.detail || '采集策略预检失败。');
+                const strategy = payload.strategy || {};
+                const order = Array.isArray(strategy.runner_order) ? strategy.runner_order.join(' -> ') : '--';
+                platformSessionMeta.innerText = `策略：${strategy.crawler_type || '--'}；优先路径：${order}；登录态：${payload.has_platform_session ? '已配置' : '未配置'}；停止条件：${(strategy.stop_conditions || []).join(' / ') || '--'}`;
+                showToast('采集策略预检完成。', 'success');
+            } catch (error) {
+                platformSessionMeta.innerText = error.message || String(error);
+                showToast(error.message || String(error), 'error');
+            } finally {
+                btnCrawlerPreflight.disabled = false;
+            }
+        }
+
         async function savePlatformSession() {
             if (!isAdminSession()) return;
             const platform = platformSessionSelect.value;
@@ -4916,6 +4947,7 @@
         btnAlertStatus.addEventListener('click', refreshAlertStatus);
         btnAlertTest.addEventListener('click', sendTestAlert);
         btnCopyPlatformHelperCommand.addEventListener('click', copyPlatformHelperCommand);
+        btnCrawlerPreflight.addEventListener('click', runCrawlerPreflight);
         btnSavePlatformSession.addEventListener('click', savePlatformSession);
         btnProbePlatformSession.addEventListener('click', probePlatformSession);
         btnClearPlatformSession.addEventListener('click', clearPlatformSession);

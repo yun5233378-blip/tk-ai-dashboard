@@ -32,6 +32,19 @@ try:
 except Exception:  # pragma: no cover
     requests = None  # type: ignore
 
+try:
+    from crawler_engine import (
+        analyze_access_friction,
+        get_crawler_preset,
+        save_crawl_artifacts,
+        select_crawler_strategy,
+    )
+except Exception:  # pragma: no cover
+    analyze_access_friction = None  # type: ignore
+    get_crawler_preset = None  # type: ignore
+    save_crawl_artifacts = None  # type: ignore
+    select_crawler_strategy = None  # type: ignore
+
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
     "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -52,6 +65,8 @@ PLATFORM_COOKIE_DOMAINS = {
     "douyin": [".douyin.com", ".iesdouyin.com"],
     "xiaohongshu": [".xiaohongshu.com", ".xhslink.com"],
 }
+
+LAST_CRAWL_CONTEXT: Dict[str, Any] = {}
 
 
 def detect_platform(source: str) -> str:
@@ -342,6 +357,7 @@ def collect_visible_text_candidates(page: Any, limit: int) -> List[str]:
 
 
 def build_browser_visible_comments(source: str, platform: str, limit: int) -> List[Dict[str, Any]]:
+    global LAST_CRAWL_CONTEXT
     try:
         from playwright.sync_api import sync_playwright
     except Exception as exc:
@@ -350,11 +366,21 @@ def build_browser_visible_comments(source: str, platform: str, limit: int) -> Li
 
     session = load_platform_session_env(platform)
     user_agent = str(session.get("user_agent") or USER_AGENT).strip() or USER_AGENT
+    preset = get_crawler_preset(platform) if get_crawler_preset else None
+    strategy = select_crawler_strategy(source, bool(session)) if select_crawler_strategy else {}
+    viewport = {
+        "width": getattr(preset, "viewport_width", 1365),
+        "height": getattr(preset, "viewport_height", 900),
+    }
+    scroll_rounds = int(getattr(preset, "scroll_rounds", 5) or 5)
+    network_events: List[Dict[str, Any]] = []
+    friction_payload: Dict[str, Any] = {}
+    artifact_payload: Dict[str, Any] = {}
     comments: List[Dict[str, Any]] = []
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         context = browser.new_context(
-            viewport={"width": 1365, "height": 900},
+            viewport=viewport,
             locale="zh-CN",
             user_agent=user_agent,
         )
@@ -365,8 +391,21 @@ def build_browser_visible_comments(source: str, platform: str, limit: int) -> Li
         page = context.new_page()
         page.set_default_timeout(12000)
         try:
-            page.goto(source, wait_until="domcontentloaded", timeout=30000)
-            for _ in range(5):
+            def record_response(response: Any) -> None:
+                if len(network_events) >= 160:
+                    return
+                try:
+                    network_events.append({
+                        "status": response.status,
+                        "url": response.url[:260],
+                        "content_type": response.headers.get("content-type", "")[:120],
+                    })
+                except Exception:
+                    return
+
+            page.on("response", record_response)
+            response = page.goto(source, wait_until="domcontentloaded", timeout=30000)
+            for _ in range(scroll_rounds):
                 page.mouse.wheel(0, 900)
                 time.sleep(1.2)
             candidates = collect_visible_text_candidates(page, limit)
@@ -374,6 +413,39 @@ def build_browser_visible_comments(source: str, platform: str, limit: int) -> Li
                 make_comment(value, platform, idx + 1, source)
                 for idx, value in enumerate(candidates)
             ]
+            html = page.content()
+            friction = analyze_access_friction(
+                html=html,
+                status_code=response.status if response else 200,
+                headers=response.headers if response else {},
+                url=source,
+            ) if analyze_access_friction else None
+            friction_payload = friction.to_dict() if friction else {}
+            if friction_payload.get("signals") or not comments:
+                screenshot = b""
+                try:
+                    screenshot = page.screenshot(full_page=True)
+                except Exception:
+                    screenshot = b""
+                if save_crawl_artifacts:
+                    artifact_payload = save_crawl_artifacts(
+                        platform=platform,
+                        url=source,
+                        html=html,
+                        screenshot=screenshot,
+                        network=network_events,
+                        friction_report=friction_payload,
+                        metadata={
+                            "strategy": strategy,
+                            "candidate_count": len(candidates),
+                            "session_cookie_count": cookie_count,
+                        },
+                    )
+                    print(
+                        f"{platform} crawler artifact saved: {artifact_payload.get('run_id')} "
+                        f"friction={friction_payload.get('level', 'none')} "
+                        f"signals={','.join(friction_payload.get('signals', [])) or 'none'}"
+                    )
         finally:
             browser.close()
     comments = dedupe_comments(comments, limit)
@@ -381,6 +453,19 @@ def build_browser_visible_comments(source: str, platform: str, limit: int) -> Li
         comment["collection_method"] = "browser_visible_comment_probe_with_session" if session else "browser_visible_comment_probe"
         if cookie_count:
             comment["session_cookie_count"] = cookie_count
+        if strategy:
+            comment["crawler_strategy"] = strategy.get("crawler_type", "")
+        if friction_payload:
+            comment["friction_level"] = friction_payload.get("level", "none")
+        if artifact_payload:
+            comment["artifact_run_id"] = artifact_payload.get("run_id", "")
+    LAST_CRAWL_CONTEXT = {
+        "platform": platform,
+        "strategy": strategy,
+        "friction": friction_payload,
+        "artifact": artifact_payload,
+        "network_event_count": len(network_events),
+    }
     return comments
 
 
@@ -393,6 +478,37 @@ def platform_guidance(platform: str, has_session: bool = False) -> str:
         if has_session:
             return "小红书链接已注入保存的浏览器登录态，但仍未读到可分析评论；请检查 Cookie 是否过期、账号是否能打开该笔记评论区，或平台是否触发验证。"
         return "小红书链接已尝试浏览器直抓，但公开页未暴露可读评论；请先在后台保存小红书采集登录态/Cookie 后重试。"
+    return "该平台暂未接入专用公开评论 API，请使用 comments:// 或文本文件导入评论。"
+
+
+def platform_guidance(platform: str, has_session: bool = False) -> str:
+    context = LAST_CRAWL_CONTEXT if isinstance(LAST_CRAWL_CONTEXT, dict) else {}
+    friction = context.get("friction") or {}
+    artifact = context.get("artifact") or {}
+    signals = ", ".join(friction.get("signals", [])) or "none"
+    artifact_tip = f" Artifact: {artifact.get('run_id')}" if artifact.get("run_id") else ""
+    if platform == "douyin":
+        if has_session:
+            return (
+                "抖音已注入保存的登录态，但仍未读到可分析评论。"
+                f"访问阻力: {friction.get('level', 'unknown')} / {signals}."
+                f"{artifact_tip} 请检查 Cookie 是否过期、账号是否能打开评论区，或平台是否触发验证。"
+            )
+        return (
+            "抖音公开页未暴露可读评论。请在后台使用本机登录助手保存抖音采集登录态后重试。"
+            f"访问阻力: {friction.get('level', 'unknown')} / {signals}.{artifact_tip}"
+        )
+    if platform == "xiaohongshu":
+        if has_session:
+            return (
+                "小红书已注入保存的登录态，但仍未读到可分析评论。"
+                f"访问阻力: {friction.get('level', 'unknown')} / {signals}."
+                f"{artifact_tip} 请检查 Cookie 是否过期、账号是否能打开笔记评论区，或平台是否触发验证。"
+            )
+        return (
+            "小红书公开页未暴露可读评论。请在后台使用本机登录助手保存小红书采集登录态后重试。"
+            f"访问阻力: {friction.get('level', 'unknown')} / {signals}.{artifact_tip}"
+        )
     return "该平台暂未接入专用公开评论 API，请使用 comments:// 或文本文件导入评论。"
 
 

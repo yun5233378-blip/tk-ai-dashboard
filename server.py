@@ -49,6 +49,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
+try:
+    from crawler_engine import get_crawler_preset, select_crawler_strategy
+except Exception:  # pragma: no cover
+    get_crawler_preset = None  # type: ignore
+    select_crawler_strategy = None  # type: ignore
+
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 if hasattr(sys.stderr, "reconfigure"):
@@ -521,6 +527,12 @@ class PlatformSessionHelperUploadRequest(BaseModel):
     cookies: str = Field(..., min_length=1, description="浏览器导出的 cookies JSON 字符串")
     user_agent: str = Field("", max_length=500, description="浏览器 User-Agent")
     note: str = Field("", max_length=160, description="可选备注")
+
+
+class CrawlerPreflightRequest(BaseModel):
+    """后台采集策略预检请求体。"""
+
+    url: str = Field(..., min_length=8, description="要预检的平台链接")
 
 
 class VsPipelineRequest(BaseModel):
@@ -5648,6 +5660,42 @@ async def admin_restore_data(payload: AdminRestoreRequest) -> Dict[str, Any]:
 async def admin_platform_sessions() -> Dict[str, Any]:
     """查看平台采集登录态配置状态，不返回 Cookie 明文。"""
     return build_platform_sessions_payload()
+
+
+@app.post("/api/admin/crawler-preflight")
+async def admin_crawler_preflight(payload: CrawlerPreflightRequest) -> Dict[str, Any]:
+    """返回 SuperSpider-inspired 采集策略、登录态覆盖和停止条件。"""
+    if select_crawler_strategy is None or get_crawler_preset is None:
+        raise HTTPException(status_code=500, detail="采集策略引擎未加载。")
+    base_channel = detect_channel(payload.url)
+    platform = base_channel.source_type
+    sessions = load_platform_sessions()
+    has_session = platform in SUPPORTED_PLATFORM_SESSIONS and bool((sessions.get(platform) or {}).get("cookies"))
+    strategy = select_crawler_strategy(payload.url, has_session)
+    preset = get_crawler_preset(platform).to_dict()
+    append_admin_audit(
+        "crawler_preflight",
+        f"采集策略预检：{platform} / {strategy.get('recommended_runner')}",
+        {"platform": platform, "has_session": has_session},
+    )
+    return {
+        "status": "success",
+        "platform": platform,
+        "has_platform_session": has_session,
+        "strategy": strategy,
+        "preset": preset,
+        "source_inspiration": {
+            "project": "Lyx3314844-03/superspider",
+            "license": "MIT",
+            "absorbed_ideas": [
+                "site presets",
+                "crawler selection contract",
+                "access friction playbook",
+                "artifact capture",
+                "authorized session replay",
+            ],
+        },
+    }
 
 
 @app.post("/api/admin/platform-session-helper-command")
