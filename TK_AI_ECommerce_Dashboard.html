@@ -887,6 +887,9 @@
                         <span id="spinner" class="hidden w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
                         抓取评论并诊断
                     </button>
+                    <button id="btn-copy-local-capture-command" class="quiet-button px-4 py-2.5 rounded-lg text-sm font-bold">
+                        本机直采
+                    </button>
                 </div>
                 <details class="mt-4 rounded-lg border border-slate-200/70 bg-white/45 p-4">
                     <summary class="cursor-pointer select-none text-xs font-black text-slate-500">应急入口：平台拦截时再粘贴评论文本</summary>
@@ -1609,8 +1612,21 @@
             return extractFirstUrl(text);
         }
 
+        function inferDomesticPlatform(value) {
+            try {
+                const url = new URL(normalizeCrawlInput(value));
+                const host = url.hostname.toLowerCase();
+                if (host.includes('douyin.com') || host.includes('iesdouyin.com')) return 'douyin';
+                if (host.includes('xiaohongshu.com') || host.includes('xhslink.com')) return 'xiaohongshu';
+            } catch (error) {
+                return '';
+            }
+            return '';
+        }
+
         const productSelector = document.getElementById('product-selector');
         const btnRunPipeline = document.getElementById('btn-run-pipeline');
+        const btnCopyLocalCaptureCommand = document.getElementById('btn-copy-local-capture-command');
         const btnImportComments = document.getElementById('btn-import-comments');
         const pipelineUrl = document.getElementById('pipeline-url');
         const manualCommentsInput = document.getElementById('manual-comments-input');
@@ -4780,6 +4796,52 @@
             }
         }
 
+        async function copyLocalCaptureCommand() {
+            if (!isAdminSession()) {
+                showToast('本机直采命令需要管理员权限。', 'error');
+                return;
+            }
+            const rawUrl = pipelineUrl.value.trim();
+            const url = normalizeCrawlInput(rawUrl);
+            const platform = inferDomesticPlatform(url);
+            if (!url || !platform) {
+                showToast('本机直采目前用于抖音 / 小红书链接，请先粘贴对应视频或笔记链接。', 'error');
+                return;
+            }
+            if (rawUrl !== url && /^https?:\/\//i.test(url)) {
+                pipelineUrl.value = url;
+            }
+            const selectedKey = productSelector.value;
+            const selectedProduct = activeData[selectedKey] || {};
+            btnCopyLocalCaptureCommand.disabled = true;
+            try {
+                const response = await authorizedFetch(`${API_BASE_URL}/api/admin/local-capture-helper-command`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        platform,
+                        url,
+                        product_id: selectedProduct.product_id || selectedKey,
+                        product_name: selectedProduct.product_name || selectedKey,
+                        limit: 100
+                    })
+                });
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok) throw new Error(payload.detail || '本机直采命令生成失败。');
+                const command = payload.windows_powershell || '';
+                await navigator.clipboard.writeText(command);
+                pipelineLoadingState.classList.remove('hidden');
+                pipelineLoadingTitle.innerText = '本机直采命令已复制';
+                pipelineLoadingDetail.innerText = '打开 Windows PowerShell 粘贴运行。浏览器弹出后登录平台、打开评论区并滚动，再回到终端按 Enter，评论会自动上传并生成诊断。';
+                progressPercent.innerText = '本机';
+                showToast('本机直采命令已复制。', 'success');
+            } catch (error) {
+                showToast(error.message || String(error), 'error');
+            } finally {
+                btnCopyLocalCaptureCommand.disabled = false;
+            }
+        }
+
         async function runCrawlerPreflight() {
             if (!isAdminSession()) return;
             const rawUrl = platformSessionProbeUrl.value.trim();
@@ -4970,6 +5032,7 @@
         btnAlertStatus.addEventListener('click', refreshAlertStatus);
         btnAlertTest.addEventListener('click', sendTestAlert);
         btnCopyPlatformHelperCommand.addEventListener('click', copyPlatformHelperCommand);
+        btnCopyLocalCaptureCommand.addEventListener('click', copyLocalCaptureCommand);
         btnCrawlerPreflight.addEventListener('click', runCrawlerPreflight);
         btnSavePlatformSession.addEventListener('click', savePlatformSession);
         btnProbePlatformSession.addEventListener('click', probePlatformSession);
@@ -5135,7 +5198,14 @@
                 renderDiagnosticCharts(updatedKey);
                 renderProductTable();
             } else {
-                showToast(payload.detail || '未采集到有效评论。若是抖音/小红书链接，可能需要后续接入浏览器登录态采集。', 'error');
+                const detail = payload.detail || '未采集到有效评论。若是抖音/小红书链接，请点击“本机直采”，用本机浏览器打开评论区后上传诊断。';
+                showToast(detail, 'error');
+                if (inferDomesticPlatform(pipelineUrl.value)) {
+                    pipelineLoadingState.classList.remove('hidden');
+                    pipelineLoadingTitle.innerText = '平台风控拦截';
+                    pipelineLoadingDetail.innerText = '云服务器无法直接读取该平台评论。点击“本机直采”，在你的电脑浏览器内打开评论区后上传评论给 AI 诊断。';
+                    progressPercent.innerText = '本机';
+                }
             }
         }
 

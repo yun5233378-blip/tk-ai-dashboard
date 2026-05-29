@@ -529,6 +529,28 @@ class PlatformSessionHelperUploadRequest(BaseModel):
     note: str = Field("", max_length=160, description="可选备注")
 
 
+class LocalCaptureHelperCommandRequest(BaseModel):
+    """管理员生成本机评论直采助手命令。"""
+
+    platform: str = Field(..., min_length=1, description="douyin / xiaohongshu")
+    url: str = Field(..., min_length=8, description="要在本机浏览器打开的平台链接")
+    product_id: str | None = Field(None, description="本次诊断要写入的产品 ID")
+    product_name: str | None = Field(None, description="本次诊断要写入的产品名称")
+    limit: int = Field(DEFAULT_LIMIT, ge=1, le=500, description="本次最多采集评论数")
+
+
+class LocalCaptureHelperUploadRequest(BaseModel):
+    """本机评论直采助手上传可见评论并触发诊断。"""
+
+    helper_token: str = Field(..., min_length=10, description="短时效助手令牌")
+    platform: str = Field(..., min_length=1, description="douyin / xiaohongshu")
+    source_url: str = Field("", description="原始平台链接")
+    product_id: str | None = Field(None, description="本次诊断要写入的产品 ID")
+    product_name: str | None = Field(None, description="本次诊断要写入的产品名称")
+    comments: List[str] = Field(..., min_length=1, description="本机浏览器采集到的评论文本")
+    limit: int = Field(DEFAULT_LIMIT, ge=1, le=500, description="本次最多导入评论数")
+
+
 class CrawlerPreflightRequest(BaseModel):
     """后台采集策略预检请求体。"""
 
@@ -1054,6 +1076,62 @@ def verify_platform_helper_token(token: str, platform: str) -> Dict[str, Any]:
         raise HTTPException(status_code=401, detail="登录助手令牌无效或已过期，请在后台重新生成。") from exc
 
 
+def create_local_capture_helper_token(
+    platform: str,
+    actor: Dict[str, Any],
+    source_url: str,
+    product_id: str,
+    product_name: str,
+    limit: int,
+    ttl_seconds: int = 900,
+) -> str:
+    """Create a short-lived token for local browser comment capture."""
+    platform_key = normalize_platform_session_key(platform)
+    now = current_epoch()
+    payload = {
+        "purpose": "local_comment_capture_helper",
+        "platform": platform_key,
+        "source_url": normalize_crawl_source(source_url),
+        "product_id": str(product_id or ""),
+        "product_name": str(product_name or ""),
+        "limit": int(limit or DEFAULT_LIMIT),
+        "sub": str(actor.get("user_id") or "operator"),
+        "username": str(actor.get("username") or "admin"),
+        "role": str(actor.get("role") or "admin"),
+        "iat": now,
+        "exp": now + max(60, ttl_seconds),
+        "nonce": secrets.token_urlsafe(12),
+    }
+    payload_part = b64url_encode(json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
+    signature = hmac.new(OPERATOR_TOKEN.encode("utf-8"), payload_part.encode("ascii"), hashlib.sha256).digest()
+    return f"lc.{payload_part}.{b64url_encode(signature)}"
+
+
+def verify_local_capture_helper_token(token: str, platform: str) -> Dict[str, Any]:
+    """Verify a local browser comment capture helper token."""
+    try:
+        prefix, payload_part, signature_part = str(token or "").split(".", 2)
+        if prefix != "lc":
+            raise ValueError("bad prefix")
+        expected_signature = hmac.new(OPERATOR_TOKEN.encode("utf-8"), payload_part.encode("ascii"), hashlib.sha256).digest()
+        actual_signature = b64url_decode(signature_part)
+        if not hmac.compare_digest(expected_signature, actual_signature):
+            raise ValueError("bad signature")
+        payload = json.loads(b64url_decode(payload_part).decode("utf-8"))
+        if payload.get("purpose") != "local_comment_capture_helper":
+            raise ValueError("bad purpose")
+        platform_key = normalize_platform_session_key(platform)
+        if payload.get("platform") != platform_key:
+            raise ValueError("platform mismatch")
+        if int(payload.get("exp", 0) or 0) < current_epoch():
+            raise ValueError("expired")
+        if payload.get("role") != "admin":
+            raise ValueError("admin required")
+        return payload
+    except Exception as exc:
+        raise HTTPException(status_code=401, detail="本机直采助手令牌无效或已过期，请重新生成命令。") from exc
+
+
 def quote_powershell(value: str) -> str:
     """Single-quote a value for PowerShell."""
     return "'" + value.replace("'", "''") + "'"
@@ -1101,6 +1179,58 @@ def build_platform_helper_commands(platform: str, helper_token: str, api_base_ur
         "python3 -m pip install --user requests playwright; "
         "python3 -m playwright install chromium; "
         f"python3 \"$p\" --platform {quote_posix(platform_key)} --api {quote_posix(api_url)} --helper-token {quote_posix(helper_token)}"
+    )
+    return {
+        "script_url": script_url,
+        "windows_powershell": windows,
+        "mac_linux": mac_linux,
+    }
+
+
+def build_local_capture_helper_commands(
+    platform: str,
+    source_url: str,
+    helper_token: str,
+    api_base_url: str,
+    limit: int,
+) -> Dict[str, str]:
+    """Build local commands that open a browser, capture visible comments, and upload them."""
+    platform_key = normalize_platform_session_key(platform)
+    script_url = f"{api_base_url.rstrip('/')}/tools/local_comment_capture_helper.py"
+    api_url = api_base_url.rstrip("/")
+    normalized_url = normalize_crawl_source(source_url)
+    windows = (
+        "$ErrorActionPreference='Stop'; "
+        "$p=Join-Path $env:TEMP 'tk_local_comment_capture_helper.py'; "
+        f"Invoke-WebRequest -UseBasicParsing {quote_powershell(script_url)} -OutFile $p; "
+        "$candidates=@("
+        "@{Exe='py';Args=@('-3.13')},"
+        "@{Exe='py';Args=@('-3.12')},"
+        "@{Exe='py';Args=@('-3.11')},"
+        "@{Exe='py';Args=@('-3.10')},"
+        "@{Exe='python';Args=@()},"
+        "@{Exe='python3';Args=@()}"
+        "); "
+        "$py=$null; "
+        "foreach($c in $candidates){ "
+        "if(-not (Get-Command $c.Exe -ErrorAction SilentlyContinue)){ continue }; "
+        "$a=$c.Args; "
+        "try { & $c.Exe @a -m ensurepip --upgrade *> $null } catch {}; "
+        "try { & $c.Exe @a -m pip --version *> $null; $py=$c; break } catch {} "
+        "}; "
+        "if(-not $py){ throw 'No usable Python with pip found. Install Python 3.12 from python.org and enable Add python.exe to PATH.' }; "
+        "$pa=$py.Args; "
+        "& $py.Exe @pa -m pip install --user --upgrade requests playwright; "
+        "& $py.Exe @pa -m playwright install chromium; "
+        f"& $py.Exe @pa $p --platform {quote_powershell(platform_key)} --url {quote_powershell(normalized_url)} --api {quote_powershell(api_url)} --helper-token {quote_powershell(helper_token)} --limit {int(limit or DEFAULT_LIMIT)}"
+    )
+    mac_linux = (
+        "set -e; "
+        "p=\"${TMPDIR:-/tmp}/tk_local_comment_capture_helper.py\"; "
+        f"curl -fsSL {quote_posix(script_url)} -o \"$p\"; "
+        "python3 -m pip install --user requests playwright; "
+        "python3 -m playwright install chromium; "
+        f"python3 \"$p\" --platform {quote_posix(platform_key)} --url {quote_posix(normalized_url)} --api {quote_posix(api_url)} --helper-token {quote_posix(helper_token)} --limit {int(limit or DEFAULT_LIMIT)}"
     )
     return {
         "script_url": script_url,
@@ -4801,6 +4931,7 @@ def requires_operator_auth(request: Request) -> bool:
         "/api/auth/login",
         "/api/auth/register",
         "/api/platform-session-helper/upload",
+        "/api/local-capture-helper/upload",
     }
     return request.url.path not in public_paths
 
@@ -5751,6 +5882,45 @@ async def admin_platform_session_helper_command(payload: PlatformSessionHelperCo
     }
 
 
+@app.post("/api/admin/local-capture-helper-command")
+async def admin_local_capture_helper_command(payload: LocalCaptureHelperCommandRequest) -> Dict[str, Any]:
+    """生成本机评论直采助手命令，绕开云服务器被平台风控拦截的问题。"""
+    platform_key = normalize_platform_session_key(payload.platform)
+    source_url = normalize_crawl_source(payload.url)
+    if not source_url.startswith(("http://", "https://")):
+        raise HTTPException(status_code=400, detail="请先填写有效的平台视频或笔记链接。")
+    actor = get_current_request_user()
+    product_id = (payload.product_id or "").strip()
+    product_name = (payload.product_name or "").strip()
+    helper_token = create_local_capture_helper_token(
+        platform_key,
+        actor,
+        source_url,
+        product_id,
+        product_name,
+        payload.limit,
+    )
+    commands = build_local_capture_helper_commands(
+        platform_key,
+        source_url,
+        helper_token,
+        "https://tk-api.void52.site",
+        payload.limit,
+    )
+    append_admin_audit(
+        "create_local_capture_helper_command",
+        f"生成{SUPPORTED_PLATFORM_SESSIONS[platform_key]['label']}本机评论直采命令。",
+        {"platform": platform_key, "url": source_url},
+    )
+    return {
+        "status": "success",
+        "platform": platform_key,
+        "url": source_url,
+        "expires_in_seconds": 900,
+        **commands,
+    }
+
+
 @app.post("/api/platform-session-helper/upload")
 async def platform_session_helper_upload(payload: PlatformSessionHelperUploadRequest) -> Dict[str, Any]:
     """本机登录助手上传浏览器 cookies；只接受短时效助手令牌。"""
@@ -5773,6 +5943,62 @@ async def platform_session_helper_upload(payload: PlatformSessionHelperUploadReq
         "status": "success",
         "session": public_platform_session_payload(platform_key, session),
     }
+
+
+@app.post("/api/local-capture-helper/upload")
+async def local_capture_helper_upload(payload: LocalCaptureHelperUploadRequest) -> Dict[str, Any]:
+    """本机浏览器助手上传可见评论，并在云端复用 AI 诊断流水线。"""
+    platform_key = normalize_platform_session_key(payload.platform)
+    helper_payload = verify_local_capture_helper_token(payload.helper_token, platform_key)
+    comments = normalize_manual_comment_lines(payload.comments, payload.limit or DEFAULT_LIMIT)
+    if not comments:
+        raise HTTPException(status_code=400, detail="本机助手没有采集到有效评论，请打开评论区并多滚动几屏后重试。")
+    if PIPELINE_LOCK.locked():
+        raise HTTPException(status_code=409, detail="已有一条诊断流水线正在执行，请稍后再试。")
+
+    source_url = normalize_crawl_source(
+        payload.source_url
+        or str(helper_payload.get("source_url") or "")
+        or "local_capture"
+    )
+    product_id = (payload.product_id or str(helper_payload.get("product_id") or "")).strip() or None
+    product_name = (payload.product_name or str(helper_payload.get("product_name") or "")).strip() or None
+
+    async with PIPELINE_LOCK:
+        reset_logs()
+        append_log(f"本机评论直采诊断流水线已启动：{platform_key}，上传评论 {len(comments)} 条。")
+        try:
+            result = await run_manual_comments_pipeline_async(
+                ManualCommentsPipelineRequest(
+                    comments=comments,
+                    source_platform=platform_key,
+                    source_url=source_url,
+                    product_id=product_id,
+                    product_name=product_name,
+                    limit=min(payload.limit or DEFAULT_LIMIT, len(comments)),
+                )
+            )
+            append_log("本机评论直采诊断成功，前端看板可以刷新数据。")
+            append_admin_audit(
+                "local_capture_helper_upload",
+                f"本机评论直采完成：{result['product_key']} / {result['product_name']}，评论 {result['raw_comment_count']} 条。",
+                {"platform": platform_key, "source_type": result["source_type"]},
+            )
+            return {
+                "status": "success",
+                "message": result["message"],
+                "raw_comment_count": result["raw_comment_count"],
+                "product_key": result["product_key"],
+                "product_id": result["product_id"],
+                "product_name": result["product_name"],
+                "source_type": result["source_type"],
+            }
+        except PipelineRuntimeError as exc:
+            append_log(f"本机评论直采诊断失败：{exc.detail}")
+            raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+        except Exception as exc:
+            append_log(f"本机评论直采诊断发生未处理异常：{exc}")
+            raise HTTPException(status_code=500, detail=f"本机评论直采诊断失败：{exc}") from exc
 
 
 @app.put("/api/admin/platform-sessions/{platform}")
