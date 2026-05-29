@@ -4327,6 +4327,7 @@ cors_allow_origins = [
     "https://dashboard.void52.site",
     "https://api.void52.site",
     "https://tk-api.void52.site",
+    "https://tk-ai-dashboard.pages.dev",
     *CORS_EXTRA_ORIGINS,
 ]
 if ALLOW_LOCAL_CORS:
@@ -4342,7 +4343,7 @@ if ALLOW_LOCAL_CORS:
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_allow_origins,
-    allow_origin_regex=r"^https://([a-zA-Z0-9-]+\.)*void52\.site$",
+    allow_origin_regex=r"^https://(([a-zA-Z0-9-]+\.)*void52\.site|([a-zA-Z0-9-]+\.)?tk-ai-dashboard\.pages\.dev)$",
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
