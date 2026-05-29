@@ -660,9 +660,58 @@
             background-image: radial-gradient(circle at 1px 1px, rgba(117, 119, 125, 0.28) 1px, transparent 0);
             background-size: 18px 18px;
         }
+        .performance-lite .app-header,
+        .performance-lite .glass-card,
+        .performance-lite .modal-backdrop,
+        .performance-lite footer {
+            backdrop-filter: none !important;
+        }
+        .performance-lite .glass-card,
+        .performance-lite .stitch-card,
+        .performance-lite .primary-action,
+        .performance-lite .brief-glow {
+            transition: border-color 0.12s ease, background-color 0.12s ease, color 0.12s ease !important;
+        }
+        .performance-lite .glass-card:hover,
+        .performance-lite .stitch-card:hover,
+        .performance-lite .primary-action:hover,
+        .performance-lite .quiet-button:hover {
+            transform: none !important;
+            box-shadow: 0 1px 3px rgba(9, 20, 38, 0.08) !important;
+            filter: none !important;
+        }
+        .performance-lite .page-section,
+        .performance-lite .backend-module {
+            content-visibility: auto;
+            contain-intrinsic-size: 900px;
+        }
+        .performance-lite .page-section.hidden,
+        .performance-lite .backend-module.hidden {
+            content-visibility: hidden;
+        }
+        .performance-lite .blur-3xl,
+        .performance-lite [class*="blur"],
+        .performance-lite .brief-glow::before,
+        .performance-lite .critical-light::before,
+        .performance-lite .alert-dot {
+            animation: none !important;
+            filter: none !important;
+        }
+        .performance-lite .animate-ping,
+        .performance-lite .animate-pulse {
+            animation-duration: 2.4s !important;
+        }
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                scroll-behavior: auto !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
     </style>
 </head>
-<body class="app-shell min-h-screen bg-slate-50 text-slate-900 antialiased">
+<body class="app-shell performance-lite min-h-screen bg-slate-50 text-slate-900 antialiased">
 
     <div id="login-screen" class="auth-dot-grid fixed inset-0 z-[120] hidden items-center justify-center bg-[#f8f9ff] p-4">
         <div class="auth-mesh absolute inset-0 pointer-events-none"></div>
@@ -1952,11 +2001,18 @@
         let currentUserRole = localStorage.getItem('tk_ai_user_role') || '';
         let currentUsername = localStorage.getItem('tk_ai_operator_username') || '';
         let latestExecutiveReportPayload = null;
+        let backendRenderDirty = true;
+        let marketChartInstance = null;
 
         const OPERATOR_TOKEN_STORAGE_KEY = 'tk_ai_operator_token';
         const OPERATOR_USERNAME_STORAGE_KEY = 'tk_ai_operator_username';
         const AUTH_USER_ROLE_STORAGE_KEY = 'tk_ai_user_role';
         const AUTH_USER_EMAIL_STORAGE_KEY = 'tk_ai_user_email';
+
+        if (window.Chart && Chart.defaults) {
+            Chart.defaults.animation = false;
+            Chart.defaults.responsiveAnimationDuration = 0;
+        }
 
         function isProtectedApiUrl(url) {
             try {
@@ -4087,6 +4143,26 @@
 
         setupBackendDetails();
 
+        function isSectionVisible(sectionId) {
+            const section = document.getElementById(sectionId);
+            return Boolean(section && !section.classList.contains('hidden'));
+        }
+
+        function markBackendDirty() {
+            backendRenderDirty = true;
+        }
+
+        function renderBackendHeavyPanels(force = false) {
+            if (!force && (!backendRenderDirty || !isSectionVisible('section-details'))) {
+                return;
+            }
+            ensureMarketTrendChart();
+            renderMarketGapRadar();
+            renderRadarEvidencePanel();
+            renderEvidenceAuditCenter();
+            backendRenderDirty = false;
+        }
+
         const navBtns = document.querySelectorAll('.nav-btn');
         const sections = document.querySelectorAll('.page-section');
         navBtns.forEach(btn => {
@@ -4105,6 +4181,9 @@
                         sec.classList.add('hidden');
                     }
                 });
+                if (targetId === 'section-details') {
+                    window.requestAnimationFrame(() => renderBackendHeavyPanels(true));
+                }
             });
         });
 
@@ -4119,11 +4198,15 @@
             });
         }
 
-        const ctxMarket = document.getElementById('marketChart').getContext('2d');
-        const marketGradient = ctxMarket.createLinearGradient(0, 0, 0, 360);
-        marketGradient.addColorStop(0, 'rgba(99, 102, 241, 0.28)');
-        marketGradient.addColorStop(1, 'rgba(99, 102, 241, 0)');
-        new Chart(ctxMarket, {
+        function ensureMarketTrendChart() {
+            if (marketChartInstance) return;
+            const marketCanvas = document.getElementById('marketChart');
+            if (!marketCanvas) return;
+            const ctxMarket = marketCanvas.getContext('2d');
+            const marketGradient = ctxMarket.createLinearGradient(0, 0, 0, 360);
+            marketGradient.addColorStop(0, 'rgba(99, 102, 241, 0.22)');
+            marketGradient.addColorStop(1, 'rgba(99, 102, 241, 0)');
+            marketChartInstance = new Chart(ctxMarket, {
             type: 'line',
             data: {
                 labels: ['2023 Q1', '2023 Q3', '2024 Q1', '2024 Q3', '2025 Q1', '2025 Q3(预测)'],
@@ -4133,10 +4216,11 @@
                         data: [50, 120, 280, 500, 850, 1300],
                         borderColor: '#6366F1',
                         backgroundColor: marketGradient,
-                        borderWidth: 3,
-                        tension: 0.4,
+                        borderWidth: 2,
+                        tension: 0.35,
                         fill: true,
-                        yAxisID: 'y'
+                        yAxisID: 'y',
+                        pointRadius: 0
                     },
                     {
                         label: '平均退货率 (%)',
@@ -4146,13 +4230,15 @@
                         borderWidth: 2,
                         borderDash: [5, 5],
                         tension: 0.2,
-                        yAxisID: 'y1'
+                        yAxisID: 'y1',
+                        pointRadius: 0
                     }
                 ]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                animation: false,
                 interaction: { mode: 'index', intersect: false },
                 plugins: {
                     tooltip: tooltipFixConfig,
@@ -4181,7 +4267,8 @@
                     }
                 }
             }
-        });
+            });
+        }
 
         function renderDiagnosticCharts(productKey) {
             const data = activeData[productKey];
@@ -4338,8 +4425,8 @@
 
             syncActiveProductTitle(productSelector.value);
             renderCompetitorCheckboxes();
-            renderMarketGapRadar();
-            renderRadarEvidencePanel();
+            markBackendDirty();
+            renderBackendHeavyPanels();
         }
 
         function renderProductTable() {
@@ -4347,8 +4434,8 @@
             tableBody.innerHTML = '';
             renderLiveOverview();
             updateRadarAlertState();
-            renderMarketGapRadar();
-            renderRadarEvidencePanel();
+            markBackendDirty();
+            renderBackendHeavyPanels();
 
             if (Object.keys(activeData).length === 0) {
                 const tr = document.createElement('tr');
@@ -4731,7 +4818,8 @@
         });
 
         btnRefreshMarketGap.addEventListener('click', () => {
-            renderMarketGapRadar();
+            markBackendDirty();
+            renderBackendHeavyPanels(true);
             showToast('机会雷达已重新计算。', 'success');
         });
 
@@ -4999,7 +5087,8 @@
             const nextKey = activeData[currentKey] ? currentKey : productSelector.value;
             renderDiagnosticCharts(nextKey);
             renderProductTable();
-            renderRadarEvidencePanel();
+            markBackendDirty();
+            renderBackendHeavyPanels();
         }
 
         function downloadJson(filename, payload) {
