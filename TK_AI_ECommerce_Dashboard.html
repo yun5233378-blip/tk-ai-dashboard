@@ -5160,10 +5160,12 @@
             const selectedProduct = activeData[selectedKey] || {};
 
             btnRunPipeline.disabled = true;
+            pipelineUrl.disabled = true;
+            productSelector.disabled = true;
             spinner.classList.remove('hidden');
             setTerminalOpenState(true);
             pipelineLoadingTitle.innerText = '正在抓取并分析评论';
-            pipelineLoadingDetail.innerText = '系统正在尝试直接读取链接内评论；如平台限制公开评论，会返回明确失败原因。';
+            pipelineLoadingDetail.innerText = `实际提交链接：${url}。系统正在尝试直接读取链接内评论；如平台限制公开评论，会返回明确失败原因。`;
             progressPercent.innerText = '15%';
             logOffset = 0;
             pollInterval = setInterval(fetchLogs, 800);
@@ -5188,6 +5190,8 @@
                 }
                 await fetchLogs();
                 btnRunPipeline.disabled = false;
+                pipelineUrl.disabled = false;
+                productSelector.disabled = false;
                 spinner.classList.add('hidden');
                 setTerminalOpenState(false);
             }
