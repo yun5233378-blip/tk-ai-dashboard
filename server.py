@@ -19,6 +19,8 @@ TK 跨境电商 AI 看板本地后端中枢
 from __future__ import annotations
 
 import asyncio
+import base64
+import contextvars
 from collections import defaultdict, deque
 import copy
 import hashlib
@@ -90,6 +92,7 @@ COMPETITOR_VS_REPORTS_PATH = BASE_DIR / "competitor_vs_reports.json"
 ADMIN_AUDIT_LOGS_PATH = BASE_DIR / "admin_audit_logs.json"
 ALERT_DEDUP_PATH = BASE_DIR / "alert_dedup.json"
 RADAR_HISTORY_PATH = BASE_DIR / "radar_history.json"
+USERS_PATH = BASE_DIR / "users.json"
 
 REDIS_URL = os.getenv("REDIS_URL", "").strip()
 DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
@@ -100,6 +103,7 @@ VS_REPORTS_STORE_KEY = os.getenv("VS_REPORTS_STORE_KEY", "tk_ai:competitor_vs_re
 ADMIN_AUDIT_STORE_KEY = os.getenv("ADMIN_AUDIT_STORE_KEY", "tk_ai:admin_audit_logs")
 ALERT_DEDUP_STORE_KEY = os.getenv("ALERT_DEDUP_STORE_KEY", "tk_ai:alert_dedup")
 RADAR_HISTORY_STORE_KEY = os.getenv("RADAR_HISTORY_STORE_KEY", "tk_ai:radar_history")
+USERS_STORE_KEY = os.getenv("USERS_STORE_KEY", "tk_ai:users")
 CORS_EXTRA_ORIGINS = [
     item.strip()
     for item in os.getenv("CORS_EXTRA_ORIGINS", "").split(",")
@@ -110,6 +114,9 @@ ENABLE_DEMO_PRODUCTS = os.getenv("ENABLE_DEMO_PRODUCTS", "0").strip() == "1"
 OPERATOR_TOKEN = os.getenv("OPERATOR_TOKEN", secrets.token_urlsafe(48)).strip()
 OPERATOR_USERNAME = os.getenv("OPERATOR_USERNAME", "admin").strip() or "admin"
 OPERATOR_PASSWORD = os.getenv("OPERATOR_PASSWORD", "你的登录密码").strip()
+REGISTRATION_INVITE_CODE = os.getenv("REGISTRATION_INVITE_CODE", "tk-ai-beta-2026").strip()
+SESSION_TTL_SECONDS = int(os.getenv("SESSION_TTL_SECONDS", str(7 * 24 * 3600)))
+PASSWORD_HASH_ITERATIONS = int(os.getenv("PASSWORD_HASH_ITERATIONS", "260000"))
 ALERT_WEBHOOK_URL = os.getenv("ALERT_WEBHOOK_URL", "").strip()
 ALERT_WEBHOOK_TOKEN = os.getenv("ALERT_WEBHOOK_TOKEN", "").strip()
 ALERT_WEBHOOK_TIMEOUT_SECONDS = int(os.getenv("ALERT_WEBHOOK_TIMEOUT_SECONDS", "8"))
@@ -158,6 +165,7 @@ LOG_LOCK = threading.Lock()
 MAX_LOG_LINES = 500
 RATE_LIMIT_BUCKETS: Dict[str, deque[float]] = defaultdict(deque)
 RATE_LIMIT_LOCK = threading.Lock()
+CURRENT_USER_CONTEXT: contextvars.ContextVar[Dict[str, Any] | None] = contextvars.ContextVar("current_user", default=None)
 
 
 # =========================
@@ -438,8 +446,17 @@ class AddProductRequest(BaseModel):
 class LoginRequest(BaseModel):
     """前端账号密码登录请求体。"""
 
-    username: str = Field(..., min_length=1, description="运营账号")
+    username: str = Field(..., min_length=1, description="运营账号或邮箱")
     password: str = Field(..., min_length=1, description="运营密码")
+
+
+class RegisterRequest(BaseModel):
+    """邀请码注册请求体。"""
+
+    username: str = Field(..., min_length=2, max_length=48, description="登录账号")
+    email: str = Field(..., min_length=5, max_length=120, description="注册邮箱")
+    password: str = Field(..., min_length=8, max_length=128, description="登录密码")
+    invite_code: str = Field(..., min_length=1, description="内测邀请码")
 
 
 class VsPipelineRequest(BaseModel):
@@ -664,19 +681,50 @@ def ensure_products_file() -> Dict[str, Dict[str, Any]]:
     return products
 
 
+def get_current_user_context() -> Dict[str, Any] | None:
+    """返回当前请求绑定的用户；后台任务没有请求上下文时返回 None。"""
+    return CURRENT_USER_CONTEXT.get()
+
+
+def is_admin_user(user: Dict[str, Any] | None) -> bool:
+    """判断当前主体是否为系统管理员。"""
+    return bool(user and user.get("role") == "admin")
+
+
+def scope_storage_key(base_key: str) -> str:
+    """普通用户使用独立 KV 命名空间；管理员继续读取全局运营数据。"""
+    user = get_current_user_context()
+    if user and not is_admin_user(user):
+        return f"{base_key}:user:{user.get('user_id')}"
+    return base_key
+
+
 def load_products() -> Dict[str, Dict[str, Any]]:
     """读取并修复前端产品字典。"""
-    return ensure_products_file()
+    return ensure_products_shape(load_storage_json(scope_storage_key(PRODUCTS_STORE_KEY), DIAGNOSED_PRODUCTS_PATH, {}))
 
 
 def save_products(products: Dict[str, Dict[str, Any]]) -> None:
     """保存完整产品字典。"""
-    save_storage_json(PRODUCTS_STORE_KEY, DIAGNOSED_PRODUCTS_PATH, products)
+    save_storage_json(scope_storage_key(PRODUCTS_STORE_KEY), DIAGNOSED_PRODUCTS_PATH, products)
+
+
+def load_users() -> Dict[str, Dict[str, Any]]:
+    """读取 SaaS 用户表，key 为 user_id。"""
+    users = load_storage_json(USERS_STORE_KEY, USERS_PATH, {})
+    if not isinstance(users, dict):
+        return {}
+    return {str(key): value for key, value in users.items() if isinstance(value, dict)}
+
+
+def save_users(users: Dict[str, Dict[str, Any]]) -> None:
+    """保存 SaaS 用户表。"""
+    save_storage_json(USERS_STORE_KEY, USERS_PATH, users)
 
 
 def load_vs_reports() -> List[Dict[str, Any]]:
     """读取竞品 PK 历史报告，异常结构自动回落为空列表。"""
-    reports = load_storage_json(VS_REPORTS_STORE_KEY, COMPETITOR_VS_REPORTS_PATH, [])
+    reports = load_storage_json(scope_storage_key(VS_REPORTS_STORE_KEY), COMPETITOR_VS_REPORTS_PATH, [])
     if isinstance(reports, list):
         return [item for item in reports if isinstance(item, dict)]
     return []
@@ -684,12 +732,12 @@ def load_vs_reports() -> List[Dict[str, Any]]:
 
 def save_vs_reports(reports: List[Dict[str, Any]]) -> None:
     """保存最近 50 条竞品 PK 历史报告。"""
-    save_storage_json(VS_REPORTS_STORE_KEY, COMPETITOR_VS_REPORTS_PATH, reports[-50:])
+    save_storage_json(scope_storage_key(VS_REPORTS_STORE_KEY), COMPETITOR_VS_REPORTS_PATH, reports[-50:])
 
 
 def load_radar_history() -> Dict[str, List[Dict[str, Any]]]:
     """读取 24H 雷达历史快照，云端优先，结构异常时自动清洗。"""
-    history = load_storage_json(RADAR_HISTORY_STORE_KEY, RADAR_HISTORY_PATH, {})
+    history = load_storage_json(scope_storage_key(RADAR_HISTORY_STORE_KEY), RADAR_HISTORY_PATH, {})
     if not isinstance(history, dict):
         return {}
 
@@ -709,7 +757,7 @@ def save_radar_history(history: Dict[str, List[Dict[str, Any]]]) -> None:
         for product_key, points in history.items()
         if isinstance(points, list)
     }
-    save_storage_json(RADAR_HISTORY_STORE_KEY, RADAR_HISTORY_PATH, trimmed)
+    save_storage_json(scope_storage_key(RADAR_HISTORY_STORE_KEY), RADAR_HISTORY_PATH, trimmed)
 
 
 def build_pending_product(product_id: str, product_name: str, url: str = "") -> Dict[str, Any]:
@@ -1521,10 +1569,12 @@ def append_admin_audit(action: str, detail: str, extra: Dict[str, Any] | None = 
     """记录关键运营动作，便于排查误操作和数据恢复。"""
     try:
         logs = load_admin_audit_logs()
+        actor = get_current_user_context() or build_admin_user()
         logs.append({
             "timestamp": current_timestamp(),
             "action": action,
             "detail": detail,
+            "actor": public_user_payload(actor),
             "extra": extra or {},
         })
         save_admin_audit_logs(logs)
@@ -4252,12 +4302,19 @@ def extract_operator_token(request: Request) -> str:
 
 
 def requires_operator_auth(request: Request) -> bool:
-    """保护所有 /api 路由，仅放行登录、健康检查和预检请求。"""
+    """保护所有 /api 路由，仅放行登录、注册、健康检查和预检请求。"""
     if request.method == "OPTIONS":
         return False
     if not request.url.path.startswith("/api/"):
         return False
-    return request.url.path not in {"/api/health", "/api/login"}
+    public_paths = {"/api/health", "/api/login", "/api/register", "/api/auth/login", "/api/auth/register"}
+    return request.url.path not in public_paths
+
+
+def requires_admin_user(request: Request) -> bool:
+    """管理员专属路由：系统体检、备份、审计、告警恢复。"""
+    path = request.url.path
+    return path == "/api/readiness" or path.startswith("/api/admin/")
 
 
 def constant_time_text_equal(left: str, right: str) -> bool:
@@ -4268,10 +4325,127 @@ def constant_time_text_equal(left: str, right: str) -> bool:
     )
 
 
+def b64url_encode(data: bytes) -> str:
+    """URL-safe base64 without padding for compact signed session tokens."""
+    return base64.urlsafe_b64encode(data).decode("ascii").rstrip("=")
+
+
+def b64url_decode(data: str) -> bytes:
+    """Decode URL-safe base64 without requiring callers to manage padding."""
+    padding = "=" * (-len(data) % 4)
+    return base64.urlsafe_b64decode((data + padding).encode("ascii"))
+
+
+def normalize_login_identifier(value: str) -> str:
+    """Normalize usernames/emails for duplicate checks and login lookup."""
+    return " ".join(str(value or "").strip().lower().split())
+
+
+def hash_password(password: str) -> str:
+    """Hash user passwords with PBKDF2-HMAC-SHA256; no plaintext storage."""
+    salt = secrets.token_bytes(16)
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, PASSWORD_HASH_ITERATIONS)
+    return f"pbkdf2_sha256${PASSWORD_HASH_ITERATIONS}${b64url_encode(salt)}${b64url_encode(digest)}"
+
+
+def verify_password(password: str, stored_hash: str) -> bool:
+    """Verify a password against the stored PBKDF2 hash."""
+    try:
+        algorithm, iterations_raw, salt_raw, digest_raw = str(stored_hash or "").split("$", 3)
+        if algorithm != "pbkdf2_sha256":
+            return False
+        iterations = int(iterations_raw)
+        salt = b64url_decode(salt_raw)
+        expected = b64url_decode(digest_raw)
+        actual = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, iterations)
+        return hmac.compare_digest(actual, expected)
+    except Exception:
+        return False
+
+
+def build_admin_user() -> Dict[str, Any]:
+    """Virtual admin principal backed by OPERATOR_* environment variables."""
+    return {"user_id": "operator", "username": OPERATOR_USERNAME, "email": "", "role": "admin", "status": "active"}
+
+
+def public_user_payload(user: Dict[str, Any]) -> Dict[str, Any]:
+    """Return a browser-safe user object without password hashes."""
+    return {
+        "user_id": str(user.get("user_id") or user.get("id") or ""),
+        "username": str(user.get("username") or ""),
+        "email": str(user.get("email") or ""),
+        "role": str(user.get("role") or "user"),
+        "status": str(user.get("status") or "active"),
+    }
+
+
+def find_user_by_login(login: str) -> tuple[Any, Any]:
+    """Find a registered user by username or email."""
+    normalized = normalize_login_identifier(login)
+    for user_id, user in load_users().items():
+        if normalize_login_identifier(user.get("username", "")) == normalized:
+            return user_id, user
+        if normalize_login_identifier(user.get("email", "")) == normalized:
+            return user_id, user
+    return None, None
+
+
+def create_session_token(user: Dict[str, Any]) -> str:
+    """Create a signed stateless session token for browser storage."""
+    now = int(time.time())
+    payload = {
+        "sub": str(user.get("user_id") or user.get("id") or ""),
+        "username": str(user.get("username") or ""),
+        "role": str(user.get("role") or "user"),
+        "iat": now,
+        "exp": now + max(3600, SESSION_TTL_SECONDS),
+    }
+    payload_part = b64url_encode(json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
+    signature = hmac.new(OPERATOR_TOKEN.encode("utf-8"), payload_part.encode("ascii"), hashlib.sha256).digest()
+    return f"tk1.{payload_part}.{b64url_encode(signature)}"
+
+
+def verify_session_token(token: str) -> Dict[str, Any] | None:
+    """Verify a signed session token and return its principal."""
+    try:
+        prefix, payload_part, signature_part = token.split(".", 2)
+        if prefix != "tk1":
+            return None
+        expected_signature = hmac.new(OPERATOR_TOKEN.encode("utf-8"), payload_part.encode("ascii"), hashlib.sha256).digest()
+        supplied_signature = b64url_decode(signature_part)
+        if not hmac.compare_digest(expected_signature, supplied_signature):
+            return None
+        payload = json.loads(b64url_decode(payload_part).decode("utf-8"))
+        if int(payload.get("exp", 0)) < int(time.time()):
+            return None
+        if payload.get("sub") == "operator" or payload.get("role") == "admin":
+            return build_admin_user()
+        user = load_users().get(str(payload.get("sub") or ""))
+        if not isinstance(user, dict) or user.get("status") != "active":
+            return None
+        return public_user_payload(user)
+    except Exception:
+        return None
+
+
+def authenticate_bearer_token(token: str) -> Dict[str, Any] | None:
+    """Accept legacy OPERATOR_TOKEN and new signed user session tokens."""
+    if token and constant_time_text_equal(token, OPERATOR_TOKEN):
+        return build_admin_user()
+    return verify_session_token(token)
+
+
+def get_current_request_user() -> Dict[str, Any]:
+    """Return the authenticated user for protected routes."""
+    user = get_current_user_context()
+    if not user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    return user
+
+
 def is_operator_authorized(request: Request) -> bool:
-    """Validate operator bearer token with constant-time comparison."""
-    supplied_token = extract_operator_token(request)
-    return bool(supplied_token) and constant_time_text_equal(supplied_token, OPERATOR_TOKEN)
+    """Validate bearer token with constant-time comparison or signed session verification."""
+    return authenticate_bearer_token(extract_operator_token(request)) is not None
 
 
 def is_login_password_valid(password: str) -> bool:
@@ -4282,38 +4456,34 @@ def is_login_password_valid(password: str) -> bool:
 
 @app.middleware("http")
 async def security_headers_and_rate_limit(request: Request, call_next: Any):
-    """生产级基础防护：安全响应头 + IP 滑动窗口限流。"""
-    if requires_operator_auth(request) and not is_operator_authorized(request):
-        return JSONResponse(
-            status_code=401,
-            content={"detail": "Unauthorized"},
-        )
+    """生产级基础防护：安全响应头 + IP 滑动窗口限流 + 多用户鉴权。"""
+    current_user: Dict[str, Any] | None = None
+    if requires_operator_auth(request):
+        current_user = authenticate_bearer_token(extract_operator_token(request))
+        if not current_user:
+            return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
+        if requires_admin_user(request) and not is_admin_user(current_user):
+            return JSONResponse(status_code=403, content={"detail": "需要管理员权限。"})
 
-    if SECURITY_RATE_LIMIT_ENABLED and request.method != "OPTIONS":
-        client_id = get_client_identity(request)
-        allowed, retry_after = consume_rate_limit(
-            f"all:{client_id}",
-            RATE_LIMIT_MAX_REQUESTS,
-            RATE_LIMIT_WINDOW_SECONDS,
-        )
-        if allowed and request.method in {"POST", "PUT", "PATCH", "DELETE"}:
-            allowed, retry_after = consume_rate_limit(
-                f"mutation:{client_id}",
-                RATE_LIMIT_MUTATION_MAX_REQUESTS,
-                RATE_LIMIT_WINDOW_SECONDS,
-            )
+    token = CURRENT_USER_CONTEXT.set(current_user)
+    try:
+        if SECURITY_RATE_LIMIT_ENABLED and request.method != "OPTIONS":
+            client_id = get_client_identity(request)
+            if current_user:
+                client_id = f"{client_id}:{current_user.get('user_id', '')}"
+            allowed, retry_after = consume_rate_limit(f"all:{client_id}", RATE_LIMIT_MAX_REQUESTS, RATE_LIMIT_WINDOW_SECONDS)
+            if allowed and request.method in {"POST", "PUT", "PATCH", "DELETE"}:
+                allowed, retry_after = consume_rate_limit(f"mutation:{client_id}", RATE_LIMIT_MUTATION_MAX_REQUESTS, RATE_LIMIT_WINDOW_SECONDS)
+            if not allowed:
+                return JSONResponse(
+                    status_code=429,
+                    content={"detail": "请求过于频繁，请稍后再试。", "retry_after_seconds": retry_after},
+                    headers={"Retry-After": str(retry_after)},
+                )
+        response = await call_next(request)
+    finally:
+        CURRENT_USER_CONTEXT.reset(token)
 
-        if not allowed:
-            return JSONResponse(
-                status_code=429,
-                content={
-                    "detail": "请求过于频繁，请稍后再试。",
-                    "retry_after_seconds": retry_after,
-                },
-                headers={"Retry-After": str(retry_after)},
-            )
-
-    response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Referrer-Policy"] = "no-referrer"
     response.headers["X-Frame-Options"] = "DENY"
@@ -4628,20 +4798,90 @@ async def readiness() -> Dict[str, Any]:
     return build_landing_readiness()
 
 
-@app.post("/api/login")
-async def login(payload: LoginRequest) -> Dict[str, Any]:
-    """账号密码登录，返回前端 localStorage 持久化使用的 Bearer 令牌。"""
-    username = payload.username.strip()
-    if not constant_time_text_equal(username, OPERATOR_USERNAME) or not is_login_password_valid(payload.password):
-        raise HTTPException(status_code=401, detail="账号或密码不正确")
-
-    append_admin_audit("login", f"运营账号登录：{username}。")
+def build_auth_response(user: Dict[str, Any]) -> Dict[str, Any]:
+    """Build a consistent login/register response for the frontend."""
+    public_user = public_user_payload(user)
+    token = create_session_token(public_user)
     return {
         "status": "success",
-        "token": OPERATOR_TOKEN,
-        "access_token": OPERATOR_TOKEN,
-        "username": username,
+        "token": token,
+        "access_token": token,
+        "user": public_user,
+        "username": public_user["username"],
+        "role": public_user["role"],
     }
+
+
+@app.post("/api/login")
+@app.post("/api/auth/login")
+async def login(payload: LoginRequest) -> Dict[str, Any]:
+    """账号密码登录，返回前端 localStorage 持久化使用的 Bearer 令牌。"""
+    login_id = payload.username.strip()
+    if constant_time_text_equal(login_id, OPERATOR_USERNAME) and is_login_password_valid(payload.password):
+        admin_user = build_admin_user()
+        append_admin_audit("login", f"管理员登录：{OPERATOR_USERNAME}。", {"role": "admin"})
+        return build_auth_response(admin_user)
+
+    user_id, user = find_user_by_login(login_id)
+    if not user_id or not user or user.get("status") != "active":
+        raise HTTPException(status_code=401, detail="账号或密码不正确")
+    if not verify_password(payload.password, str(user.get("password_hash") or "")):
+        raise HTTPException(status_code=401, detail="账号或密码不正确")
+
+    users = load_users()
+    users[user_id]["last_login_at"] = current_timestamp()
+    save_users(users)
+    public_user = public_user_payload(users[user_id])
+    append_admin_audit("login", f"用户登录：{public_user['username']}。", {"user_id": user_id, "role": public_user["role"]})
+    return build_auth_response(public_user)
+
+
+@app.post("/api/register")
+@app.post("/api/auth/register")
+async def register(payload: RegisterRequest) -> Dict[str, Any]:
+    """邀请码注册：用于外部测试用户创建自己的隔离数据空间。"""
+    if not REGISTRATION_INVITE_CODE or not constant_time_text_equal(payload.invite_code.strip(), REGISTRATION_INVITE_CODE):
+        raise HTTPException(status_code=403, detail="邀请码无效或已过期。")
+
+    username = normalize_login_identifier(payload.username)
+    email = normalize_login_identifier(payload.email)
+    if len(username) < 2:
+        raise HTTPException(status_code=400, detail="账号至少需要 2 个字符。")
+    if "@" not in email or "." not in email:
+        raise HTTPException(status_code=400, detail="请输入有效邮箱。")
+    if len(payload.password) < 8:
+        raise HTTPException(status_code=400, detail="密码至少需要 8 位。")
+    if normalize_login_identifier(OPERATOR_USERNAME) == username:
+        raise HTTPException(status_code=409, detail="该账号已被占用。")
+
+    users = load_users()
+    for user in users.values():
+        if normalize_login_identifier(user.get("username", "")) == username:
+            raise HTTPException(status_code=409, detail="该账号已被占用。")
+        if normalize_login_identifier(user.get("email", "")) == email:
+            raise HTTPException(status_code=409, detail="该邮箱已注册。")
+
+    user_id = "usr_" + secrets.token_urlsafe(12).replace("-", "").replace("_", "")[:16]
+    user = {
+        "user_id": user_id,
+        "username": username,
+        "email": email,
+        "password_hash": hash_password(payload.password),
+        "role": "user",
+        "status": "active",
+        "created_at": current_timestamp(),
+        "last_login_at": current_timestamp(),
+    }
+    users[user_id] = user
+    save_users(users)
+    append_admin_audit("register", f"新用户注册：{username}。", {"user_id": user_id, "email": email})
+    return build_auth_response(user)
+
+
+@app.get("/api/auth/me")
+async def auth_me() -> Dict[str, Any]:
+    """返回当前登录用户，不泄露密码哈希。"""
+    return {"status": "success", "user": public_user_payload(get_current_request_user())}
 
 
 @app.get("/api/products")

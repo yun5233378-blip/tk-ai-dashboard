@@ -523,29 +523,41 @@
     <div id="login-screen" class="fixed inset-0 z-[120] hidden items-center justify-center bg-slate-950/25 backdrop-blur-xl p-4">
         <div class="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(99,102,241,0.18),transparent_34%),radial-gradient(circle_at_72%_82%,rgba(139,92,246,0.14),transparent_36%),#F8FAFC]"></div>
         <form id="login-form" class="login-card relative rounded-2xl w-full max-w-sm p-7 md:p-8">
-            <div class="mb-7 text-center">
+            <div class="mb-6 text-center">
                 <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white shadow-[0_18px_48px_rgba(99,102,241,0.18)] text-3xl">✨</div>
                 <div class="flex justify-center gap-2 mb-3">
                     <span class="kicker-pill">[SECURED]</span>
                     <span class="kicker-pill">[PLATINUM]</span>
                 </div>
-                <h2 class="text-xl font-black text-slate-900">TK-AI 安全登入</h2>
-                <p class="mt-2 text-xs font-semibold text-slate-400">系统内置账号校验</p>
+                <h2 id="auth-title" class="text-xl font-black text-slate-900">TK-AI 安全登入</h2>
+                <p id="auth-subtitle" class="mt-2 text-xs font-semibold text-slate-400">系统内置账号校验</p>
+            </div>
+            <div class="mb-5 grid grid-cols-2 gap-1 rounded-xl border border-slate-200/70 bg-slate-100/80 p-1">
+                <button id="auth-mode-login" type="button" class="rounded-lg bg-white px-3 py-2 text-xs font-black text-indigo-700 shadow-sm">登录</button>
+                <button id="auth-mode-register" type="button" class="rounded-lg px-3 py-2 text-xs font-black text-slate-500">注册</button>
             </div>
             <div class="space-y-4">
                 <div>
-                    <label class="block text-xs font-bold text-slate-500 mb-1">账号</label>
+                    <label id="login-username-label" class="block text-xs font-bold text-slate-500 mb-1">账号 / 邮箱</label>
                     <input id="login-username" type="text" autocomplete="username" value="admin" class="neo-input w-full px-3.5 py-2.5 rounded-lg text-sm focus:outline-none transition-all">
+                </div>
+                <div id="register-email-wrap" class="hidden">
+                    <label class="block text-xs font-bold text-slate-500 mb-1">邮箱</label>
+                    <input id="register-email" type="email" autocomplete="email" placeholder="you@example.com" class="neo-input w-full px-3.5 py-2.5 rounded-lg text-sm focus:outline-none transition-all">
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-slate-500 mb-1">密码</label>
                     <input id="login-password" type="password" autocomplete="current-password" class="neo-input w-full px-3.5 py-2.5 rounded-lg text-sm focus:outline-none transition-all">
                 </div>
+                <div id="register-invite-wrap" class="hidden">
+                    <label class="block text-xs font-bold text-slate-500 mb-1">邀请码</label>
+                    <input id="register-invite-code" type="text" autocomplete="off" placeholder="请输入内测邀请码" class="neo-input w-full px-3.5 py-2.5 rounded-lg text-sm focus:outline-none transition-all">
+                </div>
                 <div id="login-error" class="hidden rounded-lg border border-rose-100 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700"></div>
             </div>
             <button id="btn-login-submit" type="submit" class="primary-action mt-6 w-full px-5 py-2.5 rounded-lg text-sm font-bold flex items-center justify-center gap-2">
                 <span id="login-spinner" class="hidden w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                安全登入
+                <span id="auth-submit-label">安全登入</span>
             </button>
         </form>
     </div>
@@ -1365,10 +1377,15 @@
         let toastTimer = null;
         let operatorAuthEnabled = false;
         let isAuthenticated = false;
+        let authMode = 'login';
+        let currentUserRole = localStorage.getItem('tk_ai_user_role') || '';
+        let currentUsername = localStorage.getItem('tk_ai_operator_username') || '';
         let latestExecutiveReportPayload = null;
 
         const OPERATOR_TOKEN_STORAGE_KEY = 'tk_ai_operator_token';
         const OPERATOR_USERNAME_STORAGE_KEY = 'tk_ai_operator_username';
+        const AUTH_USER_ROLE_STORAGE_KEY = 'tk_ai_user_role';
+        const AUTH_USER_EMAIL_STORAGE_KEY = 'tk_ai_user_email';
 
         function isProtectedApiUrl(url) {
             try {
@@ -1399,7 +1416,10 @@
 
         function syncAuthStateFromSession() {
             isAuthenticated = Boolean(getOperatorToken());
+            currentUserRole = localStorage.getItem(AUTH_USER_ROLE_STORAGE_KEY) || currentUserRole || '';
+            currentUsername = localStorage.getItem(OPERATOR_USERNAME_STORAGE_KEY) || currentUsername || '';
             updateLogoutVisibility();
+            updateAdminUiVisibility();
             setLoginVisible(!isAuthenticated);
         }
 
@@ -1407,9 +1427,62 @@
             const btnLogout = document.getElementById('btn-logout');
             if (isAuthenticated) {
                 btnLogout.classList.remove('hidden');
+                btnLogout.innerText = currentUsername ? `安全登出 🔓 · ${currentUsername}` : '安全登出 🔓';
             } else {
                 btnLogout.classList.add('hidden');
             }
+        }
+
+        function isAdminSession() {
+            return currentUserRole === 'admin';
+        }
+
+        function updateAdminUiVisibility() {
+            const adminElements = [btnAdminExport, btnAdminImport, btnAdminRefreshAudit, btnAlertStatus, btnAlertTest];
+            adminElements.forEach(element => {
+                if (!element) return;
+                element.classList.toggle('hidden', isAuthenticated && !isAdminSession());
+            });
+            if (adminBackupMeta && isAuthenticated && !isAdminSession()) {
+                adminBackupMeta.innerText = '普通用户空间已隔离，备份、恢复和告警测试仅管理员可见。';
+            }
+            if (adminAuditList && isAuthenticated && !isAdminSession()) {
+                adminAuditList.innerHTML = '<div class="rounded-lg border border-slate-100 bg-white/70 p-4 text-sm text-slate-500">普通用户只保留自己的商品与诊断数据，系统审计日志由管理员查看。</div>';
+            }
+        }
+
+        async function refreshCurrentUser() {
+            if (!getOperatorToken()) return null;
+            const response = await authorizedFetch(`${API_BASE_URL}/api/auth/me`);
+            if (!response.ok) return null;
+            const payload = await response.json().catch(() => ({}));
+            const user = payload.user || {};
+            currentUserRole = user.role || 'user';
+            currentUsername = user.username || currentUsername || '';
+            localStorage.setItem(AUTH_USER_ROLE_STORAGE_KEY, currentUserRole);
+            localStorage.setItem(OPERATOR_USERNAME_STORAGE_KEY, currentUsername);
+            if (user.email) localStorage.setItem(AUTH_USER_EMAIL_STORAGE_KEY, user.email);
+            updateLogoutVisibility();
+            updateAdminUiVisibility();
+            return user;
+        }
+
+        function setAuthMode(mode) {
+            authMode = mode === 'register' ? 'register' : 'login';
+            const isRegister = authMode === 'register';
+            document.getElementById('auth-title').innerText = isRegister ? '创建内测账号' : 'TK-AI 安全登入';
+            document.getElementById('auth-subtitle').innerText = isRegister ? '邀请码注册后自动进入独立数据空间' : '系统内置账号校验';
+            document.getElementById('auth-submit-label').innerText = isRegister ? '创建账号并进入' : '安全登入';
+            document.getElementById('login-username-label').innerText = isRegister ? '账号' : '账号 / 邮箱';
+            document.getElementById('register-email-wrap').classList.toggle('hidden', !isRegister);
+            document.getElementById('register-invite-wrap').classList.toggle('hidden', !isRegister);
+            document.getElementById('login-username').value = isRegister ? '' : (document.getElementById('login-username').value || 'admin');
+            document.getElementById('auth-mode-login').className = isRegister
+                ? 'rounded-lg px-3 py-2 text-xs font-black text-slate-500'
+                : 'rounded-lg bg-white px-3 py-2 text-xs font-black text-indigo-700 shadow-sm';
+            document.getElementById('auth-mode-register').className = isRegister
+                ? 'rounded-lg bg-white px-3 py-2 text-xs font-black text-indigo-700 shadow-sm'
+                : 'rounded-lg px-3 py-2 text-xs font-black text-slate-500';
         }
 
         async function authorizedFetch(url, options = {}) {
@@ -1431,8 +1504,13 @@
             if (protectedApi && response.status === 401) {
                 localStorage.removeItem(OPERATOR_TOKEN_STORAGE_KEY);
                 localStorage.removeItem(OPERATOR_USERNAME_STORAGE_KEY);
+                localStorage.removeItem(AUTH_USER_ROLE_STORAGE_KEY);
+                localStorage.removeItem(AUTH_USER_EMAIL_STORAGE_KEY);
+                currentUserRole = '';
+                currentUsername = '';
                 isAuthenticated = false;
                 updateLogoutVisibility();
+                updateAdminUiVisibility();
                 setLoginVisible(true);
                 throw new Error('登录已失效，请重新登录。');
             }
@@ -1550,13 +1628,15 @@
             const loginForm = document.getElementById('login-form');
             const username = usernameInput.value.trim();
             const password = passwordInput.value;
+            const email = document.getElementById('register-email').value.trim();
+            const inviteCode = document.getElementById('register-invite-code').value.trim();
 
             loginError.classList.add('hidden');
             loginError.innerText = '';
             loginForm.classList.remove('shake');
 
-            if (!username || !password) {
-                loginError.innerText = '账号或密码错误，请重新输入';
+            if (!username || !password || (authMode === 'register' && (!email || !inviteCode))) {
+                loginError.innerText = authMode === 'register' ? '请填写账号、邮箱、密码和邀请码' : '账号或密码错误，请重新输入';
                 loginError.classList.remove('hidden');
                 loginForm.classList.add('shake');
                 setTimeout(() => loginForm.classList.remove('shake'), 380);
@@ -1567,10 +1647,14 @@
             loginSpinner.classList.remove('hidden');
 
             try {
-                const response = await fetch(`${API_BASE_URL}/api/login`, {
+                const endpoint = authMode === 'register' ? '/api/register' : '/api/login';
+                const body = authMode === 'register'
+                    ? { username, email, password, invite_code: inviteCode }
+                    : { username, password };
+                const response = await fetch(`${API_BASE_URL}${endpoint}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, password })
+                    body: JSON.stringify(body)
                 });
                 const payload = await response.json().catch(() => ({}));
                 if (!response.ok) {
@@ -1578,24 +1662,34 @@
                 }
 
                 const token = payload.token || payload.access_token;
+                const user = payload.user || {};
                 if (token) {
                     localStorage.setItem(OPERATOR_TOKEN_STORAGE_KEY, token);
                 }
-                localStorage.setItem(OPERATOR_USERNAME_STORAGE_KEY, payload.username || username);
+                currentUsername = user.username || payload.username || username;
+                currentUserRole = user.role || payload.role || 'user';
+                localStorage.setItem(OPERATOR_USERNAME_STORAGE_KEY, currentUsername);
+                localStorage.setItem(AUTH_USER_ROLE_STORAGE_KEY, currentUserRole);
+                if (user.email) localStorage.setItem(AUTH_USER_EMAIL_STORAGE_KEY, user.email);
                 isAuthenticated = true;
                 operatorAuthEnabled = true;
                 setLoginVisible(false);
                 updateLogoutVisibility();
-                document.getElementById('api-status-badge').innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> 实时 API 在线 · 已登录';
-                showToast('登录成功。', 'success');
+                updateAdminUiVisibility();
+                document.getElementById('api-status-badge').innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> 实时 API 在线 · ${currentUserRole === 'admin' ? '管理员' : '用户'}已登录`;
+                showToast(authMode === 'register' ? '注册成功，已进入独立数据空间。' : '登录成功。', 'success');
                 await fetchAndLoadRealData(productSelector.value);
                 renderSelectorOptions(productSelector.value);
                 renderDiagnosticCharts(productSelector.value);
                 renderProductTable();
-                await refreshAdminAuditLogs();
-                await refreshAlertStatus();
+                if (isAdminSession()) {
+                    await refreshAdminAuditLogs();
+                    await refreshAlertStatus();
+                } else {
+                    updateAdminUiVisibility();
+                }
             } catch (error) {
-                loginError.innerText = '账号或密码错误，请重新输入';
+                loginError.innerText = error.message || (authMode === 'register' ? '注册失败，请检查邀请码或账号信息' : '账号或密码错误，请重新输入');
                 loginError.classList.remove('hidden');
                 loginForm.classList.add('shake');
                 setTimeout(() => loginForm.classList.remove('shake'), 380);
@@ -1609,8 +1703,14 @@
         function logout() {
             localStorage.removeItem(OPERATOR_TOKEN_STORAGE_KEY);
             localStorage.removeItem(OPERATOR_USERNAME_STORAGE_KEY);
+            localStorage.removeItem(AUTH_USER_ROLE_STORAGE_KEY);
+            localStorage.removeItem(AUTH_USER_EMAIL_STORAGE_KEY);
+            currentUserRole = '';
+            currentUsername = '';
             isAuthenticated = false;
             updateLogoutVisibility();
+            updateAdminUiVisibility();
+            setAuthMode('login');
             setLoginVisible(true);
             document.getElementById('api-status-badge').innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> 实时 API 在线 · 待登录';
             showToast('已退出登录。', 'info');
@@ -1618,6 +1718,9 @@
 
         document.getElementById('login-form').addEventListener('submit', handleLoginSubmit);
         document.getElementById('btn-logout').addEventListener('click', logout);
+        document.getElementById('auth-mode-login').addEventListener('click', () => setAuthMode('login'));
+        document.getElementById('auth-mode-register').addEventListener('click', () => setAuthMode('register'));
+        setAuthMode('login');
 
         function showToast(message, type = 'info') {
             const toast = document.getElementById('toast');
@@ -4183,6 +4286,7 @@
                     badge.className = 'ml-3 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-800 border border-emerald-100 flex items-center gap-1.5';
                     badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> ${isAuthenticated ? '实时 API 在线 · 已登录' : '实时 API 在线 · 待登录'}`;
                     if (isAuthenticated) {
+                        await refreshCurrentUser();
                         await fetchAndLoadRealData();
                     }
                 } else {
@@ -4204,9 +4308,11 @@
                 renderSelectorOptions(productSelector.value);
                 renderDiagnosticCharts(productSelector.value);
                 renderProductTable();
-                if (isLocalApiOnline && isAuthenticated) {
+                if (isLocalApiOnline && isAuthenticated && isAdminSession()) {
                     await refreshAdminAuditLogs();
                     await refreshAlertStatus();
+                } else {
+                    updateAdminUiVisibility();
                 }
             }
         }
@@ -4448,9 +4554,11 @@
                 progressPercent.innerText = '100%';
                 showToast(`📡 雷达巡检完成：检查 ${payload.checked_count || 0} 个，红线 ${payload.critical_count || 0} 个。`, payload.critical_count > 0 ? 'error' : 'success');
                 await refreshProductsForRadar();
-                if (isLocalApiOnline && isAuthenticated) {
+                if (isLocalApiOnline && isAuthenticated && isAdminSession()) {
                     await refreshAdminAuditLogs();
                     await refreshAlertStatus();
+                } else {
+                    updateAdminUiVisibility();
                 }
             } catch (error) {
                 showToast(error.message || String(error), 'error');
