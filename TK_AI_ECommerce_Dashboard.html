@@ -1140,6 +1140,43 @@
                     </div>
                 </details>
 
+                <details id="auth-admin-panel" class="backend-accordion glass-card rounded-lg overflow-hidden border border-slate-200/60">
+                    <summary class="cursor-pointer select-none px-6 py-4 flex items-center justify-between gap-4 hover:bg-indigo-50/40 transition-colors">
+                        <span class="font-black text-slate-900">用户与邀请码管理</span>
+                        <span class="text-xs font-bold text-indigo-600">展开</span>
+                    </summary>
+                    <div class="border-t border-slate-100 p-6 space-y-6">
+                        <div class="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-6">
+                            <div class="rounded-lg border border-slate-100 bg-white/70 p-4">
+                                <div class="flex items-center justify-between gap-3 mb-3">
+                                    <h3 class="text-sm font-black text-slate-900">注册用户</h3>
+                                    <button id="btn-refresh-users" class="quiet-button px-3 py-1.5 rounded-lg text-xs font-bold">刷新</button>
+                                </div>
+                                <div id="admin-users-list" class="space-y-2 text-sm text-slate-600">等待加载用户列表...</div>
+                            </div>
+                            <div class="rounded-lg border border-indigo-100 bg-indigo-50/40 p-4">
+                                <h3 class="text-sm font-black text-slate-900 mb-3">创建邀请码</h3>
+                                <div class="space-y-3">
+                                    <input id="invite-code-input" class="neo-input w-full px-3 py-2 rounded-lg text-sm" placeholder="可选：自定义邀请码">
+                                    <div class="grid grid-cols-2 gap-2">
+                                        <input id="invite-max-uses" type="number" min="1" max="100" value="1" class="neo-input w-full px-3 py-2 rounded-lg text-sm" placeholder="次数">
+                                        <input id="invite-days" type="number" min="1" max="365" value="14" class="neo-input w-full px-3 py-2 rounded-lg text-sm" placeholder="天数">
+                                    </div>
+                                    <input id="invite-note" class="neo-input w-full px-3 py-2 rounded-lg text-sm" placeholder="备注，如：第一批内测">
+                                    <button id="btn-create-invite" class="primary-action w-full px-4 py-2 rounded-lg text-sm font-bold">生成邀请码</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="rounded-lg border border-slate-100 bg-white/70 p-4">
+                            <div class="flex items-center justify-between gap-3 mb-3">
+                                <h3 class="text-sm font-black text-slate-900">邀请码</h3>
+                                <button id="btn-refresh-invites" class="quiet-button px-3 py-1.5 rounded-lg text-xs font-bold">刷新</button>
+                            </div>
+                            <div id="admin-invites-list" class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-slate-600">等待加载邀请码...</div>
+                        </div>
+                    </div>
+                </details>
+
                 <details class="backend-accordion glass-card rounded-lg overflow-hidden border border-slate-200/60">
                     <summary class="cursor-pointer select-none px-6 py-4 flex items-center justify-between gap-4 hover:bg-indigo-50/40 transition-colors">
                         <span class="font-black text-slate-900">系统维护与告警</span>
@@ -1438,7 +1475,7 @@
         }
 
         function updateAdminUiVisibility() {
-            const adminElements = [btnAdminExport, btnAdminImport, btnAdminRefreshAudit, btnAlertStatus, btnAlertTest];
+            const adminElements = [btnAdminExport, btnAdminImport, btnAdminRefreshAudit, btnAlertStatus, btnAlertTest, authAdminPanel];
             adminElements.forEach(element => {
                 if (!element) return;
                 element.classList.toggle('hidden', isAuthenticated && !isAdminSession());
@@ -1614,6 +1651,16 @@
         const btnAdminImport = document.getElementById('btn-admin-import');
         const btnAdminRefreshAudit = document.getElementById('btn-admin-refresh-audit');
         const adminRestoreFile = document.getElementById('admin-restore-file');
+        const authAdminPanel = document.getElementById('auth-admin-panel');
+        const adminUsersList = document.getElementById('admin-users-list');
+        const adminInvitesList = document.getElementById('admin-invites-list');
+        const btnRefreshUsers = document.getElementById('btn-refresh-users');
+        const btnRefreshInvites = document.getElementById('btn-refresh-invites');
+        const btnCreateInvite = document.getElementById('btn-create-invite');
+        const inviteCodeInput = document.getElementById('invite-code-input');
+        const inviteMaxUses = document.getElementById('invite-max-uses');
+        const inviteDays = document.getElementById('invite-days');
+        const inviteNote = document.getElementById('invite-note');
         const alertStatusMeta = document.getElementById('alert-status-meta');
         const btnAlertStatus = document.getElementById('btn-alert-status');
         const btnAlertTest = document.getElementById('btn-alert-test');
@@ -1685,6 +1732,7 @@
                 if (isAdminSession()) {
                     await refreshAdminAuditLogs();
                     await refreshAlertStatus();
+                    await refreshAuthAdminPanel();
                 } else {
                     updateAdminUiVisibility();
                 }
@@ -4311,6 +4359,7 @@
                 if (isLocalApiOnline && isAuthenticated && isAdminSession()) {
                     await refreshAdminAuditLogs();
                     await refreshAlertStatus();
+                    await refreshAuthAdminPanel();
                 } else {
                     updateAdminUiVisibility();
                 }
@@ -4375,6 +4424,87 @@
                     <div class="mt-2 text-sm text-slate-700 leading-relaxed">${item.detail || '无详情'}</div>
                 </div>
             `).join('');
+        }
+
+
+        function renderAdminUsers(users) {
+            if (!adminUsersList) return;
+            if (!Array.isArray(users) || users.length === 0) {
+                adminUsersList.innerHTML = '<div class="rounded-lg border border-dashed border-slate-200 p-4 text-sm text-slate-400">暂无注册用户。</div>';
+                return;
+            }
+            adminUsersList.innerHTML = users.map(user => `
+                <div class="rounded-lg border border-slate-100 bg-white/80 p-3 flex items-center justify-between gap-3">
+                    <div>
+                        <div class="font-black text-slate-900">${escapeHtml(user.username || '')}</div>
+                        <div class="text-xs text-slate-400">${escapeHtml(user.email || '')} · 商品 ${user.products_count || 0} · ${escapeHtml(user.status || '')}</div>
+                    </div>
+                    <button data-user-status="${escapeHtml(user.user_id || '')}" data-next-status="${user.status === 'active' ? 'disabled' : 'active'}" class="quiet-button px-3 py-1.5 rounded-lg text-xs font-bold">${user.status === 'active' ? '禁用' : '启用'}</button>
+                </div>
+            `).join('');
+        }
+
+        function renderAdminInvites(invites) {
+            if (!adminInvitesList) return;
+            if (!Array.isArray(invites) || invites.length === 0) {
+                adminInvitesList.innerHTML = '<div class="rounded-lg border border-dashed border-slate-200 p-4 text-sm text-slate-400 md:col-span-2">暂无邀请码。</div>';
+                return;
+            }
+            adminInvitesList.innerHTML = invites.map(invite => `
+                <div class="rounded-lg border border-slate-100 bg-white/80 p-4">
+                    <div class="flex items-center justify-between gap-3">
+                        <span class="font-mono text-sm font-black text-indigo-700">${escapeHtml(invite.code || '')}</span>
+                        <span class="text-xs font-bold ${invite.status === 'active' ? 'text-emerald-600' : 'text-slate-400'}">${escapeHtml(invite.status || '')}</span>
+                    </div>
+                    <div class="mt-2 text-xs text-slate-500">使用 ${invite.used_count || 0}/${invite.max_uses || 1} · 过期 ${escapeHtml(invite.expires_at || '永不过期')}</div>
+                    <div class="mt-1 text-xs text-slate-400">${escapeHtml(invite.note || '')}</div>
+                    ${invite.status === 'active' ? `<button data-disable-invite="${escapeHtml(invite.code || '')}" class="quiet-button mt-3 px-3 py-1.5 rounded-lg text-xs font-bold">停用</button>` : ''}
+                </div>
+            `).join('');
+        }
+
+        async function refreshAuthAdminPanel() {
+            if (!isAdminSession()) {
+                updateAdminUiVisibility();
+                return;
+            }
+            try {
+                const usersRes = await authorizedFetch(`${API_BASE_URL}/api/admin/users`);
+                const usersPayload = await usersRes.json().catch(() => ({}));
+                if (!usersRes.ok) throw new Error(usersPayload.detail || '用户列表读取失败');
+                renderAdminUsers(usersPayload.users || []);
+
+                const invitesRes = await authorizedFetch(`${API_BASE_URL}/api/admin/invites`);
+                const invitesPayload = await invitesRes.json().catch(() => ({}));
+                if (!invitesRes.ok) throw new Error(invitesPayload.detail || '邀请码读取失败');
+                renderAdminInvites(invitesPayload.invites || []);
+            } catch (error) {
+                showToast(error.message || '读取用户与邀请码失败', 'error');
+            }
+        }
+
+        async function createInviteFromForm() {
+            if (!isAdminSession()) return;
+            try {
+                const response = await authorizedFetch(`${API_BASE_URL}/api/admin/invites`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        code: inviteCodeInput.value.trim() || null,
+                        max_uses: Number(inviteMaxUses.value || 1),
+                        expires_in_days: Number(inviteDays.value || 14),
+                        note: inviteNote.value.trim()
+                    })
+                });
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok) throw new Error(payload.detail || '邀请码创建失败');
+                showToast(`邀请码已创建：${payload.invite.code}`, 'success');
+                inviteCodeInput.value = '';
+                inviteNote.value = '';
+                await refreshAuthAdminPanel();
+            } catch (error) {
+                showToast(error.message || '邀请码创建失败', 'error');
+            }
         }
 
         async function refreshAdminAuditLogs() {
@@ -4557,6 +4687,7 @@
                 if (isLocalApiOnline && isAuthenticated && isAdminSession()) {
                     await refreshAdminAuditLogs();
                     await refreshAlertStatus();
+                    await refreshAuthAdminPanel();
                 } else {
                     updateAdminUiVisibility();
                 }
