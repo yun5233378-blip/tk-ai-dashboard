@@ -154,6 +154,7 @@ CRAWLER_TIMEOUT_SECONDS = 180
 DIAGNOSE_TIMEOUT_SECONDS = 180
 RADAR_PATROL_INTERVAL_SECONDS = int(os.getenv("RADAR_PATROL_INTERVAL_SECONDS", "43200"))
 RADAR_PATROL_STARTUP_DELAY_SECONDS = int(os.getenv("RADAR_PATROL_STARTUP_DELAY_SECONDS", "600"))
+TIKTOK_AUTOPILOT_ONLY = os.getenv("TIKTOK_AUTOPILOT_ONLY", "1").strip() == "1"
 RADAR_NEGATIVE_SPIKE_THRESHOLD = 15
 RADAR_SCORE_CRITICAL_THRESHOLD = 60
 RADAR_HISTORY_MAX_POINTS = int(os.getenv("RADAR_HISTORY_MAX_POINTS", "96"))
@@ -2064,6 +2065,21 @@ def get_product_source_url(product: Dict[str, Any]) -> str:
     return str(product.get("source_url") or product.get("url") or "").strip()
 
 
+def detect_source_type_from_url(url: str) -> str:
+    """Return the crawler source type for a registered source URL."""
+    if not url:
+        return ""
+    try:
+        return detect_channel(url).source_type
+    except Exception:
+        return ""
+
+
+def is_tiktok_source_url(url: str) -> bool:
+    """TikTok autopilot should only spend crawl budget on TikTok URLs."""
+    return detect_source_type_from_url(url) == "tiktok"
+
+
 def current_timestamp() -> str:
     """返回适合写入 JSON 与前端展示的本地时间戳。"""
     return time.strftime("%Y-%m-%d %H:%M:%S")
@@ -2583,8 +2599,8 @@ async def run_single_radar_check(product_key: str, previous_product: Dict[str, A
     }
 
 
-async def run_radar_patrol_once(trigger: str = "manual") -> Dict[str, Any]:
-    """执行一轮全库商品舆情雷达巡检。"""
+async def run_radar_patrol_once(trigger: str = "manual", source_type: str | None = None) -> Dict[str, Any]:
+    """执行一轮商品舆情雷达巡检，可限定到 TikTok 等单一平台。"""
     global RADAR_LAST_RUN_AT
 
     if RADAR_LOCK.locked():
@@ -2595,14 +2611,20 @@ async def run_radar_patrol_once(trigger: str = "manual") -> Dict[str, Any]:
     async with RADAR_LOCK:
         async with PIPELINE_LOCK:
             products = load_products()
+            normalized_source_type = (source_type or "").strip().lower()
             targets = [
                 (product_key, product)
                 for product_key, product in products.items()
                 if get_product_source_url(product)
+                and (
+                    not normalized_source_type
+                    or detect_source_type_from_url(get_product_source_url(product)) == normalized_source_type
+                )
             ]
 
             RADAR_LAST_RUN_AT = current_timestamp()
-            append_log(f"📡 [雷达巡检]: 已启动 {trigger} 巡检，本轮目标商品 {len(targets)} 个。")
+            source_label = normalized_source_type or "all"
+            append_log(f"📡 [雷达巡检]: 已启动 {trigger} 巡检，范围 {source_label}，本轮目标商品 {len(targets)} 个。")
             results: List[Dict[str, Any]] = []
 
             for product_key, product in targets:
@@ -2621,6 +2643,7 @@ async def run_radar_patrol_once(trigger: str = "manual") -> Dict[str, Any]:
             return {
                 "status": "success",
                 "trigger": trigger,
+                "source_type": source_label,
                 "checked_count": len(results),
                 "critical_count": critical_count,
                 "last_run_at": RADAR_LAST_RUN_AT,
@@ -2633,7 +2656,10 @@ async def auto_radar_patrol_loop() -> None:
     await asyncio.sleep(max(0, RADAR_PATROL_STARTUP_DELAY_SECONDS))
     while True:
         try:
-            await run_radar_patrol_once(trigger="auto")
+            await run_radar_patrol_once(
+                trigger="auto",
+                source_type="tiktok" if TIKTOK_AUTOPILOT_ONLY else None,
+            )
         except PipelineRuntimeError as exc:
             append_log(f"📡 [雷达巡检]: 本轮自动巡检跳过，原因：{exc.detail}")
         except asyncio.CancelledError:
@@ -5551,6 +5577,7 @@ async def health() -> Dict[str, Any]:
             "last_run_at": RADAR_LAST_RUN_AT,
             "interval_seconds": RADAR_PATROL_INTERVAL_SECONDS,
             "startup_delay_seconds": RADAR_PATROL_STARTUP_DELAY_SECONDS,
+            "tiktok_autopilot_only": TIKTOK_AUTOPILOT_ONLY,
         },
         "scripts": {
             "tiktok": SCRAPE_TIKTOK_SCRIPT.exists(),
@@ -6227,6 +6254,27 @@ async def post_run_radar_patrol() -> Dict[str, Any]:
         raise HTTPException(
             status_code=500,
             detail=f"雷达巡检执行失败：{exc}",
+        ) from exc
+
+
+@app.post("/api/run-tiktok-autopilot")
+async def post_run_tiktok_autopilot() -> Dict[str, Any]:
+    """手动触发 TikTok 专用自动巡检，只复跑已注册的 TikTok 商品链接。"""
+    try:
+        result = await run_radar_patrol_once(trigger="tiktok_autopilot", source_type="tiktok")
+        append_admin_audit(
+            "run_tiktok_autopilot",
+            f"TikTok 自动巡检完成：目标 {result.get('checked_count', 0)} 个，红线 {result.get('critical_count', 0)} 个。",
+        )
+        return result
+    except PipelineRuntimeError as exc:
+        append_log(f"TikTok 自动巡检触发失败：{exc.detail}")
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    except Exception as exc:
+        append_log(f"TikTok 自动巡检发生未处理异常：{exc}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"TikTok 自动巡检执行失败：{exc}",
         ) from exc
 
 
