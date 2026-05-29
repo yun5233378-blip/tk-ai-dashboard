@@ -6,42 +6,77 @@
     <title>TK跨境电商 AI 负面舆情诊断与智能选品系统</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
     <style>
         :root {
-            --tk-bg: #F8FAFC;
-            --tk-surface: rgba(255, 255, 255, 0.8);
+            --tk-bg: #f8f9ff;
+            --tk-surface: rgba(255, 255, 255, 0.86);
             --tk-surface-strong: rgba(255, 255, 255, 0.92);
-            --tk-ink: #0F172A;
-            --tk-muted: #64748B;
-            --tk-line: rgba(226, 232, 240, 0.72);
-            --tk-indigo: #6366F1;
-            --tk-violet: #8B5CF6;
+            --tk-ink: #0b1c30;
+            --tk-muted: #667085;
+            --tk-line: rgba(197, 198, 205, 0.72);
+            --tk-sidebar: #091426;
+            --tk-sidebar-panel: #1e293b;
+            --tk-sidebar-muted: #8590a6;
+            --tk-indigo: #4b41e1;
+            --tk-indigo-strong: #645efb;
+            --tk-violet: #645efb;
             --tk-rose: #FB7185;
             --tk-emerald: #34D399;
             --tk-ease: cubic-bezier(0.16, 1, 0.3, 1);
-            --tk-card-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
-            --tk-card-shadow-hover: 0 18px 46px -14px rgba(99, 102, 241, 0.18), 0 0 28px rgba(139, 92, 246, 0.10);
+            --tk-card-shadow: 0 1px 3px rgba(9, 20, 38, 0.05);
+            --tk-card-shadow-hover: 0 18px 46px -22px rgba(9, 20, 38, 0.2), 0 0 0 1px rgba(75, 65, 225, 0.08);
         }
         * {
             letter-spacing: 0;
         }
         body {
-            font-family: 'PingFang SC', 'SF Pro Display', 'Inter', system-ui, sans-serif;
-            background-color: #F8FAFC;
+            font-family: 'Inter', 'PingFang SC', 'SF Pro Display', system-ui, sans-serif;
+            background-color: var(--tk-bg);
             background-image:
-                radial-gradient(at 0% 0%, rgba(79, 70, 229, 0.05) 0px, transparent 50%),
-                radial-gradient(at 100% 100%, rgba(236, 72, 153, 0.03) 0px, transparent 50%);
+                radial-gradient(at 0% 0%, rgba(75, 65, 225, 0.08) 0px, transparent 46%),
+                radial-gradient(at 100% 100%, rgba(111, 251, 190, 0.07) 0px, transparent 42%);
             color: var(--tk-ink);
             text-rendering: geometricPrecision;
         }
+        .material-symbols-outlined {
+            display: inline-block;
+            vertical-align: middle;
+            font-variation-settings: 'FILL' 0, 'wght' 500, 'GRAD' 0, 'opsz' 24;
+            line-height: 1;
+        }
         .app-shell {
-            background-color: #F8FAFC;
+            background-color: var(--tk-bg);
+        }
+        .command-sidebar {
+            background: var(--tk-sidebar);
+            border-right: 1px solid rgba(197, 198, 205, 0.2);
+            box-shadow: 14px 0 42px rgba(9, 20, 38, 0.18);
+        }
+        .command-sidebar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .command-sidebar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .command-sidebar::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 999px;
+        }
+        .workspace-shell {
+            min-height: 100vh;
+        }
+        @media (min-width: 1024px) {
+            .workspace-shell {
+                margin-left: 260px;
+            }
         }
         .app-header {
-            background: rgba(255, 255, 255, 0.82);
-            border-bottom: 1px solid rgba(226, 232, 240, 0.68);
-            box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
-            backdrop-filter: blur(22px) saturate(1.4);
+            background: rgba(248, 249, 255, 0.86);
+            border-bottom: 1px solid rgba(197, 198, 205, 0.66);
+            box-shadow: 0 1px 3px rgba(9, 20, 38, 0.05);
+            backdrop-filter: blur(18px) saturate(1.25);
         }
         .chart-container {
             position: relative;
@@ -56,29 +91,82 @@
             .chart-container { height: 400px; }
         }
         .nav-btn {
-            border-bottom: 2px solid transparent;
-            border-radius: 999px;
-            padding: 0.48rem 0.7rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            width: 100%;
+            min-height: 2.75rem;
+            border-left: 4px solid transparent;
+            border-radius: 0.75rem;
+            padding: 0.75rem 1rem;
+            color: var(--tk-sidebar-muted);
+            font-size: 0.8rem;
+            font-weight: 800;
+            text-align: left;
+            transition: transform 0.18s var(--tk-ease), background-color 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+        }
+        .nav-btn:hover {
+            background: var(--tk-sidebar-panel);
+            color: #ffffff;
         }
         .nav-active {
-            border-bottom-color: transparent;
-            background: #FFFFFF;
-            color: #4F46E5;
-            font-weight: 700;
-            border: 1px solid rgba(99, 102, 241, 0.14);
-            box-shadow: 0 4px 20px -2px rgba(99, 102, 241, 0.12), 0 2px 6px -1px rgba(99, 102, 241, 0.08);
+            background: var(--tk-indigo-strong);
+            color: #ffffff !important;
+            border-left-color: var(--tk-indigo);
+            box-shadow: 0 12px 26px rgba(75, 65, 225, 0.22);
+            transform: scale(0.985);
+        }
+        .mobile-nav .nav-btn {
+            width: auto;
+            min-height: 2.35rem;
+            border-left: 0;
+            border-bottom: 2px solid transparent;
+            border-radius: 999px;
+            padding: 0.55rem 0.85rem;
+            color: #667085;
+            background: rgba(255, 255, 255, 0.72);
+        }
+        .mobile-nav .nav-btn:hover,
+        .mobile-nav .nav-active {
+            background: #ffffff;
+            color: var(--tk-indigo) !important;
+            border-bottom-color: var(--tk-indigo);
+            transform: none;
+            box-shadow: 0 8px 24px rgba(75, 65, 225, 0.12);
+        }
+        #api-status-badge {
+            background: rgba(111, 251, 190, 0.18) !important;
+            border-color: rgba(0, 164, 114, 0.18) !important;
+            color: #005236 !important;
+        }
+        .command-search {
+            background: rgba(255, 255, 255, 0.8);
+            border: 1px solid rgba(197, 198, 205, 0.7);
+        }
+        .command-avatar {
+            background: linear-gradient(135deg, #d8e3fb, #e2dfff);
+            color: #091426;
+        }
+        .command-logout {
+            background: rgba(255, 255, 255, 0.8);
+            border: 1px solid rgba(197, 198, 205, 0.72);
+            color: #0b1c30;
+        }
+        .command-logout:hover {
+            border-color: rgba(75, 65, 225, 0.28);
+            color: var(--tk-indigo);
         }
         .glass-card {
-            background: rgba(255, 255, 255, 0.8);
-            backdrop-filter: blur(16px) saturate(1.25);
-            border: 1px solid rgba(226, 232, 240, 0.6);
+            background: var(--tk-surface);
+            backdrop-filter: blur(14px) saturate(1.15);
+            border: 1px solid rgba(197, 198, 205, 0.62);
             box-shadow: var(--tk-card-shadow);
             transition: transform 0.3s var(--tk-ease), box-shadow 0.3s var(--tk-ease), border-color 0.3s var(--tk-ease), background-color 0.3s var(--tk-ease);
         }
         .glass-card:hover {
             transform: translateY(-2px);
             box-shadow: var(--tk-card-shadow-hover);
-            border-color: rgba(99, 102, 241, 0.22);
+            border-color: rgba(75, 65, 225, 0.24);
         }
 
         .metric-card {
@@ -518,7 +606,7 @@
         }
     </style>
 </head>
-<body class="app-shell min-h-screen flex flex-col bg-slate-50 text-slate-900 antialiased">
+<body class="app-shell min-h-screen bg-slate-50 text-slate-900 antialiased">
 
     <div id="login-screen" class="fixed inset-0 z-[120] hidden items-center justify-center bg-slate-950/25 backdrop-blur-xl p-4">
         <div class="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(99,102,241,0.18),transparent_34%),radial-gradient(circle_at_72%_82%,rgba(139,92,246,0.14),transparent_36%),#F8FAFC]"></div>
@@ -567,27 +655,86 @@
         <span id="toast-msg">提示消息</span>
     </div>
 
-    <header class="app-header sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 min-h-16 py-3 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-            <div class="flex flex-wrap items-center gap-2 font-black text-xl">
-                <span class="text-2xl">✨</span>
-                <span class="bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">TK-AI 智选舆情看板</span>
-                <span id="api-status-badge" class="ml-3 px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 flex items-center gap-1.5 border border-amber-200/70">
-                    <span class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
-                    等待 API 连接
-                </span>
-                <button id="btn-logout" class="hidden quiet-button ml-1 px-3 py-1 rounded-full text-xs font-bold">登出 🔓</button>
-            </div>
-            <nav class="w-full lg:w-auto flex gap-2 overflow-x-auto rounded-full border border-slate-200/70 bg-white/60 p-1 shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
-                <button data-target="section-market" class="nav-btn nav-active whitespace-nowrap text-sm transition-colors hover:text-indigo-500">运营总览</button>
-                <button data-target="section-sentiment" class="nav-btn whitespace-nowrap text-sm text-slate-500 transition-colors hover:text-indigo-500">AI诊断</button>
-                <button data-target="section-products" class="nav-btn whitespace-nowrap text-sm text-slate-500 transition-colors hover:text-indigo-500">选品建议</button>
-                <button data-target="section-details" class="nav-btn whitespace-nowrap text-sm text-slate-500 transition-colors hover:text-indigo-500">后台明细</button>
-            </nav>
+    <aside class="command-sidebar fixed left-0 top-0 z-50 hidden h-screen w-[260px] flex-col overflow-y-auto px-3 py-5 lg:flex">
+        <div class="px-4 pb-7">
+            <div class="mb-5 flex h-11 w-11 items-center justify-center rounded-xl bg-white/10 text-2xl text-white shadow-[0_20px_42px_rgba(0,0,0,0.22)]">✨</div>
+            <h1 class="text-xl font-black text-white">Command Center</h1>
+            <p class="mt-1 text-xs font-bold uppercase tracking-wide text-[#8590a6]">TikTok AI Operator</p>
         </div>
-    </header>
+        <nav class="flex-1 space-y-1">
+            <button data-target="section-market" class="nav-btn nav-active">
+                <span class="material-symbols-outlined text-[20px]">dashboard</span>
+                <span>运营总览</span>
+            </button>
+            <button data-target="section-sentiment" class="nav-btn">
+                <span class="material-symbols-outlined text-[20px]">psychology</span>
+                <span>AI 诊断</span>
+            </button>
+            <button data-target="section-products" class="nav-btn">
+                <span class="material-symbols-outlined text-[20px]">inventory_2</span>
+                <span>选品建议</span>
+            </button>
+            <button data-target="section-details" class="nav-btn">
+                <span class="material-symbols-outlined text-[20px]">query_stats</span>
+                <span>后台明细</span>
+            </button>
+        </nav>
+        <div class="mt-7 space-y-3 border-t border-white/10 pt-5">
+            <div class="rounded-xl bg-white/5 p-4">
+                <div class="text-xs font-black uppercase tracking-wide text-[#8590a6]">当前策略</div>
+                <div class="mt-2 text-sm font-bold leading-relaxed text-white">专注 TikTok 评论抓取与选品决策闭环</div>
+            </div>
+            <button id="sidebar-run-pipeline-shortcut" type="button" class="w-full rounded-xl bg-[#4b41e1] px-4 py-3 text-sm font-black text-white shadow-[0_18px_34px_rgba(75,65,225,0.28)] transition hover:bg-[#645efb]">
+                新建诊断
+            </button>
+        </div>
+    </aside>
 
-    <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 w-full">
+    <div class="workspace-shell">
+        <header class="app-header sticky top-0 z-40">
+            <div class="px-4 py-3 sm:px-6 lg:px-8">
+                <div class="flex flex-col gap-3 lg:h-16 lg:flex-row lg:items-center lg:justify-between lg:gap-6">
+                    <div class="min-w-0">
+                        <div class="text-[11px] font-black uppercase tracking-wide text-slate-400">TK-AI Command Center</div>
+                        <div class="mt-1 flex flex-wrap items-center gap-3">
+                            <h2 class="text-xl font-black tracking-tight text-[#091426] sm:text-2xl">TikTok Intelligence</h2>
+                            <span id="api-status-badge" class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-bold">
+                                <span class="h-2 w-2 rounded-full bg-amber-400 animate-pulse"></span>
+                                等待 API 连接
+                            </span>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-3">
+                        <div class="command-search hidden items-center gap-2 rounded-lg px-3 py-2 md:flex">
+                            <span class="material-symbols-outlined text-[19px] text-slate-400">search</span>
+                            <span class="text-xs font-semibold text-slate-400">搜索商品、报告、Brief</span>
+                        </div>
+                        <button id="btn-logout" class="command-logout hidden rounded-lg px-3 py-2 text-xs font-black transition">登出 🔓</button>
+                        <div class="command-avatar flex h-9 w-9 items-center justify-center rounded-full text-xs font-black">TK</div>
+                    </div>
+                </div>
+                <nav class="mobile-nav mt-3 flex gap-2 overflow-x-auto rounded-full border border-slate-200/70 bg-white/60 p-1 shadow-[0_1px_3px_rgba(0,0,0,0.03)] lg:hidden">
+                    <button data-target="section-market" class="nav-btn nav-active whitespace-nowrap">
+                        <span class="material-symbols-outlined text-[18px]">dashboard</span>
+                        <span>运营总览</span>
+                    </button>
+                    <button data-target="section-sentiment" class="nav-btn whitespace-nowrap">
+                        <span class="material-symbols-outlined text-[18px]">psychology</span>
+                        <span>AI 诊断</span>
+                    </button>
+                    <button data-target="section-products" class="nav-btn whitespace-nowrap">
+                        <span class="material-symbols-outlined text-[18px]">inventory_2</span>
+                        <span>选品建议</span>
+                    </button>
+                    <button data-target="section-details" class="nav-btn whitespace-nowrap">
+                        <span class="material-symbols-outlined text-[18px]">query_stats</span>
+                        <span>后台明细</span>
+                    </button>
+                </nav>
+            </div>
+        </header>
+
+        <main class="mx-auto w-full max-w-[1600px] px-4 py-8 sm:px-6 lg:px-8">
         <div id="radar-alert-banner" class="warning-banner hidden mb-8 rounded-lg px-6 py-4">
             <div class="flex items-start gap-3">
                 <span class="alert-dot" aria-hidden="true"></span>
@@ -1273,7 +1420,8 @@
                 </div>
             </div>
         </div>
-    </main>
+        </main>
+    </div>
 
     <div id="add-product-modal" class="modal-backdrop fixed inset-0 z-[80] hidden flex items-center justify-center p-4">
         <div class="modal-panel rounded-lg max-w-md w-full p-6 md:p-8 mx-4">
@@ -3597,15 +3745,13 @@
         const sections = document.querySelectorAll('.page-section');
         navBtns.forEach(btn => {
             btn.addEventListener('click', (e) => {
-                navBtns.forEach(b => {
-                    b.classList.remove('nav-active', 'text-indigo-600', 'font-semibold');
-                    b.classList.add('text-slate-500');
-                });
-                const current = e.target;
-                current.classList.add('nav-active');
-                current.classList.remove('text-slate-500');
-
+                const current = e.currentTarget;
                 const targetId = current.getAttribute('data-target');
+                navBtns.forEach(b => {
+                    const isSameTarget = b.getAttribute('data-target') === targetId;
+                    b.classList.toggle('nav-active', isSameTarget);
+                    b.classList.toggle('text-slate-500', !isSameTarget);
+                });
                 sections.forEach(sec => {
                     if (sec.id === targetId) {
                         sec.classList.remove('hidden');
@@ -3615,6 +3761,17 @@
                 });
             });
         });
+
+        const sidebarRunPipelineShortcut = document.getElementById('sidebar-run-pipeline-shortcut');
+        if (sidebarRunPipelineShortcut) {
+            sidebarRunPipelineShortcut.addEventListener('click', () => {
+                const diagnosisNav = Array.from(navBtns).find(btn => btn.getAttribute('data-target') === 'section-sentiment');
+                if (diagnosisNav) {
+                    diagnosisNav.click();
+                }
+                setTimeout(() => document.getElementById('pipeline-url')?.focus(), 80);
+            });
+        }
 
         const ctxMarket = document.getElementById('marketChart').getContext('2d');
         const marketGradient = ctxMarket.createLinearGradient(0, 0, 0, 360);
