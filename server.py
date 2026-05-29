@@ -416,6 +416,17 @@ class PipelineRequest(BaseModel):
     limit: int = Field(DEFAULT_LIMIT, ge=1, le=500, description="本次最多抓取评论数")
 
 
+class ManualCommentsPipelineRequest(BaseModel):
+    """前端 POST /api/import-comments-pipeline 的请求体。"""
+
+    comments: List[str] = Field(..., min_length=1, description="复制导入的评论文本数组")
+    source_platform: str = Field("manual", description="来源平台：douyin / xiaohongshu / manual")
+    source_url: str = Field("manual_import", description="可选的原始笔记/视频链接")
+    product_id: str | None = Field(None, description="本次诊断要写入的产品 ID")
+    product_name: str | None = Field(None, description="本次诊断要写入的产品名称")
+    limit: int = Field(DEFAULT_LIMIT, ge=1, le=500, description="本次最多导入评论数")
+
+
 class AddProductRequest(BaseModel):
     """前端 POST /api/add-product 的请求体。"""
 
@@ -4071,6 +4082,76 @@ async def run_ai_diagnose_async(channel: ChannelConfig) -> Dict[str, Any]:
     return report
 
 
+def normalize_manual_comment_lines(comments: List[str], limit: int) -> List[str]:
+    """清洗运营复制的多平台评论，过滤空行和重复内容。"""
+    cleaned: List[str] = []
+    seen = set()
+    for item in comments:
+        for raw_line in str(item or "").splitlines():
+            line = " ".join(raw_line.strip().split())
+            if not line:
+                continue
+            if line.startswith(("-", "*", "•")):
+                line = line[1:].strip()
+            if len(line) < 4:
+                continue
+            key = line.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            cleaned.append(line[:500])
+            if len(cleaned) >= limit:
+                return cleaned
+    return cleaned
+
+
+def build_comments_url(comments: List[str]) -> str:
+    """把评论数组编码为多源适配器支持的 comments:// 输入。"""
+    from urllib.parse import quote
+
+    return "comments://" + quote("\n".join(comments), safe="")
+
+
+async def run_manual_comments_pipeline_async(payload: ManualCommentsPipelineRequest) -> Dict[str, Any]:
+    """把抖音/小红书等复制评论直接导入现有 AI 诊断流水线。"""
+    comments = normalize_manual_comment_lines(payload.comments, payload.limit or DEFAULT_LIMIT)
+    if not comments:
+        raise PipelineRuntimeError(400, "没有可分析的有效评论，请至少粘贴 1 条 4 个字以上的评论。")
+
+    source_platform = (payload.source_platform or "manual").strip().lower() or "manual"
+    channel_key = source_platform if source_platform in CHANNELS else "manual"
+    base_channel = CHANNELS[channel_key]
+    source_url = (payload.source_url or "manual_import").strip() or "manual_import"
+    runtime_payload = PipelineRequest(
+        url=build_comments_url(comments),
+        product_id=payload.product_id,
+        product_name=payload.product_name or f"{source_platform} 评论导入样本",
+        limit=min(payload.limit or DEFAULT_LIMIT, len(comments)),
+    )
+    channel = resolve_runtime_channel(runtime_payload, base_channel)
+    append_log(f"收到手动评论导入：{channel.product_name}，来源：{source_platform}，评论 {len(comments)} 条。")
+
+    imported_comments = await run_crawler_async(channel, runtime_payload.url, runtime_payload.limit or DEFAULT_LIMIT)
+    report = await run_ai_diagnose_async(channel)
+    diagnosed_product = merge_report_into_products(
+        channel,
+        report,
+        source_url,
+        radar_sample_size=len(imported_comments),
+        radar_history_source=f"manual_import:{source_platform}",
+    )
+    product_name = str(diagnosed_product.get("product_name", "")).strip() or channel.product_name
+    return {
+        "source_type": channel.source_type,
+        "product_key": channel.product_key,
+        "product_id": channel.product_id,
+        "product_name": product_name,
+        "raw_comment_count": len(imported_comments),
+        "diagnosed_product": diagnosed_product,
+        "message": f"手动评论导入成功：{source_platform} -> {channel.product_key} / {product_name}，已分析 {len(imported_comments)} 条评论。",
+    }
+
+
 async def run_pipeline_async(payload: PipelineRequest) -> Dict[str, Any]:
     """异步执行完整流水线：识别 URL -> 爬虫 -> AI 诊断 -> 合并前端数据。"""
     url = payload.url.strip()
@@ -4771,6 +4852,40 @@ async def post_generate_brief(payload: BriefRequest) -> Dict[str, Any]:
             status_code=500,
             detail=f"采购 Brief 生成失败：{exc}",
         ) from exc
+
+
+@app.post("/api/import-comments-pipeline")
+async def post_import_comments_pipeline(payload: ManualCommentsPipelineRequest) -> Dict[str, Any]:
+    """导入运营复制的抖音/小红书评论，并复用现有 AI 诊断流水线。"""
+    if PIPELINE_LOCK.locked():
+        raise HTTPException(status_code=409, detail="已有一条诊断流水线正在执行，请稍后再试。")
+
+    async with PIPELINE_LOCK:
+        reset_logs()
+        append_log("手动评论导入诊断流水线已启动。")
+        try:
+            result = await run_manual_comments_pipeline_async(payload)
+            append_log("手动评论导入诊断成功，前端看板可以刷新数据。")
+            append_admin_audit(
+                "import_comments_pipeline",
+                f"手动评论导入完成：{result['product_key']} / {result['product_name']}，评论 {result['raw_comment_count']} 条。",
+                {"source_type": result["source_type"]},
+            )
+            return {
+                "status": "success",
+                "message": result["message"],
+                "raw_comment_count": result["raw_comment_count"],
+                "product_key": result["product_key"],
+                "product_id": result["product_id"],
+                "product_name": result["product_name"],
+                "source_type": result["source_type"],
+            }
+        except PipelineRuntimeError as exc:
+            append_log(f"手动评论导入诊断失败：{exc.detail}")
+            raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+        except Exception as exc:
+            append_log(f"手动评论导入诊断发生未处理异常：{exc}")
+            raise HTTPException(status_code=500, detail=f"手动评论导入诊断失败：{exc}") from exc
 
 
 @app.post("/api/run-pipeline")

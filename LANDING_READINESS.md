@@ -110,6 +110,16 @@ curl -fsS -H "Authorization: Bearer $OPERATOR_TOKEN"   https://tk-api.void52.sit
 - TikTok：保留原真实评论抓取链路。
 - 抖音：通过多源适配器识别链接；公开页面只能抽取可访问文本信号，评论受限时使用 `comments://` 或文本文件导入。
 - 小红书：通过多源适配器识别链接；公开页面只能抽取可访问文本信号，评论受限时使用 `comments://` 或文本文件导入。
-- 手动导入：运营可复制多行评论，使用 `comments://评论1%0A评论2` 进入同一 AI 诊断链路。
+- 手动导入：运营可在前端复制多行评论，或用 `comments://评论1%0A评论2` 进入同一 AI 诊断链路。
+
+前端已提供“导入抖音 / 小红书评论文本”入口，运营不需要手写 `comments://`：
+
+1. 打开 AI 诊断。
+2. 选择要写回的商品。
+3. 展开“导入抖音 / 小红书评论文本”。
+4. 选择来源平台，粘贴每行一条评论。
+5. 点击“导入分析”，系统会复用现有 AI 诊断、证据账本、经营报告和 Brief 链路。
+
+线上接口：`POST /api/import-comments-pipeline`，请求体包含 `source_platform`、`product_id`、`product_name` 和 `comments` 数组。该接口已在生产环境完成冒烟验证。
 
 这样做的目的不是“假装全网爬虫”，而是先让国内市场讨论样本能合规进入现有诊断、报告和 Brief 闭环。后续如果有官方 API、授权 Cookie 或企业数据源，再在 `scrape_multi_source_comments.py` 中增加专用适配器。

@@ -865,15 +865,30 @@
                 <div class="flex flex-wrap gap-2 mb-4">
                     <span class="kicker-pill">YouTube</span>
                     <span class="kicker-pill">TikTok</span>
-                    <span class="kicker-pill">排队</span>
+                    <span class="kicker-pill">抖音</span>
+                    <span class="kicker-pill">小红书</span>
+                    <span class="kicker-pill">评论导入</span>
                 </div>
                 <div class="flex flex-col md:flex-row gap-3">
-                    <input id="pipeline-url" type="text" placeholder="请输入 YouTube / TikTok / 抖音 / 小红书链接，或 comments:// 粘贴评论..." class="neo-input flex-grow px-4 py-2.5 rounded-lg text-sm focus:outline-none transition-all">
+                    <input id="pipeline-url" type="text" placeholder="请输入 YouTube / TikTok / 抖音 / 小红书链接..." class="neo-input flex-grow px-4 py-2.5 rounded-lg text-sm focus:outline-none transition-all">
                     <button id="btn-run-pipeline" class="primary-action px-6 py-2.5 rounded-lg text-sm font-medium flex items-center justify-center gap-2">
                         <span id="spinner" class="hidden w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
                         开始 AI 抓取与分析
                     </button>
                 </div>
+                <details class="mt-4 rounded-lg border border-slate-200/70 bg-white/60 p-4">
+                    <summary class="cursor-pointer select-none text-sm font-black text-slate-700">导入抖音 / 小红书评论文本</summary>
+                    <div class="mt-3 grid grid-cols-1 lg:grid-cols-[160px_1fr_auto] gap-3">
+                        <select id="manual-source-platform" class="neo-input px-3 py-2.5 rounded-lg text-sm focus:outline-none">
+                            <option value="xiaohongshu">小红书</option>
+                            <option value="douyin">抖音</option>
+                            <option value="manual">其他</option>
+                        </select>
+                        <input id="manual-source-url" type="text" placeholder="可选：原始笔记 / 视频链接" class="neo-input px-3 py-2.5 rounded-lg text-sm focus:outline-none">
+                        <button id="btn-import-comments" class="quiet-button px-4 py-2.5 rounded-lg text-sm font-bold">导入分析</button>
+                    </div>
+                    <textarea id="manual-comments-input" rows="5" placeholder="每行一条评论，直接复制抖音/小红书评论区文本即可。" class="neo-input mt-3 w-full px-3 py-3 rounded-lg text-sm leading-6 focus:outline-none resize-y"></textarea>
+                </details>
 
                 <div id="pipeline-loading-state" class="hidden mt-5 rounded-lg border border-indigo-100 bg-indigo-50/70 px-4 py-3">
                     <div class="flex items-center justify-between gap-4">
@@ -1427,7 +1442,11 @@
 
         const productSelector = document.getElementById('product-selector');
         const btnRunPipeline = document.getElementById('btn-run-pipeline');
+        const btnImportComments = document.getElementById('btn-import-comments');
         const pipelineUrl = document.getElementById('pipeline-url');
+        const manualCommentsInput = document.getElementById('manual-comments-input');
+        const manualSourcePlatform = document.getElementById('manual-source-platform');
+        const manualSourceUrl = document.getElementById('manual-source-url');
         const btnRunRadarPatrol = document.getElementById('btn-run-radar-patrol');
         const radarPatrolSpinner = document.getElementById('radar-patrol-spinner');
         const pipelineLoadingState = document.getElementById('pipeline-loading-state');
@@ -4494,6 +4513,25 @@
             }
         }
 
+        async function finishPipelineResponse(response, selectedKey, successMessage) {
+            const payload = await response.json().catch(() => ({}));
+            if (response.ok) {
+                const updatedKey = payload.product_key || selectedKey;
+                if (payload.product_name && activeData[updatedKey]) {
+                    activeData[updatedKey].product_name = payload.product_name;
+                }
+                progressPercent.innerText = '100%';
+                showToast(successMessage, 'success');
+                await fetchAndLoadRealData(updatedKey);
+                renderSelectorOptions(updatedKey);
+                productSelector.value = updatedKey;
+                renderDiagnosticCharts(updatedKey);
+                renderProductTable();
+            } else {
+                showToast(payload.detail || '未采集到有效评论，或 AI 分析服务暂时不可用。', 'error');
+            }
+        }
+
         btnRunPipeline.addEventListener('click', async () => {
             if (!isLocalApiOnline) {
                 showToast('API 未连接，请稍后刷新页面重试。', 'error');
@@ -4502,7 +4540,7 @@
 
             const url = pipelineUrl.value.trim();
             if (!url) {
-                showToast('请输入合法链接，或使用 comments:// 粘贴多行评论。', 'error');
+                showToast('请输入合法链接，或使用下方评论导入入口。', 'error');
                 return;
             }
 
@@ -4528,23 +4566,7 @@
                         product_name: selectedProduct.product_name || selectedKey
                     })
                 });
-                const payload = await response.json().catch(() => ({}));
-
-                if (response.ok) {
-                    const updatedKey = payload.product_key || selectedKey;
-                    if (payload.product_name && activeData[updatedKey]) {
-                        activeData[updatedKey].product_name = payload.product_name;
-                    }
-                    progressPercent.innerText = '100%';
-                    showToast('🎉 AI 舆情诊断成功！报告已完美热更新。', 'success');
-                    await fetchAndLoadRealData(updatedKey);
-                    renderSelectorOptions(updatedKey);
-                    productSelector.value = updatedKey;
-                    renderDiagnosticCharts(updatedKey);
-                    renderProductTable();
-                } else {
-                    showToast(payload.detail || '抓取未采集到有效评论，或 AI 分析服务暂时不可用。', 'error');
-                }
+                await finishPipelineResponse(response, selectedKey, 'AI 舆情诊断成功，报告已热更新。');
             } catch (error) {
                 showToast('网络数据通道遭遇波动，请检查 FastAPI 运行日志。', 'error');
             } finally {
@@ -4554,6 +4576,58 @@
                 }
                 await fetchLogs();
                 btnRunPipeline.disabled = false;
+                spinner.classList.add('hidden');
+                setTerminalOpenState(false);
+            }
+        });
+
+
+        btnImportComments.addEventListener('click', async () => {
+            if (!isLocalApiOnline) {
+                showToast('API 未连接，请稍后刷新页面重试。', 'error');
+                return;
+            }
+            const rawText = manualCommentsInput.value.trim();
+            const comments = rawText.split('\n').map(item => item.trim()).filter(Boolean);
+            if (comments.length === 0) {
+                showToast('请先粘贴至少 1 条评论文本。', 'error');
+                return;
+            }
+            const selectedKey = productSelector.value;
+            const selectedProduct = activeData[selectedKey] || {};
+
+            btnImportComments.disabled = true;
+            spinner.classList.remove('hidden');
+            setTerminalOpenState(true);
+            pipelineLoadingTitle.innerText = '正在导入评论并分析';
+            pipelineLoadingDetail.innerText = '系统正在读取复制的国内平台评论，并生成 AI 舆情报告。';
+            progressPercent.innerText = '15%';
+            logOffset = 0;
+            pollInterval = setInterval(fetchLogs, 800);
+
+            try {
+                const response = await authorizedFetch(`${API_BASE_URL}/api/import-comments-pipeline`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        comments: comments,
+                        source_platform: manualSourcePlatform.value,
+                        source_url: manualSourceUrl.value.trim() || 'manual_import',
+                        product_id: selectedProduct.product_id || selectedKey,
+                        product_name: selectedProduct.product_name || selectedKey,
+                        limit: Math.min(500, comments.length)
+                    })
+                });
+                await finishPipelineResponse(response, selectedKey, '评论导入诊断成功，报告已热更新。');
+            } catch (error) {
+                showToast('网络数据通道遭遇波动，请检查 FastAPI 运行日志。', 'error');
+            } finally {
+                if (pollInterval) {
+                    clearInterval(pollInterval);
+                    pollInterval = null;
+                }
+                await fetchLogs();
+                btnImportComments.disabled = false;
                 spinner.classList.add('hidden');
                 setTerminalOpenState(false);
             }
