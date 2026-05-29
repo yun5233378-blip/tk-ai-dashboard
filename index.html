@@ -1178,6 +1178,44 @@
                     </div>
                 </details>
 
+                <details id="platform-session-panel" class="backend-accordion glass-card rounded-lg overflow-hidden border border-slate-200/60">
+                    <summary class="cursor-pointer select-none px-6 py-4 flex items-center justify-between gap-4 hover:bg-indigo-50/40 transition-colors">
+                        <span class="font-black text-slate-900">平台采集登录态</span>
+                        <span class="text-xs font-bold text-indigo-600">展开</span>
+                    </summary>
+                    <div class="border-t border-slate-100 p-6 space-y-5">
+                        <div id="platform-session-list" class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-slate-600">等待加载平台状态...</div>
+                        <div class="grid grid-cols-1 xl:grid-cols-[260px_1fr] gap-5">
+                            <div class="rounded-lg border border-indigo-100 bg-indigo-50/45 p-4">
+                                <div class="text-xs font-black text-indigo-700 mb-3">保存登录态</div>
+                                <div class="space-y-3">
+                                    <select id="platform-session-select" class="neo-input w-full px-3 py-2 rounded-lg text-sm">
+                                        <option value="douyin">抖音</option>
+                                        <option value="xiaohongshu">小红书</option>
+                                    </select>
+                                    <input id="platform-session-user-agent" class="neo-input w-full px-3 py-2 rounded-lg text-sm" placeholder="可选：浏览器 User-Agent">
+                                    <input id="platform-session-note" class="neo-input w-full px-3 py-2 rounded-lg text-sm" placeholder="备注，如：运营号 A / 今日更新">
+                                    <input id="platform-session-probe-url" class="neo-input w-full px-3 py-2 rounded-lg text-sm" placeholder="测试链接，可填抖音视频或小红书笔记">
+                                    <div class="flex flex-wrap gap-2">
+                                        <button id="btn-save-platform-session" class="primary-action px-4 py-2 rounded-lg text-xs font-bold">保存</button>
+                                        <button id="btn-probe-platform-session" class="quiet-button px-4 py-2 rounded-lg text-xs font-bold">测试</button>
+                                        <button id="btn-clear-platform-session" class="quiet-button px-4 py-2 rounded-lg text-xs font-bold text-rose-600">清除</button>
+                                        <button id="btn-refresh-platform-sessions" class="quiet-button px-4 py-2 rounded-lg text-xs font-bold">刷新</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="rounded-lg border border-slate-100 bg-white/70 p-4">
+                                <div class="flex items-center justify-between gap-3 mb-2">
+                                    <div class="text-xs font-black text-slate-500">Cookie Header / JSON 导出</div>
+                                    <span class="text-[11px] font-bold text-slate-400">服务器保存，不回显明文</span>
+                                </div>
+                                <textarea id="platform-session-cookies" rows="9" class="neo-input w-full px-3 py-3 rounded-lg text-xs leading-5 font-mono resize-y" placeholder="粘贴浏览器请求头中的 Cookie: a=b; c=d，或 Cookie-Editor / DevTools 导出的 JSON cookies 数组。"></textarea>
+                                <p id="platform-session-meta" class="mt-3 text-xs text-slate-500 leading-relaxed">登录态只用于服务器端评论采集，不会进入备份导出，也不会返回给前端。若平台触发验证码或 Cookie 过期，请在真实浏览器重新登录后更新。</p>
+                            </div>
+                        </div>
+                    </div>
+                </details>
+
                 <details class="backend-accordion glass-card rounded-lg overflow-hidden border border-slate-200/60">
                     <summary class="cursor-pointer select-none px-6 py-4 flex items-center justify-between gap-4 hover:bg-indigo-50/40 transition-colors">
                         <span class="font-black text-slate-900">系统维护与告警</span>
@@ -1476,7 +1514,7 @@
         }
 
         function updateAdminUiVisibility() {
-            const adminElements = [btnAdminExport, btnAdminImport, btnAdminRefreshAudit, btnAlertStatus, btnAlertTest, authAdminPanel];
+            const adminElements = [btnAdminExport, btnAdminImport, btnAdminRefreshAudit, btnAlertStatus, btnAlertTest, authAdminPanel, platformSessionPanel];
             adminElements.forEach(element => {
                 if (!element) return;
                 element.classList.toggle('hidden', isAuthenticated && !isAdminSession());
@@ -1665,6 +1703,18 @@
         const alertStatusMeta = document.getElementById('alert-status-meta');
         const btnAlertStatus = document.getElementById('btn-alert-status');
         const btnAlertTest = document.getElementById('btn-alert-test');
+        const platformSessionPanel = document.getElementById('platform-session-panel');
+        const platformSessionList = document.getElementById('platform-session-list');
+        const platformSessionSelect = document.getElementById('platform-session-select');
+        const platformSessionCookies = document.getElementById('platform-session-cookies');
+        const platformSessionUserAgent = document.getElementById('platform-session-user-agent');
+        const platformSessionNote = document.getElementById('platform-session-note');
+        const platformSessionProbeUrl = document.getElementById('platform-session-probe-url');
+        const platformSessionMeta = document.getElementById('platform-session-meta');
+        const btnSavePlatformSession = document.getElementById('btn-save-platform-session');
+        const btnProbePlatformSession = document.getElementById('btn-probe-platform-session');
+        const btnClearPlatformSession = document.getElementById('btn-clear-platform-session');
+        const btnRefreshPlatformSessions = document.getElementById('btn-refresh-platform-sessions');
 
         async function handleLoginSubmit(event) {
             event.preventDefault();
@@ -4497,6 +4547,7 @@
                 const invitesPayload = await invitesRes.json().catch(() => ({}));
                 if (!invitesRes.ok) throw new Error(invitesPayload.detail || '邀请码读取失败');
                 renderAdminInvites(invitesPayload.invites || []);
+                await refreshPlatformSessions();
             } catch (error) {
                 showToast(error.message || '读取用户与邀请码失败', 'error');
             }
@@ -4640,6 +4691,141 @@
             }
         }
 
+        function renderPlatformSessions(sessions) {
+            if (!platformSessionList) return;
+            const list = Array.isArray(sessions) ? sessions : [];
+            if (!list.length) {
+                platformSessionList.innerHTML = '<div class="rounded-lg border border-dashed border-slate-200 bg-slate-50/80 p-4 text-sm text-slate-400 md:col-span-2">暂无平台登录态配置。</div>';
+                return;
+            }
+            platformSessionList.innerHTML = list.map(item => {
+                const enabled = Boolean(item.enabled);
+                const badgeClass = enabled
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                    : 'bg-slate-50 text-slate-500 border-slate-100';
+                const testText = item.last_test_status === 'success'
+                    ? `最近测试成功 · ${item.last_test_comment_count || 0} 条`
+                    : (item.last_test_status === 'failed' ? '最近测试失败' : '未测试');
+                return `
+                    <div class="rounded-lg border border-slate-100 bg-white/75 p-4">
+                        <div class="flex items-start justify-between gap-3">
+                            <div>
+                                <div class="text-sm font-black text-slate-900">${escapeHtml(item.label || item.platform)}</div>
+                                <div class="mt-1 text-xs text-slate-500">${enabled ? `Cookie ${item.cookie_count || 0} 枚 · 指纹 ${escapeHtml(item.fingerprint || '--')}` : '未保存 Cookie'}</div>
+                            </div>
+                            <span class="px-2.5 py-1 rounded-full border text-[11px] font-black ${badgeClass}">${enabled ? '已启用' : '未配置'}</span>
+                        </div>
+                        <div class="mt-3 text-xs text-slate-500 leading-relaxed">
+                            ${item.updated_at ? `更新：${escapeHtml(item.updated_at)} · ${escapeHtml(item.updated_by || 'admin')}` : '保存后主诊断流程会自动带登录态抓取。'}
+                        </div>
+                        <div class="mt-2 text-xs font-bold ${item.last_test_status === 'failed' ? 'text-rose-600' : 'text-slate-500'}">${escapeHtml(testText)}</div>
+                        ${item.last_test_message ? `<div class="mt-1 text-[11px] text-slate-400 leading-relaxed">${escapeHtml(item.last_test_message)}</div>` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function refreshPlatformSessions() {
+            if (!isAdminSession() || !platformSessionList) return;
+            try {
+                const response = await authorizedFetch(`${API_BASE_URL}/api/admin/platform-sessions`);
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    throw new Error(payload.detail || '平台登录态读取失败。');
+                }
+                renderPlatformSessions(payload.sessions || []);
+            } catch (error) {
+                platformSessionList.innerHTML = `<div class="rounded-lg border border-rose-100 bg-rose-50/70 p-4 text-sm text-rose-600 md:col-span-2">${escapeHtml(error.message || String(error))}</div>`;
+            }
+        }
+
+        async function savePlatformSession() {
+            if (!isAdminSession()) return;
+            const platform = platformSessionSelect.value;
+            const cookies = platformSessionCookies.value.trim();
+            if (!cookies) {
+                showToast('请先粘贴 Cookie Header 或 JSON cookies。', 'error');
+                return;
+            }
+            btnSavePlatformSession.disabled = true;
+            try {
+                const response = await authorizedFetch(`${API_BASE_URL}/api/admin/platform-sessions/${encodeURIComponent(platform)}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        cookies,
+                        user_agent: platformSessionUserAgent.value.trim(),
+                        note: platformSessionNote.value.trim()
+                    })
+                });
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok) throw new Error(payload.detail || '平台登录态保存失败。');
+                platformSessionCookies.value = '';
+                platformSessionMeta.innerText = '已保存到服务器。Cookie 明文不会回显，后续链接直抓会自动注入。';
+                await refreshPlatformSessions();
+                await refreshAdminAuditLogs();
+                showToast('平台采集登录态已保存。', 'success');
+            } catch (error) {
+                showToast(error.message || String(error), 'error');
+            } finally {
+                btnSavePlatformSession.disabled = false;
+            }
+        }
+
+        async function clearPlatformSession() {
+            if (!isAdminSession()) return;
+            const platform = platformSessionSelect.value;
+            if (!window.confirm('确认清除该平台的采集登录态吗？')) return;
+            btnClearPlatformSession.disabled = true;
+            try {
+                const response = await authorizedFetch(`${API_BASE_URL}/api/admin/platform-sessions/${encodeURIComponent(platform)}`, {
+                    method: 'DELETE'
+                });
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok) throw new Error(payload.detail || '平台登录态清除失败。');
+                platformSessionCookies.value = '';
+                platformSessionMeta.innerText = '已清除该平台登录态。';
+                await refreshPlatformSessions();
+                await refreshAdminAuditLogs();
+                showToast('平台采集登录态已清除。', 'success');
+            } catch (error) {
+                showToast(error.message || String(error), 'error');
+            } finally {
+                btnClearPlatformSession.disabled = false;
+            }
+        }
+
+        async function probePlatformSession() {
+            if (!isAdminSession()) return;
+            const platform = platformSessionSelect.value;
+            const url = platformSessionProbeUrl.value.trim();
+            if (!url) {
+                showToast('请先填写用于测试的抖音或小红书链接。', 'error');
+                return;
+            }
+            btnProbePlatformSession.disabled = true;
+            platformSessionMeta.innerText = '正在用服务器登录态测试评论读取...';
+            try {
+                const response = await authorizedFetch(`${API_BASE_URL}/api/admin/platform-sessions/${encodeURIComponent(platform)}/probe`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url, limit: 5 })
+                });
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok) throw new Error(payload.detail || '平台登录态测试失败。');
+                platformSessionMeta.innerText = `测试成功，读到 ${payload.comment_count || 0} 条评论。样例：${payload.sample || '--'}`;
+                await refreshPlatformSessions();
+                await refreshAdminAuditLogs();
+                showToast('平台登录态测试成功。', 'success');
+            } catch (error) {
+                platformSessionMeta.innerText = error.message || String(error);
+                await refreshPlatformSessions();
+                showToast(error.message || String(error), 'error');
+            } finally {
+                btnProbePlatformSession.disabled = false;
+            }
+        }
+
         const btnShowModal = document.getElementById('btn-show-add-modal');
         const addModal = document.getElementById('add-product-modal');
         const btnCloseModal = document.getElementById('btn-close-modal');
@@ -4703,6 +4889,10 @@
         btnAdminRefreshAudit.addEventListener('click', refreshAdminAuditLogs);
         btnAlertStatus.addEventListener('click', refreshAlertStatus);
         btnAlertTest.addEventListener('click', sendTestAlert);
+        btnSavePlatformSession.addEventListener('click', savePlatformSession);
+        btnProbePlatformSession.addEventListener('click', probePlatformSession);
+        btnClearPlatformSession.addEventListener('click', clearPlatformSession);
+        btnRefreshPlatformSessions.addEventListener('click', refreshPlatformSessions);
         adminRestoreFile.addEventListener('change', (event) => {
             const file = event.target.files && event.target.files[0];
             restoreAdminBackup(file);

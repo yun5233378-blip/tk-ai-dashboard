@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 import re
 import sys
@@ -45,6 +46,11 @@ PLATFORM_HINTS = {
     "douyin": ["douyin.com", "v.douyin.com", "iesdouyin.com"],
     "xiaohongshu": ["xiaohongshu.com", "xhslink.com"],
     "manual": [],
+}
+
+PLATFORM_COOKIE_DOMAINS = {
+    "douyin": [".douyin.com", ".iesdouyin.com"],
+    "xiaohongshu": [".xiaohongshu.com", ".xhslink.com"],
 }
 
 
@@ -161,6 +167,114 @@ def build_public_page_comments(source: str, platform: str, limit: int) -> List[D
     return dedupe_comments(comments, limit)
 
 
+def load_platform_session_env(platform: str) -> Dict[str, Any]:
+    raw_value = os.getenv("TK_PLATFORM_SESSION_JSON", "").strip()
+    if not raw_value:
+        return {}
+    try:
+        payload = json.loads(raw_value)
+    except json.JSONDecodeError:
+        return {}
+    if not isinstance(payload, dict):
+        return {}
+    if str(payload.get("platform") or "").strip().lower() != platform:
+        return {}
+    return payload
+
+
+def platform_cookie_domains(platform: str, source: str) -> List[str]:
+    domains = list(PLATFORM_COOKIE_DOMAINS.get(platform, []))
+    host = urlparse(source).hostname or ""
+    if host and host not in domains:
+        domains.append(host)
+    return list(dict.fromkeys(domains))
+
+
+def normalize_cookie_entry(item: Dict[str, Any], source: str, platform: str) -> Dict[str, Any] | None:
+    name = str(item.get("name") or "").strip()
+    value = str(item.get("value") or "")
+    if not name:
+        return None
+    cookie: Dict[str, Any] = {
+        "name": name,
+        "value": value,
+        "path": str(item.get("path") or "/"),
+    }
+    domain = str(item.get("domain") or "").strip()
+    url = str(item.get("url") or "").strip()
+    if domain:
+        cookie["domain"] = domain
+    elif url:
+        cookie["url"] = url
+    else:
+        cookie["url"] = source
+
+    for key in ("httpOnly", "secure"):
+        if key in item:
+            cookie[key] = bool(item.get(key))
+    if "expires" in item:
+        try:
+            cookie["expires"] = int(float(item["expires"]))
+        except Exception:
+            pass
+    same_site = str(item.get("sameSite") or "").strip().capitalize()
+    if same_site in {"Strict", "Lax", "None"}:
+        cookie["sameSite"] = same_site
+    return cookie
+
+
+def parse_cookie_header_text(raw_cookie: str, source: str, platform: str) -> List[Dict[str, Any]]:
+    value = re.sub(r"^cookie\s*:\s*", "", raw_cookie.strip(), flags=re.I)
+    parts = [part.strip() for part in value.split(";") if "=" in part]
+    domains = platform_cookie_domains(platform, source)
+    cookies: List[Dict[str, Any]] = []
+    for part in parts:
+        name, cookie_value = part.split("=", 1)
+        name = name.strip()
+        if not name or name.lower() in {"path", "domain", "expires", "max-age", "samesite", "secure", "httponly"}:
+            continue
+        for domain in domains:
+            cookies.append({
+                "name": name,
+                "value": cookie_value.strip(),
+                "domain": domain,
+                "path": "/",
+            })
+    return cookies
+
+
+def parse_platform_cookies(raw_cookie: str, source: str, platform: str) -> List[Dict[str, Any]]:
+    value = (raw_cookie or "").strip()
+    if not value:
+        return []
+    try:
+        parsed = json.loads(value)
+        if isinstance(parsed, dict) and isinstance(parsed.get("cookies"), list):
+            parsed = parsed["cookies"]
+        elif isinstance(parsed, dict) and isinstance(parsed.get("cookie"), str):
+            return parse_cookie_header_text(parsed["cookie"], source, platform)
+        elif isinstance(parsed, dict) and isinstance(parsed.get("cookies"), str):
+            return parse_cookie_header_text(parsed["cookies"], source, platform)
+        if isinstance(parsed, list):
+            cookies = [
+                normalize_cookie_entry(item, source, platform)
+                for item in parsed
+                if isinstance(item, dict)
+            ]
+            return [cookie for cookie in cookies if cookie]
+    except json.JSONDecodeError:
+        pass
+    return parse_cookie_header_text(value, source, platform)
+
+
+def add_platform_session_cookies(context: Any, source: str, platform: str, session: Dict[str, Any]) -> int:
+    cookies = parse_platform_cookies(str(session.get("cookies") or ""), source, platform)
+    if not cookies:
+        return 0
+    context.add_cookies(cookies)
+    return len(cookies)
+
+
 def is_probable_comment_text(text: str) -> bool:
     value = normalize_comment_text(text)
     if len(value) < MIN_COMMENT_LENGTH or len(value) > 220:
@@ -234,14 +348,20 @@ def build_browser_visible_comments(source: str, platform: str, limit: int) -> Li
         print(f"{platform} browser comment probe unavailable: {exc}")
         return []
 
+    session = load_platform_session_env(platform)
+    user_agent = str(session.get("user_agent") or USER_AGENT).strip() or USER_AGENT
     comments: List[Dict[str, Any]] = []
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         context = browser.new_context(
             viewport={"width": 1365, "height": 900},
             locale="zh-CN",
-            user_agent=USER_AGENT,
+            user_agent=user_agent,
         )
+        cookie_count = 0
+        if session:
+            cookie_count = add_platform_session_cookies(context, source, platform, session)
+            print(f"{platform} session injected {cookie_count} browser cookies.")
         page = context.new_page()
         page.set_default_timeout(12000)
         try:
@@ -258,15 +378,21 @@ def build_browser_visible_comments(source: str, platform: str, limit: int) -> Li
             browser.close()
     comments = dedupe_comments(comments, limit)
     for comment in comments:
-        comment["collection_method"] = "browser_visible_comment_probe"
+        comment["collection_method"] = "browser_visible_comment_probe_with_session" if session else "browser_visible_comment_probe"
+        if cookie_count:
+            comment["session_cookie_count"] = cookie_count
     return comments
 
 
-def platform_guidance(platform: str) -> str:
+def platform_guidance(platform: str, has_session: bool = False) -> str:
     if platform == "douyin":
-        return "抖音链接已尝试浏览器直抓，但公开页未暴露可读评论；需要接入浏览器登录态/Cookie 后重试，或临时使用应急评论文本导入。"
+        if has_session:
+            return "抖音链接已注入保存的浏览器登录态，但仍未读到可分析评论；请检查 Cookie 是否过期、账号是否能打开该视频评论区，或平台是否触发验证。"
+        return "抖音链接已尝试浏览器直抓，但公开页未暴露可读评论；请先在后台保存抖音采集登录态/Cookie 后重试。"
     if platform == "xiaohongshu":
-        return "小红书链接已尝试浏览器直抓，但公开页未暴露可读评论；需要接入浏览器登录态/Cookie 后重试，或临时使用应急评论文本导入。"
+        if has_session:
+            return "小红书链接已注入保存的浏览器登录态，但仍未读到可分析评论；请检查 Cookie 是否过期、账号是否能打开该笔记评论区，或平台是否触发验证。"
+        return "小红书链接已尝试浏览器直抓，但公开页未暴露可读评论；请先在后台保存小红书采集登录态/Cookie 后重试。"
     return "该平台暂未接入专用公开评论 API，请使用 comments:// 或文本文件导入评论。"
 
 
@@ -276,6 +402,7 @@ def collect_comments(source: str, limit: int) -> tuple[str, List[Dict[str, Any]]
         comments = read_manual_comments(source, platform, limit)
         return platform, comments
 
+    session = load_platform_session_env(platform) if platform in {"douyin", "xiaohongshu"} else {}
     if platform in {"douyin", "xiaohongshu"}:
         try:
             comments = build_browser_visible_comments(source, platform, limit)
@@ -293,15 +420,16 @@ def collect_comments(source: str, limit: int) -> tuple[str, List[Dict[str, Any]]
     except Exception as exc:
         print(f"{platform} public page extraction unavailable: {exc}")
 
-    raise RuntimeError(platform_guidance(platform))
+    raise RuntimeError(platform_guidance(platform, bool(session)))
 
 
 def write_comments(path: Path, platform: str, source: str, comments: List[Dict[str, Any]]) -> None:
+    collection_method = str(comments[0].get("collection_method") or "public_page_or_manual_import") if comments else "public_page_or_manual_import"
     payload = {
         "schema": "tk_multi_source_comments_v1",
         "source_platform": platform,
         "source_url": source if source.startswith("http") else "manual_import",
-        "collection_method": "public_page_or_manual_import",
+        "collection_method": collection_method,
         "collected_at": time.strftime("%Y-%m-%d %H:%M:%S"),
         "comments": comments,
     }
@@ -318,7 +446,7 @@ def main() -> int:
     try:
         platform, comments = collect_comments(args.source, args.limit)
         if not comments:
-            raise RuntimeError(platform_guidance(platform))
+            raise RuntimeError(platform_guidance(platform, bool(load_platform_session_env(platform))))
         output_path = Path(args.output)
         write_comments(output_path, platform, args.source, comments)
         print(f"{platform} adapter saved {len(comments)} comments/signals to {output_path}")

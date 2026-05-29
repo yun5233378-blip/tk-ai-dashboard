@@ -28,6 +28,7 @@ import hmac
 import json
 import math
 import os
+import re
 import secrets
 import subprocess
 import sys
@@ -96,6 +97,7 @@ USERS_PATH = BASE_DIR / "users.json"
 SESSIONS_PATH = BASE_DIR / "sessions.json"
 INVITES_PATH = BASE_DIR / "invites.json"
 LOGIN_ATTEMPTS_PATH = BASE_DIR / "login_attempts.json"
+PLATFORM_SESSIONS_PATH = BASE_DIR / "platform_sessions.json"
 
 REDIS_URL = os.getenv("REDIS_URL", "").strip()
 DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
@@ -110,6 +112,7 @@ USERS_STORE_KEY = os.getenv("USERS_STORE_KEY", "tk_ai:users")
 SESSIONS_STORE_KEY = os.getenv("SESSIONS_STORE_KEY", "tk_ai:sessions")
 INVITES_STORE_KEY = os.getenv("INVITES_STORE_KEY", "tk_ai:invites")
 LOGIN_ATTEMPTS_STORE_KEY = os.getenv("LOGIN_ATTEMPTS_STORE_KEY", "tk_ai:login_attempts")
+PLATFORM_SESSIONS_STORE_KEY = os.getenv("PLATFORM_SESSIONS_STORE_KEY", "tk_ai:platform_sessions")
 CORS_EXTRA_ORIGINS = [
     item.strip()
     for item in os.getenv("CORS_EXTRA_ORIGINS", "").split(",")
@@ -489,6 +492,21 @@ class UserStatusRequest(BaseModel):
     status: str = Field(..., description="active / disabled")
 
 
+class PlatformSessionRequest(BaseModel):
+    """管理员保存平台采集登录态的请求体。"""
+
+    cookies: str = Field(..., min_length=1, description="浏览器 Cookie Header 或 JSON 导出")
+    user_agent: str = Field("", max_length=500, description="可选浏览器 User-Agent")
+    note: str = Field("", max_length=160, description="可选备注")
+
+
+class PlatformSessionProbeRequest(BaseModel):
+    """管理员测试平台登录态是否能读取评论。"""
+
+    url: str = Field(..., min_length=8, description="用于测试的平台视频或笔记链接")
+    limit: int = Field(5, ge=1, le=30, description="最多测试抓取评论数")
+
+
 class VsPipelineRequest(BaseModel):
     """前端 POST /api/run-vs-pipeline 的请求体。"""
 
@@ -798,6 +816,136 @@ def load_login_attempts() -> Dict[str, Dict[str, Any]]:
 def save_login_attempts(attempts: Dict[str, Dict[str, Any]]) -> None:
     """保存登录失败锁定状态。"""
     save_storage_json(LOGIN_ATTEMPTS_STORE_KEY, LOGIN_ATTEMPTS_PATH, attempts)
+
+
+SUPPORTED_PLATFORM_SESSIONS: Dict[str, Dict[str, Any]] = {
+    "douyin": {
+        "label": "抖音",
+        "hosts": ["douyin.com", "v.douyin.com", "iesdouyin.com"],
+    },
+    "xiaohongshu": {
+        "label": "小红书",
+        "hosts": ["xiaohongshu.com", "xhslink.com"],
+    },
+}
+
+
+def normalize_platform_session_key(platform: str) -> str:
+    """Normalize frontend platform aliases into the crawler session key."""
+    platform_key = (platform or "").strip().lower()
+    aliases = {
+        "xhs": "xiaohongshu",
+        "red": "xiaohongshu",
+        "xiaohongshu": "xiaohongshu",
+        "douyin": "douyin",
+    }
+    platform_key = aliases.get(platform_key, platform_key)
+    if platform_key not in SUPPORTED_PLATFORM_SESSIONS:
+        raise HTTPException(status_code=400, detail="暂只支持抖音和小红书采集登录态。")
+    return platform_key
+
+
+def estimate_cookie_count(cookies: str) -> int:
+    """Estimate how many cookies were pasted without exposing their values."""
+    value = (cookies or "").strip()
+    if not value:
+        return 0
+    try:
+        parsed = json.loads(value)
+        if isinstance(parsed, list):
+            return len([item for item in parsed if isinstance(item, dict) and item.get("name")])
+        if isinstance(parsed, dict):
+            if isinstance(parsed.get("cookies"), list):
+                return len([item for item in parsed["cookies"] if isinstance(item, dict) and item.get("name")])
+            if isinstance(parsed.get("cookie"), str):
+                value = parsed["cookie"]
+            elif isinstance(parsed.get("cookies"), str):
+                value = parsed["cookies"]
+    except Exception:
+        pass
+    value = re.sub(r"^cookie\s*:\s*", "", value, flags=re.I)
+    return len([part for part in value.split(";") if "=" in part])
+
+
+def platform_cookie_fingerprint(cookies: str) -> str:
+    """Return a short fingerprint for audits and UI status; never return cookies."""
+    value = (cookies or "").strip()
+    if not value:
+        return ""
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()[:12]
+
+
+def load_platform_sessions() -> Dict[str, Dict[str, Any]]:
+    """Load server-side platform crawler login states. Raw cookies stay server-side."""
+    sessions = load_storage_json(PLATFORM_SESSIONS_STORE_KEY, PLATFORM_SESSIONS_PATH, {})
+    if not isinstance(sessions, dict):
+        return {}
+    cleaned: Dict[str, Dict[str, Any]] = {}
+    for platform, session in sessions.items():
+        if platform in SUPPORTED_PLATFORM_SESSIONS and isinstance(session, dict):
+            cleaned[str(platform)] = dict(session)
+    return cleaned
+
+
+def save_platform_sessions(sessions: Dict[str, Dict[str, Any]]) -> None:
+    """Persist platform crawler login states outside normal user backup exports."""
+    cleaned = {
+        platform: session
+        for platform, session in sessions.items()
+        if platform in SUPPORTED_PLATFORM_SESSIONS and isinstance(session, dict)
+    }
+    save_storage_json(PLATFORM_SESSIONS_STORE_KEY, PLATFORM_SESSIONS_PATH, cleaned)
+
+
+def public_platform_session_payload(platform: str, session: Dict[str, Any] | None) -> Dict[str, Any]:
+    """Build a safe frontend payload without returning raw Cookie values."""
+    meta = SUPPORTED_PLATFORM_SESSIONS[platform]
+    cookies = str((session or {}).get("cookies") or "")
+    return {
+        "platform": platform,
+        "label": meta["label"],
+        "hosts": meta["hosts"],
+        "enabled": bool(cookies),
+        "updated_at": str((session or {}).get("updated_at") or ""),
+        "updated_by": str((session or {}).get("updated_by") or ""),
+        "cookie_count": int((session or {}).get("cookie_count") or estimate_cookie_count(cookies)),
+        "fingerprint": str((session or {}).get("fingerprint") or platform_cookie_fingerprint(cookies)),
+        "user_agent_set": bool(str((session or {}).get("user_agent") or "").strip()),
+        "note": str((session or {}).get("note") or ""),
+        "last_test_at": str((session or {}).get("last_test_at") or ""),
+        "last_test_status": str((session or {}).get("last_test_status") or ""),
+        "last_test_message": str((session or {}).get("last_test_message") or ""),
+        "last_test_comment_count": int((session or {}).get("last_test_comment_count") or 0),
+    }
+
+
+def build_platform_sessions_payload() -> Dict[str, Any]:
+    """Return all supported platform session statuses for the admin panel."""
+    sessions = load_platform_sessions()
+    return {
+        "status": "success",
+        "sessions": [
+            public_platform_session_payload(platform, sessions.get(platform))
+            for platform in SUPPORTED_PLATFORM_SESSIONS
+        ],
+    }
+
+
+def build_crawler_session_env(source_type: str) -> Dict[str, str]:
+    """Inject the matching platform login state into a crawler subprocess."""
+    platform = (source_type or "").strip().lower()
+    if platform not in SUPPORTED_PLATFORM_SESSIONS:
+        return {}
+    session = load_platform_sessions().get(platform) or {}
+    cookies = str(session.get("cookies") or "").strip()
+    if not cookies:
+        return {}
+    payload = {
+        "platform": platform,
+        "cookies": cookies,
+        "user_agent": str(session.get("user_agent") or "").strip(),
+    }
+    return {"TK_PLATFORM_SESSION_JSON": json.dumps(payload, ensure_ascii=False)}
 
 
 def load_vs_reports() -> List[Dict[str, Any]]:
@@ -3728,16 +3876,23 @@ def format_shell_command(command: List[str]) -> str:
     return " ".join(parts)
 
 
-def build_subprocess_env() -> Dict[str, str]:
+def build_subprocess_env(extra_env: Dict[str, str] | None = None) -> Dict[str, str]:
     """继承当前环境变量，并强制 Python 子进程使用 UTF-8 输出。"""
     env = os.environ.copy()
     env.setdefault("PYTHONIOENCODING", "utf-8")
     env.setdefault("PYTHONUTF8", "1")
     env["PYTHONUNBUFFERED"] = "1"
+    if extra_env:
+        env.update({key: value for key, value in extra_env.items() if value is not None})
     return env
 
 
-def run_subprocess(command: List[str], stage_name: str, timeout_seconds: int) -> subprocess.CompletedProcess[str]:
+def run_subprocess(
+    command: List[str],
+    stage_name: str,
+    timeout_seconds: int,
+    extra_env: Dict[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
     """
     执行外部脚本并实时捕获输出。
 
@@ -3756,7 +3911,7 @@ def run_subprocess(command: List[str], stage_name: str, timeout_seconds: int) ->
             text=True,
             encoding="utf-8",
             errors="replace",
-            env=build_subprocess_env(),
+            env=build_subprocess_env(extra_env),
             shell=False,
         )
 
@@ -3832,6 +3987,7 @@ async def run_subprocess_async(
     command: List[str],
     stage_name: str,
     timeout_seconds: int,
+    extra_env: Dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """
     使用 asyncio.create_subprocess_shell 执行外部脚本，并把 stdout/stderr 实时穿透到网页终端。
@@ -3845,7 +4001,7 @@ async def run_subprocess_async(
         cwd=str(BASE_DIR),
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.STDOUT,
-        env=build_subprocess_env(),
+        env=build_subprocess_env(extra_env),
     )
 
     async def read_output() -> None:
@@ -3992,8 +4148,12 @@ def run_crawler(channel: ChannelConfig, url: str, limit: int) -> List[Dict[str, 
     print(f"[Gateway] 开始执行爬虫通道：{channel.display_name}", flush=True)
     print(f"[Gateway] Crawler command: {format_command(command)}", flush=True)
     append_log(f"路由进入爬虫通道：{channel.display_name}")
+    session_env = build_crawler_session_env(channel.source_type)
+    if session_env:
+        label = SUPPORTED_PLATFORM_SESSIONS.get(channel.source_type, {}).get("label", channel.source_type)
+        append_log(f"已为{label}注入服务器保存的采集登录态。")
 
-    completed = run_subprocess(command, "爬虫", CRAWLER_TIMEOUT_SECONDS)
+    completed = run_subprocess(command, "爬虫", CRAWLER_TIMEOUT_SECONDS, session_env)
     comments = read_comments_after_crawl(completed.stdout, completed.stderr)
     append_log(f"爬虫产出有效评论 {len(comments)} 条。")
     return comments
@@ -4146,11 +4306,68 @@ async def run_crawler_async(channel: ChannelConfig, url: str, limit: int) -> Lis
     print(f"[Gateway] 开始执行爬虫通道：{channel.display_name}", flush=True)
     print(f"[Gateway] Crawler command: {format_command(command)}", flush=True)
     append_log(f"路由进入爬虫通道：{channel.display_name}")
+    session_env = build_crawler_session_env(channel.source_type)
+    if session_env:
+        label = SUPPORTED_PLATFORM_SESSIONS.get(channel.source_type, {}).get("label", channel.source_type)
+        append_log(f"已为{label}注入服务器保存的采集登录态。")
 
-    completed = await run_subprocess_async(command, "爬虫", CRAWLER_TIMEOUT_SECONDS)
+    completed = await run_subprocess_async(command, "爬虫", CRAWLER_TIMEOUT_SECONDS, session_env)
     comments = read_comments_after_crawl(completed.stdout, completed.stderr)
     append_log(f"爬虫产出有效评论 {len(comments)} 条。")
     return comments
+
+
+async def run_platform_session_probe_async(
+    platform: str,
+    url: str,
+    limit: int,
+) -> Dict[str, Any]:
+    """Use the stored platform login state to test whether comments are readable."""
+    platform_key = normalize_platform_session_key(platform)
+    base_channel = detect_channel(url)
+    if base_channel.source_type != platform_key:
+        raise PipelineRuntimeError(400, "测试链接与所选平台不匹配。")
+    session_env = build_crawler_session_env(platform_key)
+    if not session_env:
+        raise PipelineRuntimeError(400, "该平台尚未保存采集登录态。")
+
+    output_path = BASE_DIR / f"_platform_session_probe_{platform_key}_{secrets.token_hex(6)}.json"
+    command = [
+        sys.executable,
+        str(SCRAPE_MULTI_SOURCE_SCRIPT),
+        url.strip(),
+        "--limit",
+        str(limit),
+        "--output",
+        str(output_path),
+    ]
+    try:
+        completed = await run_subprocess_async(command, "登录态测试", min(CRAWLER_TIMEOUT_SECONDS, 90), session_env)
+        if not output_path.exists():
+            raise PipelineRuntimeError(500, "登录态测试结束，但未生成测试评论文件。")
+        try:
+            raw_data = json.loads(output_path.read_text(encoding="utf-8"))
+        except UnicodeDecodeError:
+            raw_data = json.loads(output_path.read_text(encoding="utf-8-sig"))
+        comments = raw_data.get("comments", []) if isinstance(raw_data, dict) else raw_data
+        valid_comments = [
+            item for item in comments
+            if isinstance(item, dict) and str(item.get("comment_text", "")).strip()
+        ]
+        if not valid_comments:
+            raise PipelineRuntimeError(400, "登录态已注入，但测试链接没有读到有效评论。")
+        return {
+            "status": "success",
+            "platform": platform_key,
+            "comment_count": len(valid_comments),
+            "sample": shorten_text(str(valid_comments[0].get("comment_text", "")), 120),
+            "stdout": shorten_text(completed.stdout, 500),
+        }
+    finally:
+        try:
+            output_path.unlink()
+        except FileNotFoundError:
+            pass
 
 
 async def run_ai_diagnose_async(channel: ChannelConfig) -> Dict[str, Any]:
@@ -5269,6 +5486,103 @@ async def admin_test_alert() -> Dict[str, Any]:
 async def admin_restore_data(payload: AdminRestoreRequest) -> Dict[str, Any]:
     """用上传的备份 JSON 恢复云端商品与 VS 报告数据。"""
     return restore_admin_backup(payload)
+
+
+@app.get("/api/admin/platform-sessions")
+async def admin_platform_sessions() -> Dict[str, Any]:
+    """查看平台采集登录态配置状态，不返回 Cookie 明文。"""
+    return build_platform_sessions_payload()
+
+
+@app.put("/api/admin/platform-sessions/{platform}")
+async def admin_save_platform_session(platform: str, payload: PlatformSessionRequest) -> Dict[str, Any]:
+    """保存抖音/小红书采集登录态，供后端爬虫子进程注入。"""
+    platform_key = normalize_platform_session_key(platform)
+    cookies = payload.cookies.strip()
+    if estimate_cookie_count(cookies) <= 0:
+        raise HTTPException(status_code=400, detail="Cookie 内容无法识别，请粘贴浏览器 Cookie Header 或 JSON 导出。")
+
+    actor = get_current_request_user()
+    sessions = load_platform_sessions()
+    sessions[platform_key] = {
+        "platform": platform_key,
+        "cookies": cookies,
+        "user_agent": payload.user_agent.strip(),
+        "note": payload.note.strip(),
+        "updated_at": current_timestamp(),
+        "updated_by": actor.get("username", "admin"),
+        "cookie_count": estimate_cookie_count(cookies),
+        "fingerprint": platform_cookie_fingerprint(cookies),
+        "last_test_at": str((sessions.get(platform_key) or {}).get("last_test_at") or ""),
+        "last_test_status": str((sessions.get(platform_key) or {}).get("last_test_status") or ""),
+        "last_test_message": str((sessions.get(platform_key) or {}).get("last_test_message") or ""),
+        "last_test_comment_count": int((sessions.get(platform_key) or {}).get("last_test_comment_count") or 0),
+    }
+    save_platform_sessions(sessions)
+    append_admin_audit(
+        "save_platform_session",
+        f"保存{SUPPORTED_PLATFORM_SESSIONS[platform_key]['label']}采集登录态。",
+        {"platform": platform_key, "cookie_count": sessions[platform_key]["cookie_count"]},
+    )
+    return {
+        "status": "success",
+        "session": public_platform_session_payload(platform_key, sessions[platform_key]),
+    }
+
+
+@app.delete("/api/admin/platform-sessions/{platform}")
+async def admin_delete_platform_session(platform: str) -> Dict[str, Any]:
+    """清除指定平台采集登录态。"""
+    platform_key = normalize_platform_session_key(platform)
+    sessions = load_platform_sessions()
+    sessions.pop(platform_key, None)
+    save_platform_sessions(sessions)
+    append_admin_audit(
+        "delete_platform_session",
+        f"清除{SUPPORTED_PLATFORM_SESSIONS[platform_key]['label']}采集登录态。",
+        {"platform": platform_key},
+    )
+    return {
+        "status": "success",
+        "session": public_platform_session_payload(platform_key, None),
+    }
+
+
+@app.post("/api/admin/platform-sessions/{platform}/probe")
+async def admin_probe_platform_session(platform: str, payload: PlatformSessionProbeRequest) -> Dict[str, Any]:
+    """用测试链接验证保存的采集登录态能否读到评论。"""
+    platform_key = normalize_platform_session_key(platform)
+    sessions = load_platform_sessions()
+    session = sessions.get(platform_key) or {}
+    try:
+        result = await run_platform_session_probe_async(platform_key, payload.url, payload.limit)
+        session["last_test_at"] = current_timestamp()
+        session["last_test_status"] = "success"
+        session["last_test_message"] = f"测试读取 {result['comment_count']} 条评论。"
+        session["last_test_comment_count"] = result["comment_count"]
+        sessions[platform_key] = session
+        save_platform_sessions(sessions)
+        append_admin_audit(
+            "probe_platform_session",
+            f"{SUPPORTED_PLATFORM_SESSIONS[platform_key]['label']}登录态测试成功，评论 {result['comment_count']} 条。",
+            {"platform": platform_key},
+        )
+        result["session"] = public_platform_session_payload(platform_key, session)
+        return result
+    except PipelineRuntimeError as exc:
+        if session:
+            session["last_test_at"] = current_timestamp()
+            session["last_test_status"] = "failed"
+            session["last_test_message"] = shorten_text(exc.detail, 240)
+            session["last_test_comment_count"] = 0
+            sessions[platform_key] = session
+            save_platform_sessions(sessions)
+        append_admin_audit(
+            "probe_platform_session_failed",
+            f"{SUPPORTED_PLATFORM_SESSIONS[platform_key]['label']}登录态测试失败：{shorten_text(exc.detail, 120)}",
+            {"platform": platform_key},
+        )
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
 @app.post("/api/add-product")
