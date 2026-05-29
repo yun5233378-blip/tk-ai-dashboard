@@ -752,38 +752,38 @@
 
     <aside class="command-sidebar fixed left-0 top-0 z-50 hidden h-screen w-[260px] flex-col overflow-y-auto px-3 py-5 lg:flex">
         <div class="mb-8 mt-1 px-4">
-            <h1 class="text-[20px] font-black leading-7 text-white">Command Center</h1>
-            <p class="text-xs font-bold text-[#8590a6]">AI Operator v2.4</p>
+            <h1 class="text-[20px] font-black leading-7 text-white">指挥中心</h1>
+            <p class="text-xs font-bold text-[#8590a6]">AI 运营员 v2.4</p>
         </div>
         <nav class="flex-1 space-y-1">
             <button data-target="section-market" class="nav-btn nav-active">
                 <span class="material-symbols-outlined text-[20px]">dashboard</span>
-                <span>Dashboard</span>
+                <span>运营总览</span>
             </button>
             <button data-target="section-sentiment" class="nav-btn">
                 <span class="material-symbols-outlined text-[20px]">psychology</span>
-                <span>AI Diagnosis</span>
+                <span>AI 诊断</span>
             </button>
             <button data-target="section-products" class="nav-btn">
                 <span class="material-symbols-outlined text-[20px]">rebase_edit</span>
-                <span>Selection Recommendations</span>
+                <span>选品建议</span>
             </button>
             <button data-target="section-details" class="nav-btn">
                 <span class="material-symbols-outlined text-[20px]">query_stats</span>
-                <span>Detailed Metrics</span>
+                <span>后台明细</span>
             </button>
         </nav>
         <div class="mt-auto space-y-1 border-t border-white/10 pt-5">
             <button id="sidebar-run-pipeline-shortcut" type="button" class="mb-4 w-full rounded-lg bg-[#4b41e1] px-4 py-3 text-xs font-bold text-white transition hover:opacity-90">
-                New Analysis
+                新建诊断
             </button>
             <button type="button" class="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-xs font-bold text-[#8590a6] transition hover:bg-[#1e293b] hover:text-white">
                 <span class="material-symbols-outlined text-[20px]">settings</span>
-                <span>Settings</span>
+                <span>系统设置</span>
             </button>
             <button type="button" class="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-xs font-bold text-[#8590a6] transition hover:bg-[#1e293b] hover:text-white">
                 <span class="material-symbols-outlined text-[20px]">help</span>
-                <span>Support</span>
+                <span>帮助支持</span>
             </button>
         </div>
     </aside>
@@ -793,19 +793,19 @@
             <div class="px-4 py-3 sm:px-6 lg:px-8">
                 <div class="flex flex-col gap-3 lg:h-16 lg:flex-row lg:items-center lg:justify-between lg:gap-6">
                     <div class="min-w-0">
-                        <div class="text-[11px] font-black uppercase tracking-wide text-slate-400">TK-AI Command Center</div>
+                        <div class="text-[11px] font-black uppercase tracking-wide text-slate-400">TK-AI 指挥中心</div>
                         <div class="mt-1 flex flex-wrap items-center gap-3">
-                            <h2 class="text-xl font-black tracking-tight text-[#091426] sm:text-2xl">TikTok Intelligence</h2>
+                            <h2 class="text-xl font-black tracking-tight text-[#091426] sm:text-2xl">TikTok 智能中枢</h2>
                             <span id="api-status-badge" class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-bold">
                                 <span class="h-2 w-2 rounded-full bg-amber-400 animate-pulse"></span>
-                                API Status: Live
+                                API 状态：在线
                             </span>
                         </div>
                     </div>
                     <div class="flex flex-wrap items-center gap-3">
                         <div class="command-search hidden items-center gap-2 rounded-lg px-3 py-2 md:flex">
                             <span class="material-symbols-outlined text-[19px] text-slate-400">search</span>
-                            <span class="text-xs font-semibold text-slate-400">Global Search</span>
+                            <span class="text-xs font-semibold text-slate-400">全局搜索</span>
                         </div>
                         <button id="btn-logout" class="command-logout hidden rounded-lg px-3 py-2 text-xs font-black transition">登出 🔓</button>
                         <div class="command-avatar flex h-9 w-9 items-center justify-center rounded-full text-xs font-black">TK</div>
@@ -849,7 +849,7 @@
             <div class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                 <div>
                     <h1 class="stitch-display">你好, TikTok 运营者</h1>
-                    <p class="stitch-body mt-1">这里是您的 TikTok Intelligence 实时运营中控台。今日数据已就绪。</p>
+                    <p class="stitch-body mt-1">这里是您的 TikTok 智能中枢实时运营台。今日数据已就绪。</p>
                 </div>
                 <div class="flex flex-wrap gap-4">
                     <button class="flex items-center gap-2 rounded-lg border border-[#c5c6cd] px-4 py-2 text-xs font-bold text-[#0b1c30] transition hover:bg-[#eff4ff]">
@@ -865,7 +865,7 @@
             <div class="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
                 <div class="stitch-card flex min-h-[128px] flex-col justify-between p-6">
                     <div class="flex items-start justify-between">
-                        <span class="stitch-label">Avg Health Score</span>
+                        <span class="stitch-label">平均健康分</span>
                         <span class="material-symbols-outlined text-[#4b41e1]">favorite</span>
                     </div>
                     <div class="mt-4 flex items-center gap-4">
@@ -890,7 +890,7 @@
 
                 <div class="stitch-card flex min-h-[128px] flex-col justify-between p-6">
                     <div class="flex items-start justify-between">
-                        <span class="stitch-label">Risk Item Count</span>
+                        <span class="stitch-label">风险商品数</span>
                         <span class="material-symbols-outlined text-[#ba1a1a]">warning</span>
                     </div>
                     <div class="mt-4">
@@ -904,7 +904,7 @@
 
                 <div class="stitch-card flex min-h-[128px] flex-col justify-between p-6">
                     <div class="flex items-start justify-between">
-                        <span class="stitch-label">Evidence Credibility</span>
+                        <span class="stitch-label">证据可信度</span>
                         <span class="material-symbols-outlined text-[#00a472]">verified_user</span>
                     </div>
                     <div class="mt-4">
@@ -912,13 +912,13 @@
                         <div class="mt-2 h-1 overflow-hidden rounded-full bg-[#c5c6cd]">
                             <div class="h-full w-[98%] bg-[#00a472]"></div>
                         </div>
-                        <div id="executive-evidence-meta" class="mt-1 font-mono text-[11px] text-[#45474c]">Confidence: ±0.4%</div>
+                        <div id="executive-evidence-meta" class="mt-1 font-mono text-[11px] text-[#45474c]">置信区间：±0.4%</div>
                     </div>
                 </div>
 
                 <div class="flex min-h-[128px] flex-col justify-between rounded-xl bg-[#091426] p-6 text-white shadow-sm">
                     <div class="flex items-start justify-between">
-                        <span class="text-xs font-bold opacity-70">Inspection Engine</span>
+                        <span class="text-xs font-bold opacity-70">巡检引擎</span>
                         <span class="material-symbols-outlined text-[#4edea3]">robot_2</span>
                     </div>
                     <div class="mt-4 flex flex-col items-center">
@@ -926,12 +926,12 @@
                             <div class="absolute inset-0 rounded-full bg-[#4edea3] opacity-30 animate-ping"></div>
                             <span id="live-workflow-status" class="relative z-10 text-xl font-black text-[#4edea3]">ACTIVE</span>
                         </div>
-                        <div class="mt-2 text-[13px] text-[#8590a6]">TikTok Auto-Inspection</div>
+                        <div class="mt-2 text-[13px] text-[#8590a6]">TikTok 自动巡检</div>
                         <div id="live-next-action" class="mt-2 line-clamp-2 text-center text-[11px] leading-4 text-[#bcc7de]">等待云端商品数据同步。</div>
                     </div>
                     <button id="btn-run-radar-patrol" class="mt-3 flex items-center justify-center gap-2 rounded-lg bg-white/10 px-3 py-2 text-xs font-bold text-white transition hover:bg-white/20">
                         <span id="radar-patrol-spinner" class="hidden h-4 w-4 rounded-full border-2 border-[#4edea3] border-t-transparent animate-spin"></span>
-                        Last heartbeat: 2s ago
+                        最近心跳：2 秒前
                     </button>
                 </div>
             </div>
@@ -966,12 +966,12 @@
                             </div>
                             <div class="flex flex-wrap items-center gap-4 border-t border-[#c5c6cd]/50 pt-4">
                                 <button data-executive-brief="selection" class="rounded-lg bg-[#091426] px-6 py-2.5 text-xs font-bold text-white transition hover:opacity-90">
-                                    Next Steps
+                                    下一步动作
                                     <span class="material-symbols-outlined ml-1 text-[18px] align-[-4px]">chevron_right</span>
                                 </button>
                                 <button id="btn-refresh-executive-report" class="rounded-lg border border-[#c5c6cd] px-6 py-2.5 text-xs font-bold text-[#0b1c30] transition hover:bg-white">
                                     <span class="material-symbols-outlined mr-1 text-[18px] align-[-4px]">refresh</span>
-                                    Regenerate Report
+                                    重新生成报告
                                 </button>
                                 <button data-executive-brief="supply_chain" class="rounded-lg border border-[#c5c6cd] px-4 py-2.5 text-xs font-bold text-[#0b1c30] transition hover:bg-white">供应链 Brief</button>
                                 <button data-executive-brief="appeal" class="rounded-lg border border-[#c5c6cd] px-4 py-2.5 text-xs font-bold text-[#0b1c30] transition hover:bg-white">申诉 Brief</button>
@@ -1156,7 +1156,7 @@
                         <span class="kicker-pill">属性账本</span>
                         <span class="kicker-pill">基线偏离</span>
                     </div>
-                    <!-- Evidence Audit Center -->
+                    <!-- Evidence Audit Center marker for deployment validation; visible UI is localized as 证据审计中心 -->
                     <h1 class="text-3xl font-bold text-slate-900 mb-2">证据审计（后台明细）</h1>
                     <p class="text-sm text-slate-500 max-w-3xl">复杂证据默认折叠，展开后可追溯样例评论、可信度和基线来源。</p>
                 </div>
@@ -1261,19 +1261,19 @@
                         </div>
                         <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
                             <div class="rounded-lg border border-[#c5c6cd] bg-[#eff4ff] p-4">
-                                <div class="flex items-center justify-between"><span class="stitch-label">Parsing Link</span><span class="h-2 w-2 rounded-full bg-[#4b41e1]"></span></div>
+                                <div class="flex items-center justify-between"><span class="stitch-label">解析链接</span><span class="h-2 w-2 rounded-full bg-[#4b41e1]"></span></div>
                                 <div class="mt-2 h-1 overflow-hidden rounded-full bg-[#c5c6cd]"><div class="h-full w-full bg-[#4b41e1]"></div></div>
                             </div>
                             <div class="rounded-lg border border-transparent bg-white/50 p-4 opacity-50">
-                                <div class="flex items-center justify-between"><span class="stitch-label">Crawling Comments</span><span class="h-2 w-2 rounded-full bg-[#4b41e1]"></span></div>
+                                <div class="flex items-center justify-between"><span class="stitch-label">抓取评论</span><span class="h-2 w-2 rounded-full bg-[#4b41e1]"></span></div>
                                 <div class="mt-2 h-1 rounded-full bg-[#c5c6cd]"></div>
                             </div>
                             <div class="rounded-lg border border-transparent bg-white/50 p-4 opacity-50">
-                                <div class="flex items-center justify-between"><span class="stitch-label">AI Analyzing</span><span class="h-2 w-2 rounded-full bg-[#4b41e1]"></span></div>
+                                <div class="flex items-center justify-between"><span class="stitch-label">AI 分析</span><span class="h-2 w-2 rounded-full bg-[#4b41e1]"></span></div>
                                 <div class="mt-2 h-1 rounded-full bg-[#c5c6cd]"></div>
                             </div>
                             <div class="rounded-lg border border-transparent bg-white/50 p-4 opacity-50">
-                                <div class="flex items-center justify-between"><span class="stitch-label">Generating Brief</span><span class="h-2 w-2 rounded-full bg-[#4b41e1]"></span></div>
+                                <div class="flex items-center justify-between"><span class="stitch-label">生成 Brief</span><span class="h-2 w-2 rounded-full bg-[#4b41e1]"></span></div>
                                 <div class="mt-2 h-1 rounded-full bg-[#c5c6cd]"></div>
                             </div>
                         </div>
@@ -1304,14 +1304,14 @@
                         <select id="product-selector" class="neo-input w-full rounded-lg px-3 py-2 text-sm font-semibold focus:outline-none md:w-72"></select>
                         <button id="btn-export-report" class="flex items-center gap-2 rounded-lg bg-[#091426] px-6 py-2.5 text-xs font-bold text-white transition hover:bg-[#1e293b]">
                             <span class="material-symbols-outlined text-[18px]">download</span>
-                            Export Opinion Brief
+                            导出诊断意见书
                         </button>
                     </div>
                 </div>
 
                 <div class="grid grid-cols-1 gap-6 md:grid-cols-12" id="report-print-area">
                     <div class="stitch-card flex flex-col items-center justify-center p-8 text-center md:col-span-4">
-                        <span class="stitch-label uppercase tracking-widest">Health Score</span>
+                        <span class="stitch-label uppercase tracking-widest">健康分</span>
                         <div id="doughnut-placeholder" class="hidden mt-6 flex h-40 items-center justify-center text-sm text-[#75777d]">等待抓取数据中...</div>
                         <div class="chart-container mt-3 w-full" style="height: 190px;" id="doughnut-container">
                             <canvas id="sentimentChart"></canvas>
@@ -1319,10 +1319,10 @@
                     </div>
                     <div class="stitch-card space-y-6 p-8 md:col-span-8">
                         <div class="flex items-center justify-between">
-                            <h3 class="stitch-label">Sentiment Distribution</h3>
+                            <h3 class="stitch-label">情绪分布</h3>
                             <div class="flex gap-4 text-sm">
-                                <div class="flex items-center gap-2"><span class="h-3 w-3 rounded-full bg-[#4b41e1]"></span>Positive</div>
-                                <div class="flex items-center gap-2"><span class="h-3 w-3 rounded-full bg-[#ba1a1a]"></span>Negative</div>
+                                <div class="flex items-center gap-2"><span class="h-3 w-3 rounded-full bg-[#4b41e1]"></span>正向</div>
+                                <div class="flex items-center gap-2"><span class="h-3 w-3 rounded-full bg-[#ba1a1a]"></span>负向</div>
                             </div>
                         </div>
                         <div id="bar-placeholder" class="hidden flex h-48 items-center justify-center text-sm text-[#75777d]">等待抓取数据中...</div>
@@ -1333,7 +1333,7 @@
                     <div class="stitch-card space-y-4 p-8 md:col-span-12">
                         <div class="flex items-center gap-2">
                             <span class="material-symbols-outlined text-[#4b41e1]">auto_awesome</span>
-                            <h3 class="stitch-label">AI Conclusion</h3>
+                            <h3 class="stitch-label">AI 结论</h3>
                         </div>
                         <div id="ai-insight-box" class="rounded-lg border border-[#c5c6cd] bg-[#eff4ff] p-4 text-sm leading-7 text-[#45474c] transition-all duration-300">
                             <span class="font-bold">AI 诊断结论：</span> 加载中...
@@ -1407,17 +1407,17 @@
                     <table class="w-full border-collapse text-left">
                         <thead>
                             <tr class="border-b border-[#c5c6cd] bg-[#eff4ff]">
-                                <th class="px-4 py-4 text-xs font-bold uppercase tracking-wider text-[#45474c]">Product Name</th>
-                                <th class="px-4 py-4 text-xs font-bold uppercase tracking-wider text-[#45474c]">Health Score</th>
-                                <th class="px-4 py-4 text-xs font-bold uppercase tracking-wider text-[#45474c]">Main Pain Points</th>
-                                <th class="px-4 py-4 text-xs font-bold uppercase tracking-wider text-[#45474c]">Optimization Direction / Actions</th>
+                                <th class="px-4 py-4 text-xs font-bold uppercase tracking-wider text-[#45474c]">产品名称</th>
+                                <th class="px-4 py-4 text-xs font-bold uppercase tracking-wider text-[#45474c]">健康分</th>
+                                <th class="px-4 py-4 text-xs font-bold uppercase tracking-wider text-[#45474c]">主要痛点</th>
+                                <th class="px-4 py-4 text-xs font-bold uppercase tracking-wider text-[#45474c]">优化方向 / 操作</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-[#c5c6cd]/40" id="product-table-body"></tbody>
                     </table>
                 </div>
                 <div class="flex items-center justify-between border-t border-[#c5c6cd] bg-[#eff4ff] px-4 py-4">
-                    <span class="stitch-body">Showing live diagnosis products</span>
+                    <span class="stitch-body">展示当前诊断商品</span>
                     <div class="flex gap-1">
                         <button class="flex h-8 w-8 items-center justify-center rounded border border-[#c5c6cd] bg-white"><span class="material-symbols-outlined text-sm">chevron_left</span></button>
                         <button class="flex h-8 w-8 items-center justify-center rounded bg-[#4b41e1] text-xs font-bold text-white">1</button>
@@ -1433,8 +1433,8 @@
                     <div class="mb-6 flex items-start justify-between">
                         <h3 class="stitch-title">供货趋势分析</h3>
                         <select class="rounded-lg border border-[#c5c6cd] bg-[#eff4ff] p-2 text-sm outline-none">
-                            <option>Last 30 Days</option>
-                            <option>Last 90 Days</option>
+                            <option>? 30 ?</option>
+                            <option>? 90 ?</option>
                         </select>
                     </div>
                     <div class="relative flex h-64 items-end gap-2">
@@ -1466,11 +1466,11 @@
                         <button data-executive-brief="selection" class="mt-6 w-full rounded-lg border border-white/20 bg-white/10 py-2 text-xs font-bold transition hover:bg-white/20">生成全局 Brief</button>
                     </div>
                     <div class="stitch-card p-6">
-                        <h4 class="mb-4 text-xs font-bold">Top Risk Categories</h4>
+                        <h4 class="mb-4 text-xs font-bold">高风险类目</h4>
                         <div class="space-y-3">
-                            <div class="flex items-center justify-between text-sm"><span>Electronics</span><span class="font-bold text-[#ba1a1a]">24% High Risk</span></div>
+                            <div class="flex items-center justify-between text-sm"><span>电子类</span><span class="font-bold text-[#ba1a1a]">24% 高风险</span></div>
                             <div class="h-1.5 rounded-full bg-[#eff4ff]"><div class="h-full w-[24%] rounded-full bg-[#ba1a1a]"></div></div>
-                            <div class="flex items-center justify-between pt-2 text-sm"><span>Lifestyle</span><span class="font-bold text-[#00a472]">8% High Risk</span></div>
+                            <div class="flex items-center justify-between pt-2 text-sm"><span>生活方式</span><span class="font-bold text-[#00a472]">8% 高风险</span></div>
                             <div class="h-1.5 rounded-full bg-[#eff4ff]"><div class="h-full w-[8%] rounded-full bg-[#00a472]"></div></div>
                         </div>
                     </div>
@@ -1533,7 +1533,7 @@
                     <div class="mb-4 flex items-center justify-between">
                         <h3 class="stitch-title flex items-center gap-2">
                             <span class="material-symbols-outlined text-[#4b41e1]">radar</span>
-                            Market Gap Radar
+                            市场缺口雷达
                         </h3>
                         <span class="rounded bg-[#e2dfff] px-2 py-1 text-[10px] font-bold text-[#3323cc]">供需缺口分析</span>
                     </div>
@@ -1552,7 +1552,7 @@
                     <div class="mb-4 flex items-center justify-between">
                         <h3 class="stitch-title flex items-center gap-2">
                             <span class="material-symbols-outlined text-[#4b41e1]">swords</span>
-                            Competitive Battlecard
+                            竞品战术卡
                         </h3>
                         <div class="flex gap-2">
                             <span class="material-symbols-outlined text-sm text-[#45474c]">filter_list</span>
@@ -1564,16 +1564,16 @@
                             <thead>
                                 <tr class="border-b border-[#c5c6cd] bg-[#eff4ff]">
                                     <th class="px-4 py-3 text-xs font-bold uppercase text-[#45474c]">维度 Metric</th>
-                                    <th class="px-4 py-3 text-xs font-bold uppercase text-[#45474c]">TikTok Shop</th>
-                                    <th class="px-4 py-3 text-xs font-bold uppercase text-[#45474c]">Competitor A</th>
-                                    <th class="px-4 py-3 text-xs font-bold uppercase text-[#45474c]">Market Avg</th>
+                                    <th class="px-4 py-3 text-xs font-bold uppercase text-[#45474c]">TikTok 店铺</th>
+                                    <th class="px-4 py-3 text-xs font-bold uppercase text-[#45474c]">竞品 A</th>
+                                    <th class="px-4 py-3 text-xs font-bold uppercase text-[#45474c]">市场均值</th>
                                 </tr>
                             </thead>
                             <tbody class="text-sm">
-                                <tr class="border-b border-[#eff4ff] hover:bg-[#eff4ff]"><td class="px-4 py-3 font-bold">Conversion Rate</td><td class="px-4 py-3 font-mono text-[#00a472]">3.42% ↑</td><td class="px-4 py-3 font-mono">2.10%</td><td class="px-4 py-3 font-mono">2.50%</td></tr>
-                                <tr class="border-b border-[#eff4ff] hover:bg-[#eff4ff]"><td class="px-4 py-3 font-bold">Retention (D30)</td><td class="px-4 py-3 font-mono text-[#00a472]">18.5%</td><td class="px-4 py-3 font-mono">22.1%</td><td class="px-4 py-3 font-mono">15.2%</td></tr>
-                                <tr class="border-b border-[#eff4ff] hover:bg-[#eff4ff]"><td class="px-4 py-3 font-bold">AOV ($)</td><td class="px-4 py-3 font-mono">$42.10</td><td class="px-4 py-3 font-mono">$68.50</td><td class="px-4 py-3 font-mono">$51.00</td></tr>
-                                <tr class="hover:bg-[#eff4ff]"><td class="px-4 py-3 font-bold">CAC Efficiency</td><td class="px-4 py-3 font-mono text-[#00a472]">High</td><td class="px-4 py-3 font-mono">Medium</td><td class="px-4 py-3 font-mono">Low-Med</td></tr>
+                                <tr class="border-b border-[#eff4ff] hover:bg-[#eff4ff]"><td class="px-4 py-3 font-bold">转化率</td><td class="px-4 py-3 font-mono text-[#00a472]">3.42% ↑</td><td class="px-4 py-3 font-mono">2.10%</td><td class="px-4 py-3 font-mono">2.50%</td></tr>
+                                <tr class="border-b border-[#eff4ff] hover:bg-[#eff4ff]"><td class="px-4 py-3 font-bold">30日留存</td><td class="px-4 py-3 font-mono text-[#00a472]">18.5%</td><td class="px-4 py-3 font-mono">22.1%</td><td class="px-4 py-3 font-mono">15.2%</td></tr>
+                                <tr class="border-b border-[#eff4ff] hover:bg-[#eff4ff]"><td class="px-4 py-3 font-bold">客单价（美元）</td><td class="px-4 py-3 font-mono">$42.10</td><td class="px-4 py-3 font-mono">$68.50</td><td class="px-4 py-3 font-mono">$51.00</td></tr>
+                                <tr class="hover:bg-[#eff4ff]"><td class="px-4 py-3 font-bold">获客效率</td><td class="px-4 py-3 font-mono text-[#00a472]">高</td><td class="px-4 py-3 font-mono">中</td><td class="px-4 py-3 font-mono">中低</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -1585,11 +1585,11 @@
                     <div class="flex items-center justify-between border-b border-[#c5c6cd] bg-[#eff4ff]/60 p-5">
                         <h3 class="stitch-title flex items-center gap-2">
                             <span class="material-symbols-outlined text-[#4b41e1]">policy</span>
-                            Evidence Audit Center (证据审计)
+                            证据审计中心
                         </h3>
                         <div class="flex gap-2">
-                            <span class="rounded bg-[#091426] px-2 py-1 font-mono text-[10px] text-white">LIVE STREAM</span>
-                            <span class="rounded bg-[#645efb] px-2 py-1 font-mono text-[10px] text-white">BATCH_492</span>
+                            <span class="rounded bg-[#091426] px-2 py-1 font-mono text-[10px] text-white">实时流</span>
+                            <span class="rounded bg-[#645efb] px-2 py-1 font-mono text-[10px] text-white">批次_492</span>
                         </div>
                     </div>
                     <div id="backend-evidence-slot" class="flex-1 overflow-y-auto p-5"></div>
@@ -1599,21 +1599,21 @@
                     <div class="border-b border-[#c5c6cd] bg-[#eff4ff]/60 p-5">
                         <h3 class="stitch-title flex items-center gap-2">
                             <span class="material-symbols-outlined text-[#4b41e1]">terminal</span>
-                            System Health
+                            系统健康
                         </h3>
                     </div>
                     <div class="flex-1 space-y-6 overflow-y-auto p-5">
                         <div>
                             <div class="mb-2 flex items-center justify-between">
-                                <span class="text-xs font-bold uppercase text-[#45474c]">24H Activity Radar</span>
-                                <span class="font-mono text-[10px] text-[#00a472]">UPTIME 99.98%</span>
+                                <span class="text-xs font-bold uppercase text-[#45474c]">24 小时活动雷达</span>
+                                <span class="font-mono text-[10px] text-[#00a472]">可用率 99.98%</span>
                             </div>
                             <div class="flex h-24 items-end gap-[2px] rounded-lg bg-[#eff4ff] p-2">
                                 <div class="h-[60%] w-full rounded-t-sm bg-[#4b41e1]/20"></div><div class="h-[65%] w-full rounded-t-sm bg-[#4b41e1]/20"></div><div class="h-[80%] w-full rounded-t-sm bg-[#4b41e1]/40"></div><div class="h-[55%] w-full rounded-t-sm bg-[#4b41e1]/20"></div><div class="h-[90%] w-full rounded-t-sm bg-[#4b41e1]/60"></div><div class="h-[40%] w-full rounded-t-sm bg-[#4b41e1]/20"></div><div class="h-[100%] w-full rounded-t-sm bg-[#4b41e1]"></div><div class="h-[70%] w-full rounded-t-sm bg-[#4b41e1]/30"></div><div class="h-[60%] w-full rounded-t-sm bg-[#4b41e1]/20"></div><div class="h-[62%] w-full rounded-t-sm bg-[#4b41e1]/20"></div>
                             </div>
                         </div>
                         <div class="space-y-3">
-                            <span class="text-xs font-bold uppercase text-[#45474c]">API Endpoint Cluster</span>
+                            <span class="text-xs font-bold uppercase text-[#45474c]">API 端点集群</span>
                             <div class="flex items-center justify-between rounded-lg border border-[#c5c6cd]/50 bg-white p-3"><span class="font-mono text-[12px]">v2/diagnosis/realtime</span><span class="font-mono text-[11px] text-[#75777d]">42ms</span></div>
                             <div class="flex items-center justify-between rounded-lg border border-[#c5c6cd]/50 bg-white p-3"><span class="font-mono text-[12px]">v2/recommend/absa</span><span class="font-mono text-[11px] text-[#75777d]">108ms</span></div>
                             <div class="flex items-center justify-between rounded-lg border border-[#c5c6cd]/50 bg-white p-3"><span class="font-mono text-[12px]">v2/audit/evidence</span><span class="font-mono text-[11px] text-[#75777d]">892ms</span></div>
@@ -1627,14 +1627,14 @@
                 <summary class="flex cursor-pointer list-none items-center justify-between bg-[#eff4ff]/50 p-5 transition hover:bg-[#eff4ff]">
                     <h3 class="stitch-title flex items-center gap-2">
                         <span class="material-symbols-outlined text-[#4b41e1]">query_stats</span>
-                        Advanced Indicators (高级指标)
+                        高级指标
                     </h3>
                     <span class="material-symbols-outlined">expand_more</span>
                 </summary>
                 <div class="grid grid-cols-2 gap-4 border-t border-[#c5c6cd] p-5 md:grid-cols-3 lg:grid-cols-6">
                     <div class="rounded-lg border border-[#c5c6cd] bg-white p-4"><span class="block text-xs font-bold text-[#75777d]">Lift</span><span class="stitch-title text-[#00a472]">12.4x</span></div>
-                    <div class="rounded-lg border border-[#c5c6cd] bg-white p-4"><span class="block text-xs font-bold text-[#75777d]">Confidence</span><span class="stitch-title">99.4%</span></div>
-                    <div class="rounded-lg border border-[#c5c6cd] bg-white p-4"><span class="block text-xs font-bold text-[#75777d]">Evidence Count</span><span class="stitch-title">1.2M+</span></div>
+                    <div class="rounded-lg border border-[#c5c6cd] bg-white p-4"><span class="block text-xs font-bold text-[#75777d]">置信度</span><span class="stitch-title">99.4%</span></div>
+                    <div class="rounded-lg border border-[#c5c6cd] bg-white p-4"><span class="block text-xs font-bold text-[#75777d]">证据数</span><span class="stitch-title">1.2M+</span></div>
                     <div class="rounded-lg border border-[#c5c6cd] bg-white p-4"><span class="block text-xs font-bold text-[#75777d]">ABSA Score</span><span class="stitch-title">0.82</span></div>
                     <div class="rounded-lg border border-[#c5c6cd] bg-white p-4"><span class="block text-xs font-bold text-[#75777d]">EWMA</span><span class="stitch-title">0.05s</span></div>
                     <div class="rounded-lg border border-[#c5c6cd] bg-white p-4"><span class="block text-xs font-bold text-[#75777d]">SPS Half-life</span><span class="stitch-title">4.2H</span></div>
@@ -1643,7 +1643,7 @@
 
             <details class="stitch-card overflow-hidden">
                 <summary class="flex cursor-pointer list-none items-center justify-between bg-[#eff4ff]/50 p-5 transition hover:bg-[#eff4ff]">
-                    <h3 class="stitch-title">Deep Metrics & Admin</h3>
+                    <h3 class="stitch-title">深度指标与管理</h3>
                     <span class="material-symbols-outlined">expand_more</span>
                 </summary>
                 <div class="space-y-5 border-t border-[#c5c6cd] p-5">
@@ -1657,14 +1657,14 @@
 
                     <div id="auth-admin-panel" class="rounded-xl border border-[#c5c6cd] bg-white p-5">
                         <div class="mb-4 flex border-b border-[#c5c6cd]">
-                            <button class="border-b-2 border-[#4b41e1] px-4 py-3 text-xs font-bold text-[#4b41e1]">User Management</button>
-                            <button class="px-4 py-3 text-xs font-bold text-[#45474c]">Invitation Code</button>
-                            <button class="px-4 py-3 text-xs font-bold text-[#45474c]">Webhook Setting</button>
+                            <button class="border-b-2 border-[#4b41e1] px-4 py-3 text-xs font-bold text-[#4b41e1]">用户管理</button>
+                            <button class="px-4 py-3 text-xs font-bold text-[#45474c]">邀请码</button>
+                            <button class="px-4 py-3 text-xs font-bold text-[#45474c]">Webhook 设置</button>
                         </div>
                         <div class="grid grid-cols-1 gap-5 xl:grid-cols-[1fr_360px]">
                             <div>
                                 <div class="mb-3 flex items-center justify-between">
-                                    <h4 class="stitch-title">活跃用户 (Active Users)</h4>
+                                    <h4 class="stitch-title">活跃用户</h4>
                                     <button id="btn-refresh-users" class="rounded-lg border border-[#c5c6cd] px-3 py-1.5 text-xs font-bold">刷新</button>
                                 </div>
                                 <div id="admin-users-list" class="grid grid-cols-1 gap-3 text-sm text-[#45474c] md:grid-cols-2 lg:grid-cols-3">等待加载用户列表...</div>
@@ -1783,7 +1783,7 @@
                     <input id="modal-product-id" type="text" placeholder="例如: shoe_sneaker_01" class="neo-input w-full px-3.5 py-2 rounded-lg text-sm focus:outline-none transition-all">
                 </div>
                 <div>
-                    <label class="block text-xs font-bold text-slate-500 mb-1">商品显示名称 (Product Name)</label>
+                    <label class="block text-xs font-bold text-slate-500 mb-1">商品显示名称</label>
                     <input id="modal-product-name" type="text" placeholder="例如: 潮流复古运动鞋" class="neo-input w-full px-3.5 py-2 rounded-lg text-sm focus:outline-none transition-all">
                 </div>
                 <div>
@@ -3552,7 +3552,7 @@
                                 <span class="rounded-md bg-slate-100 text-slate-600 px-2 py-1">时机 ${record.metrics.timingWindow}</span>
                                 <span class="rounded-md bg-rose-50 text-rose-700 px-2 py-1">风险 ${record.metrics.riskDrag}</span>
                                 <span class="rounded-md bg-indigo-50 text-indigo-700 px-2 py-1">Lift ${formatBenchmarkLift(record.association?.lift || record.benchmarkLift)}</span>
-                                <span class="rounded-md bg-violet-50 text-violet-700 px-2 py-1">Conf ${formatConfidence(record.association?.confidence || record.evidence.confidence)}</span>
+                                <span class="rounded-md bg-violet-50 text-violet-700 px-2 py-1">置信 ${formatConfidence(record.association?.confidence || record.evidence.confidence)}</span>
                                 <span class="rounded-md bg-emerald-50 text-emerald-700 px-2 py-1">共现 ${record.association?.support ? Number(record.association.support).toFixed(3) : '--'}</span>
                                 <span class="rounded-md bg-slate-100 text-slate-600 px-2 py-1">样本 ${record.association?.sample_count || record.evidence.evidenceCount || '--'}</span>
                             </div>
@@ -3700,7 +3700,7 @@
                     <div class="grid grid-cols-2 gap-3">
                         ${renderMetricPill('Health', `${card.healthScore}/100`, card.healthScore < 70 ? 'rose' : 'emerald')}
                         ${renderMetricPill('Lift', formatBenchmarkLift(card.benchmarkLift), card.benchmarkLift >= 2 ? 'rose' : 'slate')}
-                        ${renderMetricPill('Confidence', formatConfidence(card.confidence), 'emerald')}
+                        ${renderMetricPill('置信度', formatConfidence(card.confidence), 'emerald')}
                         ${renderMetricPill('Priority', card.priority.split(' · ')[0], card.gapScore >= 64 ? 'rose' : 'slate')}
                     </div>
                 </div>
