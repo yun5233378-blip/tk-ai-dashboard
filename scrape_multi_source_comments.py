@@ -68,14 +68,38 @@ PLATFORM_COOKIE_DOMAINS = {
 
 LAST_CRAWL_CONTEXT: Dict[str, Any] = {}
 
+SHARE_URL_PATTERN = re.compile(r"https?://[A-Za-z0-9\-._~:/?#@!$&()*+,;=%]+", re.I)
+TRAILING_URL_PUNCTUATION = "，。！？；：、,.!?;:)）】]》>\"'"
+
+
+def extract_first_url(value: str) -> str:
+    """Extract the first real URL from a copied platform share sentence."""
+    text = str(value or "").strip()
+    match = SHARE_URL_PATTERN.search(text)
+    if not match:
+        return text
+    return match.group(0).strip().rstrip(TRAILING_URL_PUNCTUATION)
+
+
+def normalize_crawl_source(value: str) -> str:
+    """Keep manual imports intact, otherwise use the extracted URL."""
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    extracted = extract_first_url(text)
+    if extracted != text:
+        return extracted
+    return text
+
 
 def detect_platform(source: str) -> str:
-    value = (source or "").strip().lower()
-    if value.startswith("comments://") or "\n" in source:
+    normalized_source = normalize_crawl_source(source)
+    value = normalized_source.lower()
+    if value.startswith("comments://") or "\n" in normalized_source:
         return "manual"
     parsed = urlparse(value)
     host = parsed.hostname or ""
-    if not host and Path(source).exists():
+    if not host and Path(normalized_source).exists():
         return "manual"
     for platform, hosts in PLATFORM_HINTS.items():
         if any(item in host for item in hosts):
@@ -163,6 +187,7 @@ def extract_public_text_candidates(html: str) -> List[str]:
 
 
 def fetch_public_page(source: str) -> str:
+    source = normalize_crawl_source(source)
     if requests is None:
         raise RuntimeError("requests is not installed")
     response = requests.get(
@@ -176,6 +201,9 @@ def fetch_public_page(source: str) -> str:
 
 
 def build_public_page_comments(source: str, platform: str, limit: int) -> List[Dict[str, Any]]:
+    source = normalize_crawl_source(source)
+    if not source.startswith(("http://", "https://")):
+        return []
     html = fetch_public_page(source)
     candidates = extract_public_text_candidates(html)
     comments = [make_comment(value, platform, idx + 1, source) for idx, value in enumerate(candidates)]
@@ -358,6 +386,7 @@ def collect_visible_text_candidates(page: Any, limit: int) -> List[str]:
 
 def build_browser_visible_comments(source: str, platform: str, limit: int) -> List[Dict[str, Any]]:
     global LAST_CRAWL_CONTEXT
+    source = normalize_crawl_source(source)
     try:
         from playwright.sync_api import sync_playwright
     except Exception as exc:
@@ -513,6 +542,7 @@ def platform_guidance(platform: str, has_session: bool = False) -> str:
 
 
 def collect_comments(source: str, limit: int) -> tuple[str, List[Dict[str, Any]]]:
+    source = normalize_crawl_source(source)
     platform = detect_platform(source)
     if platform == "manual":
         comments = read_manual_comments(source, platform, limit)
@@ -540,6 +570,7 @@ def collect_comments(source: str, limit: int) -> tuple[str, List[Dict[str, Any]]
 
 
 def write_comments(path: Path, platform: str, source: str, comments: List[Dict[str, Any]]) -> None:
+    source = normalize_crawl_source(source)
     collection_method = str(comments[0].get("collection_method") or "public_page_or_manual_import") if comments else "public_page_or_manual_import"
     payload = {
         "schema": "tk_multi_source_comments_v1",

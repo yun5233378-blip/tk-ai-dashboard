@@ -882,7 +882,7 @@
                     <span class="kicker-pill">链接直抓</span>
                 </div>
                 <div class="flex flex-col md:flex-row gap-3">
-                    <input id="pipeline-url" type="text" placeholder="粘贴商品视频 / 笔记链接，系统会直接抓取评论并诊断..." class="neo-input flex-grow px-4 py-2.5 rounded-lg text-sm focus:outline-none transition-all">
+                    <input id="pipeline-url" type="text" placeholder="粘贴商品视频 / 笔记链接，或整段抖音分享口令..." class="neo-input flex-grow px-4 py-2.5 rounded-lg text-sm focus:outline-none transition-all">
                     <button id="btn-run-pipeline" class="primary-action px-6 py-2.5 rounded-lg text-sm font-medium flex items-center justify-center gap-2">
                         <span id="spinner" class="hidden w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
                         抓取评论并诊断
@@ -1195,7 +1195,7 @@
                                     </select>
                                     <input id="platform-session-user-agent" class="neo-input w-full px-3 py-2 rounded-lg text-sm" placeholder="可选：浏览器 User-Agent">
                                     <input id="platform-session-note" class="neo-input w-full px-3 py-2 rounded-lg text-sm" placeholder="备注，如：运营号 A / 今日更新">
-                                    <input id="platform-session-probe-url" class="neo-input w-full px-3 py-2 rounded-lg text-sm" placeholder="测试链接，可填抖音视频或小红书笔记">
+                                    <input id="platform-session-probe-url" class="neo-input w-full px-3 py-2 rounded-lg text-sm" placeholder="测试链接，可填整段抖音 / 小红书分享口令">
                                     <div class="flex flex-wrap gap-2">
                                         <button id="btn-copy-platform-helper-command" class="primary-action px-4 py-2 rounded-lg text-xs font-bold">复制登录助手命令</button>
                                         <button id="btn-save-platform-session" class="primary-action px-4 py-2 rounded-lg text-xs font-bold">保存</button>
@@ -1594,6 +1594,19 @@
             }
 
             return response;
+        }
+
+        function extractFirstUrl(value) {
+            const text = String(value || '').trim();
+            const match = text.match(/https?:\/\/[A-Za-z0-9\-._~:/?#@!$&()*+,;=%]+/i);
+            if (!match) return text;
+            return match[0].replace(/[，。！？；：、,.!?;:)）\]】》>"']+$/g, '');
+        }
+
+        function normalizeCrawlInput(value) {
+            const text = String(value || '').trim();
+            if (!text || text.startsWith('comments://')) return text;
+            return extractFirstUrl(text);
         }
 
         const productSelector = document.getElementById('product-selector');
@@ -4769,10 +4782,15 @@
 
         async function runCrawlerPreflight() {
             if (!isAdminSession()) return;
-            const url = platformSessionProbeUrl.value.trim();
+            const rawUrl = platformSessionProbeUrl.value.trim();
+            const url = normalizeCrawlInput(rawUrl);
             if (!url) {
                 showToast('请先填写要预检的抖音或小红书链接。', 'error');
                 return;
+            }
+            if (rawUrl !== url && /^https?:\/\//i.test(url)) {
+                platformSessionProbeUrl.value = url;
+                showToast('已从分享口令中提取平台链接。', 'info');
             }
             btnCrawlerPreflight.disabled = true;
             platformSessionMeta.innerText = '正在分析采集策略与访问阻力边界...';
@@ -4855,10 +4873,15 @@
         async function probePlatformSession() {
             if (!isAdminSession()) return;
             const platform = platformSessionSelect.value;
-            const url = platformSessionProbeUrl.value.trim();
+            const rawUrl = platformSessionProbeUrl.value.trim();
+            const url = normalizeCrawlInput(rawUrl);
             if (!url) {
                 showToast('请先填写用于测试的抖音或小红书链接。', 'error');
                 return;
+            }
+            if (rawUrl !== url && /^https?:\/\//i.test(url)) {
+                platformSessionProbeUrl.value = url;
+                showToast('已从分享口令中提取平台链接。', 'info');
             }
             btnProbePlatformSession.disabled = true;
             platformSessionMeta.innerText = '正在用服务器登录态测试评论读取...';
@@ -5122,10 +5145,15 @@
                 return;
             }
 
-            const url = pipelineUrl.value.trim();
+            const rawUrl = pipelineUrl.value.trim();
+            const url = normalizeCrawlInput(rawUrl);
             if (!url) {
                 showToast('请粘贴商品视频或笔记链接后再启动抓取。', 'error');
                 return;
+            }
+            if (rawUrl !== url && /^https?:\/\//i.test(url)) {
+                pipelineUrl.value = url;
+                showToast('已从分享口令中提取视频链接。', 'info');
             }
 
             const selectedKey = productSelector.value;

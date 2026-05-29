@@ -23,6 +23,18 @@ from urllib.parse import urlparse
 BASE_DIR = Path(__file__).resolve().parent
 ARTIFACT_ROOT = BASE_DIR / "artifacts" / "crawler_runs"
 
+SHARE_URL_PATTERN = re.compile(r"https?://[A-Za-z0-9\-._~:/?#@!$&()*+,;=%]+", re.I)
+TRAILING_URL_PUNCTUATION = "，。！？；：、,.!?;:)）】]》>\"'"
+
+
+def extract_first_url(value: str) -> str:
+    """Extract the first real URL from a copied platform share sentence."""
+    text = str(value or "").strip()
+    match = SHARE_URL_PATTERN.search(text)
+    if not match:
+        return text
+    return match.group(0).strip().rstrip(TRAILING_URL_PUNCTUATION)
+
 
 @dataclass(frozen=True)
 class BrowserPreset:
@@ -116,7 +128,7 @@ PRESETS: Dict[str, BrowserPreset] = {
 
 
 def detect_platform_family(url: str) -> str:
-    host = (urlparse(url.strip()).hostname or "").lower()
+    host = (urlparse(extract_first_url(url)).hostname or "").lower()
     if any(domain in host for domain in PRESETS["douyin"].allowed_domains):
         return "douyin"
     if any(domain in host for domain in PRESETS["xiaohongshu"].allowed_domains):

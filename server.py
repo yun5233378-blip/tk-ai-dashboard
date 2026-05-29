@@ -3914,6 +3914,30 @@ def get_log_slice(after: int = 0) -> Dict[str, Any]:
 # URL 识别与通道分流
 # =========================
 
+SHARE_URL_PATTERN = re.compile(r"https?://[A-Za-z0-9\-._~:/?#@!$&()*+,;=%]+", re.I)
+TRAILING_URL_PUNCTUATION = "，。！？；：、,.!?;:)）】]》>\"'"
+
+
+def extract_first_url(value: str) -> str:
+    """Extract the first real URL from a copied platform share sentence."""
+    text = str(value or "").strip()
+    match = SHARE_URL_PATTERN.search(text)
+    if not match:
+        return text
+    return match.group(0).strip().rstrip(TRAILING_URL_PUNCTUATION)
+
+
+def normalize_crawl_source(value: str) -> str:
+    """Keep manual imports intact, otherwise route by the extracted URL."""
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    extracted = extract_first_url(text)
+    if extracted != text:
+        return extracted
+    return text
+
+
 def detect_channel(url: str) -> ChannelConfig:
     """
     根据 URL 自动选择采集通道。
@@ -3926,7 +3950,7 @@ def detect_channel(url: str) -> ChannelConfig:
     - comments:// 或多行文本 -> 手动评论导入
     - 其他公开网页 -> 公共网页文本信号适配器
     """
-    normalized_url = url.strip()
+    normalized_url = normalize_crawl_source(url)
     lower_url = normalized_url.lower()
     parsed = urlparse(normalized_url)
     hostname = (parsed.hostname or "").lower()
@@ -3953,7 +3977,7 @@ def detect_channel(url: str) -> ChannelConfig:
 
 def build_auto_product_id(source_type: str, url: str) -> str:
     """为未显式选择商品的诊断任务生成稳定动态 ID，避免落回固定类目。"""
-    digest = hashlib.sha1(url.strip().encode("utf-8")).hexdigest()[:10]
+    digest = hashlib.sha1(normalize_crawl_source(url).encode("utf-8")).hexdigest()[:10]
     return f"{source_type}_auto_{digest}"
 
 
@@ -4417,9 +4441,12 @@ def merge_report_into_products(
 
 def run_pipeline_sync(payload: PipelineRequest) -> Dict[str, Any]:
     """同步执行完整流水线：识别 URL -> 爬虫 -> AI 诊断 -> 合并前端数据。"""
-    url = payload.url.strip()
+    raw_url = payload.url.strip()
+    url = normalize_crawl_source(raw_url)
     if not url:
         raise PipelineRuntimeError(400, "URL 不能为空。")
+    if raw_url != url:
+        append_log(f"已从分享文案中提取链接：{url}")
 
     base_channel = detect_channel(url)
     channel = resolve_runtime_channel(payload, base_channel)
@@ -4485,6 +4512,7 @@ async def run_platform_session_probe_async(
 ) -> Dict[str, Any]:
     """Use the stored platform login state to test whether comments are readable."""
     platform_key = normalize_platform_session_key(platform)
+    url = normalize_crawl_source(url)
     base_channel = detect_channel(url)
     if base_channel.source_type != platform_key:
         raise PipelineRuntimeError(400, "测试链接与所选平台不匹配。")
@@ -4496,7 +4524,7 @@ async def run_platform_session_probe_async(
     command = [
         sys.executable,
         str(SCRAPE_MULTI_SOURCE_SCRIPT),
-        url.strip(),
+        url,
         "--limit",
         str(limit),
         "--output",
@@ -4660,9 +4688,12 @@ async def run_manual_comments_pipeline_async(payload: ManualCommentsPipelineRequ
 
 async def run_pipeline_async(payload: PipelineRequest) -> Dict[str, Any]:
     """异步执行完整流水线：识别 URL -> 爬虫 -> AI 诊断 -> 合并前端数据。"""
-    url = payload.url.strip()
+    raw_url = payload.url.strip()
+    url = normalize_crawl_source(raw_url)
     if not url:
         raise PipelineRuntimeError(400, "URL 不能为空。")
+    if raw_url != url:
+        append_log(f"已从分享文案中提取链接：{url}")
 
     base_channel = detect_channel(url)
     channel = resolve_runtime_channel(payload, base_channel)
@@ -5667,11 +5698,12 @@ async def admin_crawler_preflight(payload: CrawlerPreflightRequest) -> Dict[str,
     """返回 SuperSpider-inspired 采集策略、登录态覆盖和停止条件。"""
     if select_crawler_strategy is None or get_crawler_preset is None:
         raise HTTPException(status_code=500, detail="采集策略引擎未加载。")
-    base_channel = detect_channel(payload.url)
+    url = normalize_crawl_source(payload.url)
+    base_channel = detect_channel(url)
     platform = base_channel.source_type
     sessions = load_platform_sessions()
     has_session = platform in SUPPORTED_PLATFORM_SESSIONS and bool((sessions.get(platform) or {}).get("cookies"))
-    strategy = select_crawler_strategy(payload.url, has_session)
+    strategy = select_crawler_strategy(url, has_session)
     preset = get_crawler_preset(platform).to_dict()
     append_admin_audit(
         "crawler_preflight",
@@ -5681,6 +5713,7 @@ async def admin_crawler_preflight(payload: CrawlerPreflightRequest) -> Dict[str,
     return {
         "status": "success",
         "platform": platform,
+        "normalized_url": url,
         "has_platform_session": has_session,
         "strategy": strategy,
         "preset": preset,
