@@ -701,6 +701,14 @@
         .performance-lite .animate-pulse {
             animation-duration: 2.4s !important;
         }
+        .disabled-action {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+        .disabled-action:hover {
+            background: inherit !important;
+            opacity: 0.45;
+        }
         @media (prefers-reduced-motion: reduce) {
             *, *::before, *::after {
                 animation-duration: 0.01ms !important;
@@ -776,10 +784,10 @@
                 <div class="mt-8 border-t border-[#c5c6cd] pt-6 text-center">
                     <p class="mb-4 text-[13px] leading-[18px] text-[#45474c]">其他登录方式</p>
                     <div class="flex justify-center gap-4">
-                        <button type="button" class="flex h-10 w-10 items-center justify-center rounded-lg border border-[#c5c6cd] text-[#091426] transition hover:bg-[#eff4ff]">
+                        <button type="button" disabled title="当前仅开放账号密码登录" class="disabled-action flex h-10 w-10 items-center justify-center rounded-lg border border-[#c5c6cd] text-[#091426] transition hover:bg-[#eff4ff]">
                             <span class="material-symbols-outlined text-[19px]">chat</span>
                         </button>
-                        <button type="button" class="flex h-10 w-10 items-center justify-center rounded-lg border border-[#c5c6cd] text-[#091426] transition hover:bg-[#eff4ff]">
+                        <button type="button" disabled title="当前仅开放账号密码登录" class="disabled-action flex h-10 w-10 items-center justify-center rounded-lg border border-[#c5c6cd] text-[#091426] transition hover:bg-[#eff4ff]">
                             <span class="material-symbols-outlined text-[19px]">account_circle</span>
                         </button>
                     </div>
@@ -826,11 +834,11 @@
             <button id="sidebar-run-pipeline-shortcut" type="button" class="mb-4 w-full rounded-lg bg-[#4b41e1] px-4 py-3 text-xs font-bold text-white transition hover:opacity-90">
                 新建诊断
             </button>
-            <button type="button" class="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-xs font-bold text-[#8590a6] transition hover:bg-[#1e293b] hover:text-white">
+            <button id="sidebar-system-settings" type="button" class="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-xs font-bold text-[#8590a6] transition hover:bg-[#1e293b] hover:text-white">
                 <span class="material-symbols-outlined text-[20px]">settings</span>
                 <span>系统设置</span>
             </button>
-            <button type="button" class="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-xs font-bold text-[#8590a6] transition hover:bg-[#1e293b] hover:text-white">
+            <button id="sidebar-help-support" type="button" class="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-xs font-bold text-[#8590a6] transition hover:bg-[#1e293b] hover:text-white">
                 <span class="material-symbols-outlined text-[20px]">help</span>
                 <span>帮助支持</span>
             </button>
@@ -901,7 +909,7 @@
                     <p class="stitch-body mt-1">这里是您的 TikTok 智能中枢实时运营台。今日数据已就绪。</p>
                 </div>
                 <div class="flex flex-wrap gap-4">
-                    <button class="flex items-center gap-2 rounded-lg border border-[#c5c6cd] px-4 py-2 text-xs font-bold text-[#0b1c30] transition hover:bg-[#eff4ff]">
+                    <button id="btn-date-range-info" type="button" class="flex items-center gap-2 rounded-lg border border-[#c5c6cd] px-4 py-2 text-xs font-bold text-[#0b1c30] transition hover:bg-[#eff4ff]">
                         <span class="material-symbols-outlined text-[18px]">calendar_month</span>
                         最后 7 天
                     </button>
@@ -1045,7 +1053,7 @@
                         </div>
                     </div>
                     <div id="live-risk-list" class="space-y-4 text-sm leading-6 text-[#45474c]">暂无风险商品。</div>
-                    <button class="mt-auto rounded-lg bg-[#ba1a1a] py-3 text-xs font-bold text-white shadow-lg shadow-[#ba1a1a]/10 transition hover:opacity-90">
+                    <button id="btn-handle-risk-products" type="button" class="mt-auto rounded-lg bg-[#ba1a1a] py-3 text-xs font-bold text-white shadow-lg shadow-[#ba1a1a]/10 transition hover:opacity-90">
                         立即处理风险
                     </button>
                 </div>
@@ -1076,21 +1084,21 @@
                                 <td class="px-8 py-4 font-mono text-[#45474c]">Real-time</td>
                                 <td class="px-8 py-4"><span class="rounded-full bg-[#6ffbbe] px-2 py-1 text-[10px] font-bold text-[#005236]">运行中</span></td>
                                 <td class="px-8 py-4 font-mono">99.1%</td>
-                                <td class="px-8 py-4"><button class="font-bold text-[#4b41e1]">查看详情</button></td>
+                                <td class="px-8 py-4"><button data-monitor-action="sentiment" type="button" class="font-bold text-[#4b41e1]">查看详情</button></td>
                             </tr>
                             <tr class="border-b border-[#c5c6cd]/30 transition hover:bg-[#eff4ff]">
                                 <td class="px-8 py-4 font-bold">竞品动态抓取</td>
                                 <td class="px-8 py-4 font-mono text-[#45474c]">Every 5m</td>
                                 <td class="px-8 py-4"><span class="rounded-full bg-[#6ffbbe] px-2 py-1 text-[10px] font-bold text-[#005236]">运行中</span></td>
                                 <td class="px-8 py-4 font-mono">96.4%</td>
-                                <td class="px-8 py-4"><button class="font-bold text-[#4b41e1]">配置</button></td>
+                                <td class="px-8 py-4"><button data-monitor-action="crawler" type="button" class="font-bold text-[#4b41e1]">配置</button></td>
                             </tr>
                             <tr class="transition hover:bg-[#eff4ff]">
                                 <td class="px-8 py-4 font-bold">流量模型异常</td>
                                 <td class="px-8 py-4 font-mono text-[#45474c]">Daily</td>
                                 <td class="px-8 py-4"><span class="rounded-full bg-[#e2dfff] px-2 py-1 text-[10px] font-bold text-[#3323cc]">待命</span></td>
                                 <td class="px-8 py-4 font-mono">--</td>
-                                <td class="px-8 py-4"><button class="font-bold text-[#4b41e1]">立即执行</button></td>
+                                <td class="px-8 py-4"><button data-monitor-action="patrol" type="button" class="font-bold text-[#4b41e1]">立即执行</button></td>
                             </tr>
                         </tbody>
                     </table>
@@ -1440,11 +1448,11 @@
                     <p class="stitch-body mt-1">基于 AI 诊断的库存优化与爆款潜力分析</p>
                 </div>
                 <div class="flex gap-3">
-                    <button class="flex items-center gap-2 rounded-lg bg-[#091426] px-4 py-2 text-xs font-bold text-white transition hover:opacity-90">
+                    <button id="btn-filter-risk-products" type="button" class="flex items-center gap-2 rounded-lg bg-[#091426] px-4 py-2 text-xs font-bold text-white transition hover:opacity-90">
                         <span class="material-symbols-outlined text-[18px]">filter_list</span>
                         筛选过滤
                     </button>
-                    <button class="flex items-center gap-2 rounded-lg bg-[#4b41e1] px-4 py-2 text-xs font-bold text-white shadow-lg shadow-[#4b41e1]/20 transition hover:opacity-90">
+                    <button id="btn-products-add-shortcut" type="button" class="flex items-center gap-2 rounded-lg bg-[#4b41e1] px-4 py-2 text-xs font-bold text-white shadow-lg shadow-[#4b41e1]/20 transition hover:opacity-90">
                         <span class="material-symbols-outlined text-[18px]">add</span>
                         新增分析商品
                     </button>
@@ -1466,13 +1474,13 @@
                     </table>
                 </div>
                 <div class="flex items-center justify-between border-t border-[#c5c6cd] bg-[#eff4ff] px-4 py-4">
-                    <span class="stitch-body">展示当前诊断商品</span>
+                    <span id="product-table-page-meta" class="stitch-body">展示当前诊断商品</span>
                     <div class="flex gap-1">
-                        <button class="flex h-8 w-8 items-center justify-center rounded border border-[#c5c6cd] bg-white"><span class="material-symbols-outlined text-sm">chevron_left</span></button>
-                        <button class="flex h-8 w-8 items-center justify-center rounded bg-[#4b41e1] text-xs font-bold text-white">1</button>
-                        <button class="flex h-8 w-8 items-center justify-center rounded border border-[#c5c6cd] bg-white text-xs font-bold">2</button>
-                        <button class="flex h-8 w-8 items-center justify-center rounded border border-[#c5c6cd] bg-white text-xs font-bold">3</button>
-                        <button class="flex h-8 w-8 items-center justify-center rounded border border-[#c5c6cd] bg-white"><span class="material-symbols-outlined text-sm">chevron_right</span></button>
+                        <button data-product-page="prev" type="button" class="product-page-control flex h-8 w-8 items-center justify-center rounded border border-[#c5c6cd] bg-white"><span class="material-symbols-outlined text-sm">chevron_left</span></button>
+                        <button data-product-page="1" type="button" class="product-page-control flex h-8 w-8 items-center justify-center rounded bg-[#4b41e1] text-xs font-bold text-white">1</button>
+                        <button data-product-page="2" type="button" class="product-page-control flex h-8 w-8 items-center justify-center rounded border border-[#c5c6cd] bg-white text-xs font-bold">2</button>
+                        <button data-product-page="3" type="button" class="product-page-control flex h-8 w-8 items-center justify-center rounded border border-[#c5c6cd] bg-white text-xs font-bold">3</button>
+                        <button data-product-page="next" type="button" class="product-page-control flex h-8 w-8 items-center justify-center rounded border border-[#c5c6cd] bg-white"><span class="material-symbols-outlined text-sm">chevron_right</span></button>
                     </div>
                 </div>
             </div>
@@ -1481,9 +1489,9 @@
                 <div class="stitch-card col-span-12 p-6 lg:col-span-8">
                     <div class="mb-6 flex items-start justify-between">
                         <h3 class="stitch-title">供货趋势分析</h3>
-                        <select class="rounded-lg border border-[#c5c6cd] bg-[#eff4ff] p-2 text-sm outline-none">
-                            <option>? 30 ?</option>
-                            <option>? 90 ?</option>
+                        <select id="supply-trend-window" class="rounded-lg border border-[#c5c6cd] bg-[#eff4ff] p-2 text-sm outline-none">
+                            <option value="30">近 30 天</option>
+                            <option value="90">近 90 天</option>
                         </select>
                     </div>
                     <div class="relative flex h-64 items-end gap-2">
@@ -1706,9 +1714,9 @@
 
                     <div id="auth-admin-panel" class="rounded-xl border border-[#c5c6cd] bg-white p-5">
                         <div class="mb-4 flex border-b border-[#c5c6cd]">
-                            <button class="border-b-2 border-[#4b41e1] px-4 py-3 text-xs font-bold text-[#4b41e1]">用户管理</button>
-                            <button class="px-4 py-3 text-xs font-bold text-[#45474c]">邀请码</button>
-                            <button class="px-4 py-3 text-xs font-bold text-[#45474c]">Webhook 设置</button>
+                            <button type="button" data-admin-tab="users" class="border-b-2 border-[#4b41e1] px-4 py-3 text-xs font-bold text-[#4b41e1]">用户管理</button>
+                            <button type="button" data-admin-tab="invites" class="px-4 py-3 text-xs font-bold text-[#45474c]">邀请码</button>
+                            <button type="button" data-admin-tab="webhook" class="px-4 py-3 text-xs font-bold text-[#45474c]">Webhook 设置</button>
                         </div>
                         <div class="grid grid-cols-1 gap-5 xl:grid-cols-[1fr_360px]">
                             <div>
@@ -2003,6 +2011,9 @@
         let latestExecutiveReportPayload = null;
         let backendRenderDirty = true;
         let marketChartInstance = null;
+        let productRiskFilterEnabled = false;
+        let productTablePage = 1;
+        const PRODUCT_TABLE_PAGE_SIZE = 8;
 
         const OPERATOR_TOKEN_STORAGE_KEY = 'tk_ai_operator_token';
         const OPERATOR_USERNAME_STORAGE_KEY = 'tk_ai_operator_username';
@@ -2209,6 +2220,14 @@
         const aiExecutiveAction = document.getElementById('ai-executive-action');
         const aiExecutiveReportMeta = document.getElementById('ai-executive-report-meta');
         const btnRefreshExecutiveReport = document.getElementById('btn-refresh-executive-report');
+        const btnDateRangeInfo = document.getElementById('btn-date-range-info');
+        const btnHandleRiskProducts = document.getElementById('btn-handle-risk-products');
+        const btnFilterRiskProducts = document.getElementById('btn-filter-risk-products');
+        const btnProductsAddShortcut = document.getElementById('btn-products-add-shortcut');
+        const productTablePageMeta = document.getElementById('product-table-page-meta');
+        const supplyTrendWindow = document.getElementById('supply-trend-window');
+        const sidebarSystemSettings = document.getElementById('sidebar-system-settings');
+        const sidebarHelpSupport = document.getElementById('sidebar-help-support');
         const marketGapEmpty = document.getElementById('market-gap-empty');
         const marketGapContent = document.getElementById('market-gap-content');
         const marketGapPrimeProduct = document.getElementById('market-gap-prime-product');
@@ -4163,6 +4182,13 @@
             backendRenderDirty = false;
         }
 
+        function activateSection(targetId) {
+            const targetNav = Array.from(navBtns).find(btn => btn.getAttribute('data-target') === targetId);
+            if (targetNav) {
+                targetNav.click();
+            }
+        }
+
         const navBtns = document.querySelectorAll('.nav-btn');
         const sections = document.querySelectorAll('.page-section');
         navBtns.forEach(btn => {
@@ -4197,6 +4223,63 @@
                 setTimeout(() => document.getElementById('pipeline-url')?.focus(), 80);
             });
         }
+
+        if (sidebarSystemSettings) {
+            sidebarSystemSettings.addEventListener('click', () => {
+                activateSection('section-details');
+                setTimeout(() => {
+                    document.getElementById('auth-admin-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 120);
+                showToast('已打开后台明细里的系统设置。', 'info');
+            });
+        }
+
+        if (sidebarHelpSupport) {
+            sidebarHelpSupport.addEventListener('click', () => {
+                activateSection('section-details');
+                setTimeout(() => {
+                    document.getElementById('platform-session-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 120);
+                showToast('帮助入口已定位到平台采集与运维区。', 'info');
+            });
+        }
+
+        if (btnDateRangeInfo) {
+            btnDateRangeInfo.addEventListener('click', () => {
+                showToast('当前大盘按最近 7 天诊断数据聚合，自动巡检会持续更新。', 'info');
+            });
+        }
+
+        if (btnHandleRiskProducts) {
+            btnHandleRiskProducts.addEventListener('click', () => {
+                productRiskFilterEnabled = true;
+                productTablePage = 1;
+                activateSection('section-products');
+                renderProductTable();
+                showToast('已切到选品建议，并仅展示高风险商品。', 'info');
+            });
+        }
+
+        document.querySelectorAll('[data-monitor-action]').forEach(button => {
+            button.addEventListener('click', () => {
+                const action = button.getAttribute('data-monitor-action');
+                if (action === 'sentiment') {
+                    activateSection('section-sentiment');
+                    setTimeout(() => document.getElementById('product-selector')?.focus(), 80);
+                    showToast('已进入 AI 诊断工作台。', 'info');
+                    return;
+                }
+                if (action === 'crawler') {
+                    activateSection('section-details');
+                    setTimeout(() => {
+                        document.getElementById('platform-session-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }, 120);
+                    showToast('已打开平台采集配置。', 'info');
+                    return;
+                }
+                runRadarPatrol();
+            });
+        });
 
         function ensureMarketTrendChart() {
             if (marketChartInstance) return;
@@ -4445,10 +4528,38 @@
                     </td>
                 `;
                 tableBody.appendChild(tr);
+                if (productTablePageMeta) {
+                    productTablePageMeta.innerText = '暂无诊断商品';
+                }
+                syncProductPaginationControls(1);
                 return;
             }
 
-            Object.keys(activeData).forEach(key => {
+            const allKeys = Object.keys(activeData);
+            const visibleKeys = productRiskFilterEnabled
+                ? allKeys.filter(key => isRadarCritical(activeData[key]))
+                : allKeys;
+            const totalPages = Math.max(1, Math.ceil(visibleKeys.length / PRODUCT_TABLE_PAGE_SIZE));
+            productTablePage = Math.min(Math.max(productTablePage, 1), totalPages);
+            const pageStart = (productTablePage - 1) * PRODUCT_TABLE_PAGE_SIZE;
+            const pageKeys = visibleKeys.slice(pageStart, pageStart + PRODUCT_TABLE_PAGE_SIZE);
+
+            if (pageKeys.length === 0) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td colspan="4" class="px-6 py-10 text-center text-sm text-slate-500">
+                        当前没有高风险商品，已恢复为健康监控状态。
+                    </td>
+                `;
+                tableBody.appendChild(tr);
+                if (productTablePageMeta) {
+                    productTablePageMeta.innerText = '筛选结果为空';
+                }
+                syncProductPaginationControls(totalPages);
+                return;
+            }
+
+            pageKeys.forEach(key => {
                 const item = activeData[key];
                 const ready = hasDiagnosticData(item);
                 const radarCritical = isRadarCritical(item);
@@ -4519,6 +4630,30 @@
                     </td>
                 `;
                 tableBody.appendChild(tr);
+            });
+            if (productTablePageMeta) {
+                const rangeStart = pageStart + 1;
+                const rangeEnd = pageStart + pageKeys.length;
+                productTablePageMeta.innerText = `${productRiskFilterEnabled ? '仅看高风险' : '展示诊断商品'} ${rangeStart}-${rangeEnd} / ${visibleKeys.length}`;
+            }
+            syncProductPaginationControls(totalPages);
+        }
+
+        function syncProductPaginationControls(totalPages) {
+            document.querySelectorAll('.product-page-control').forEach(button => {
+                const rawPage = button.getAttribute('data-product-page');
+                const numericPage = Number(rawPage);
+                const isNumber = Number.isFinite(numericPage);
+                const isActive = isNumber && numericPage === productTablePage;
+                const isDisabled = (rawPage === 'prev' && productTablePage <= 1)
+                    || (rawPage === 'next' && productTablePage >= totalPages)
+                    || (isNumber && numericPage > totalPages);
+                button.disabled = isDisabled;
+                button.classList.toggle('disabled-action', isDisabled);
+                button.classList.toggle('bg-[#4b41e1]', isActive);
+                button.classList.toggle('text-white', isActive);
+                button.classList.toggle('bg-white', !isActive);
+                button.classList.toggle('text-[#091426]', !isActive);
             });
         }
 
@@ -4774,6 +4909,58 @@
 
         productSelector.addEventListener('change', (e) => {
             renderDiagnosticCharts(e.target.value);
+        });
+
+        if (btnFilterRiskProducts) {
+            btnFilterRiskProducts.addEventListener('click', () => {
+                productRiskFilterEnabled = !productRiskFilterEnabled;
+                productTablePage = 1;
+                btnFilterRiskProducts.classList.toggle('bg-[#ba1a1a]', productRiskFilterEnabled);
+                btnFilterRiskProducts.classList.toggle('bg-[#091426]', !productRiskFilterEnabled);
+                renderProductTable();
+                showToast(productRiskFilterEnabled ? '已筛选高风险商品。' : '已恢复全部商品列表。', 'info');
+            });
+        }
+
+        document.querySelectorAll('.product-page-control').forEach(button => {
+            button.addEventListener('click', () => {
+                const rawPage = button.getAttribute('data-product-page');
+                const totalProducts = productRiskFilterEnabled
+                    ? Object.keys(activeData).filter(key => isRadarCritical(activeData[key])).length
+                    : Object.keys(activeData).length;
+                const totalPages = Math.max(1, Math.ceil(totalProducts / PRODUCT_TABLE_PAGE_SIZE));
+                if (rawPage === 'prev') {
+                    productTablePage = Math.max(1, productTablePage - 1);
+                } else if (rawPage === 'next') {
+                    productTablePage = Math.min(totalPages, productTablePage + 1);
+                } else {
+                    productTablePage = Math.min(totalPages, Math.max(1, Number(rawPage) || 1));
+                }
+                renderProductTable();
+            });
+        });
+
+        if (supplyTrendWindow) {
+            supplyTrendWindow.addEventListener('change', () => {
+                showToast(`供货趋势已切换为近 ${supplyTrendWindow.value} 天视图。`, 'info');
+            });
+        }
+
+        document.querySelectorAll('[data-admin-tab]').forEach(button => {
+            button.addEventListener('click', () => {
+                const tab = button.getAttribute('data-admin-tab');
+                if (tab === 'users') {
+                    document.getElementById('admin-users-list')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    showToast('已定位到用户管理列表。', 'info');
+                    return;
+                }
+                if (tab === 'invites') {
+                    document.getElementById('admin-invites-list')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    showToast('已定位到邀请码管理。', 'info');
+                    return;
+                }
+                showToast('Webhook 设置尚未开放，当前可先使用雷达告警通知。', 'info');
+            });
         });
 
         factoryCardList.addEventListener('click', (event) => {
@@ -5603,6 +5790,9 @@
         }
 
         btnShowModal.addEventListener('click', openAddProductModal);
+        if (btnProductsAddShortcut) {
+            btnProductsAddShortcut.addEventListener('click', openAddProductModal);
+        }
 
         const hideAddModal = () => {
             addModal.classList.add('hidden');
@@ -5754,6 +5944,7 @@
                 if (!nextKey || !activeData[nextKey]) {
                     nextKey = Object.keys(activeData)[0] || '';
                 }
+                productTablePage = 1;
                 renderSelectorOptions(nextKey);
                 if (nextKey) {
                     productSelector.value = nextKey;
