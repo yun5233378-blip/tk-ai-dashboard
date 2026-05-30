@@ -1,6 +1,6 @@
 # TK-AI 跨境电商舆情诊断与选品决策中枢
 
-![TK-AI Dashboard Preview](docs/assets/dashboard-preview.png)
+![TK-AI Cross-Border E-Commerce Intelligence](docs/assets/tk-ai-hero.png)
 
 > 面向 TikTok Shop / 跨境电商卖家的 AI 舆情分析与供应链优化系统。项目将商品评论抓取、LLM 情感分类、风险雷达、供应商改良建议和经营 Brief 生成串成一个可部署的 SaaS 工作台，帮助运营团队从非结构化评论中快速定位质量缺陷和选品机会。
 
@@ -9,6 +9,12 @@
 [![Redis](https://img.shields.io/badge/Redis-Cache%20%2F%20State-DC382D?logo=redis&logoColor=white)](https://redis.io/)
 [![LLM](https://img.shields.io/badge/LLM-OpenAI%20%2F%20OpenRouter-111827)](https://platform.openai.com/)
 [![Docker](https://img.shields.io/badge/Docker-Cloud%20Deploy-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
+
+## 产品界面
+
+> 真实运行中的 Web 指挥中心：前台聚合健康分、风险商品、证据可信度和 AI 综合经营报告；复杂算法指标收纳到后台明细，降低运营人员理解成本。
+
+![TK-AI Dashboard Preview](docs/assets/dashboard-preview.png)
 
 ## 用户与痛点
 
