@@ -171,10 +171,6 @@ docker compose up -d --build
 Authorization: Bearer <session-token>
 ```
 
-## 适合写进简历的表述
-
-> 独立设计并实现一个面向 TikTok Shop 跨境卖家的 AI 舆情诊断与选品决策系统，基于 FastAPI + Redis + Playwright + LLM 构建评论抓取、情感分类、风险雷达、SPS 修复预测和供应链 Brief 生成链路；前端采用 Tailwind + Chart.js 实现 SaaS 化经营看板，并补齐账号密码登录、邀请码注册、Token 鉴权、管理员审计和 Docker 云端部署能力。
-
 ## 免责声明
 
 本项目用于跨境电商评论分析、运营复盘和供应链改良研究。采集第三方平台数据时应遵守平台服务条款、隐私政策和当地法律法规。
